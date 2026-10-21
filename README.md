@@ -228,6 +228,26 @@ MySQL database. Set the `.env` values there, run `npm run db:setup` and
 `npm run create-admin`, start it with `npm start`, and put it behind HTTPS
 (then set `COOKIE_SECURE=true`).
 
+## Mobile app
+
+The Android app for residents and maintenance crews lives in `mobile/`. It's
+built with [Expo](https://expo.dev/) (React Native) and uses the same server,
+accounts, and live updates as the website. Administrators keep using the
+website.
+
+```powershell
+cd mobile
+npm install
+npx expo start
+```
+
+Scan the QR code with **Expo Go** on an Android phone on the same Wi-Fi, or
+press `w` to open it in a browser. The app follows the brand in
+`assets/css/core.css` (tokens in `mobile/src/theme/tokens.ts`), and its icons
+and splash screen are made from the Q mark. Headlines use the static
+Archivo Expanded ExtraBold file in `mobile/assets/fonts/` (SIL Open Font
+License).
+
 ## Brand and design
 
 The design follows `ResQRoad Brandsheet.pdf`:
@@ -276,6 +296,7 @@ assets/js/shell.js            Theme, sidebar, popovers, Ctrl+K palette, notifica
 assets/js/charts.js           SVG charts (trend, columns, donut, bars, sparklines)
 assets/js/*.js                One script per page (admin, maintenance, citizen, …)
 storage/photos/               Uploaded photos (created automatically; not committed)
+mobile/                       The Android app (Expo): screens in mobile/src/app/
 ```
 
 ## Acknowledgements
