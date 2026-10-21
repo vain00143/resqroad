@@ -54,8 +54,8 @@
             <button class="nav-item" type="button" data-crew-view="jobs" data-tip="My assigned jobs">
               <svg data-icon="wrench"></svg><span class="nav-label">My assigned jobs</span><span class="nav-badge is-hot" data-nav-count="jobs"></span>
             </button>
-            <button class="nav-item" type="button" data-crew-view="map" data-tip="Locations">
-              <svg data-icon="map-pin"></svg><span class="nav-label">Locations</span>
+            <button class="nav-item" type="button" data-crew-view="map" data-tip="Repair sites">
+              <svg data-icon="map"></svg><span class="nav-label">Repair sites</span>
             </button>
           </nav>
           <p class="sidebar-section">More</p>
@@ -103,7 +103,7 @@
                 <p id="overview-summary">Manage your assigned jobs and submit completed repairs.</p>
               </div>
               <div class="welcome-actions">
-                <button class="btn btn-light" type="button" data-switch-view="map"><svg data-icon="map-pin"></svg>Job locations</button>
+                <button class="btn btn-light" type="button" data-switch-view="map"><svg data-icon="map"></svg>Repair sites</button>
                 <button class="btn btn-primary" type="button" data-switch-view="jobs"><svg data-icon="wrench"></svg>My jobs<span class="btn-count" data-count="active">0</span></button>
               </div>
             </div>
@@ -114,7 +114,7 @@
               <section class="card" aria-labelledby="next-title">
                 <div class="card-header">
                   <div>
-                    <h2 class="card-title" id="next-title">Up next</h2>
+                    <h2 class="card-title" id="next-title"><svg data-icon="zap"></svg>Up next</h2>
                     <p class="card-subtitle">Your highest-priority job right now.</p>
                   </div>
                 </div>
@@ -123,7 +123,7 @@
               <section class="card" aria-labelledby="crew-activity-title">
                 <div class="card-header">
                   <div>
-                    <h2 class="card-title" id="crew-activity-title">Recent updates</h2>
+                    <h2 class="card-title" id="crew-activity-title"><svg data-icon="activity"></svg>Recent updates</h2>
                     <p class="card-subtitle">Assignments and reviews on your jobs.</p>
                   </div>
                 </div>
@@ -134,13 +134,13 @@
             <section class="card" style="margin-top: 1.25rem" aria-labelledby="overview-map-title">
               <div class="card-header">
                 <div>
-                  <h2 class="card-title" id="overview-map-title">My assigned locations</h2>
+                  <h2 class="card-title" id="overview-map-title"><svg data-icon="map"></svg>My repair sites</h2>
                   <p class="card-subtitle">Select a marker to jump to that repair assignment.</p>
                 </div>
                 <button class="link-button" type="button" data-switch-view="map">Full map<svg data-icon="arrow-right" class="icon-sm"></svg></button>
               </div>
               <div class="card-body">
-                <div class="map" id="maintenance-map" style="height: 20rem"></div>
+                <div class="map overview-map" id="maintenance-map"></div>
                 <div id="overview-legend"></div>
               </div>
             </section>
@@ -176,19 +176,27 @@
             <div class="page-head">
               <div>
                 <p class="eyebrow">Field work</p>
-                <h1 class="page-title" id="locations-title">Job locations</h1>
+                <h1 class="page-title" id="locations-title">Repair sites</h1>
                 <p class="page-desc">Every repair assigned to you. Select a pin, then open the job.</p>
               </div>
             </div>
             <div class="map-layout">
-              <div class="map-main">
-                <div class="map" id="crew-map"></div>
-                <div id="crew-map-legend"></div>
-              </div>
+              <section class="card map-main" aria-labelledby="crew-map-title">
+                <div class="card-header">
+                  <div>
+                    <h2 class="card-title" id="crew-map-title"><svg data-icon="map"></svg>Repair site map</h2>
+                    <p class="card-subtitle">Pins show each repair assigned to you.</p>
+                  </div>
+                </div>
+                <div class="card-body">
+                  <div class="map" id="crew-map"></div>
+                  <div id="crew-map-legend"></div>
+                </div>
+              </section>
               <aside class="card map-side" aria-labelledby="crew-map-list-title">
                 <div class="card-header">
                   <div>
-                    <h2 class="card-title" id="crew-map-list-title">My jobs</h2>
+                    <h2 class="card-title" id="crew-map-list-title"><svg data-icon="list"></svg>My jobs</h2>
                     <p class="card-subtitle" id="crew-map-count"></p>
                   </div>
                 </div>

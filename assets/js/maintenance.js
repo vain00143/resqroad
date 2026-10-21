@@ -1,5 +1,5 @@
 /* Maintenance crew workspace: overview, assigned jobs (start a repair, submit
-   notes with before-and-after photos), and a map of job locations. Repair
+   notes with before-and-after photos), and a map of repair sites. Repair
    drafts survive re-renders, so typing is never lost when data refreshes. */
 (async function () {
   "use strict";
@@ -26,7 +26,7 @@
   const viewDetails = {
     overview: { crumb: "Overview", title: "Road maintenance workspace", icon: "dashboard" },
     jobs: { crumb: "My assigned jobs", title: "My assigned jobs", icon: "wrench" },
-    map: { crumb: "Locations", title: "Job locations", icon: "map-pin" },
+    map: { crumb: "Repair sites", title: "Repair sites", icon: "map" },
   };
 
   const $ = function (selector) {
@@ -201,7 +201,6 @@
         esc(next.id) +
         "</span>" +
         ui.severityBadge(next.severity) +
-        ui.statusPill(next.status) +
         "</div><h3>" +
         esc(next.title) +
         '</h3><p class="job-meta"><span>' +
@@ -315,30 +314,6 @@
     );
   }
 
-  function repairPhotoBlock(list) {
-    const withData = ui.photosWithData(list);
-    if (withData.length) {
-      return (
-        '<div class="gallery" data-gallery-group>' +
-        withData
-          .map(function (photo, index) {
-            return (
-              '<button class="gallery-item" type="button" data-gallery-index="' +
-              index +
-              '" aria-label="View ' +
-              esc(photo.name) +
-              '">' +
-              ui.photoImg(photo) +
-              "</button>"
-            );
-          })
-          .join("") +
-        "</div>"
-      );
-    }
-    return ui.fileChips(list);
-  }
-
   function renderJobCard(report, index) {
     const photos = ui.reportPhotos(report);
     const assigned = lastEvent(report, "assigned");
@@ -388,9 +363,9 @@
         '</span></div><p class="detail-description">' +
         esc(report.repair.notes) +
         '</p><div class="before-after"><div><h4>Before</h4>' +
-        repairPhotoBlock(report.repair.beforePhotos) +
+        ui.photoGallery(ui.repairPhotos(report, "before"), "Before repair photos") +
         "</div><div><h4>After</h4>" +
-        repairPhotoBlock(report.repair.afterPhotos) +
+        ui.photoGallery(ui.repairPhotos(report, "after"), "After repair photos") +
         "</div></div>" +
         (report.status === "repair_submitted"
           ? '<p class="field-hint" style="margin-top: 0.75rem">This repair is waiting for an administrator to verify it.</p>'
@@ -572,9 +547,7 @@
                 esc(report.title) +
                 "</strong><small><span>" +
                 esc(report.id + " · " + report.road) +
-                "</span>" +
-                ui.statusPill(report.status) +
-                "</small></button></li>"
+                "</span></small></button></li>"
               );
             })
             .join("")

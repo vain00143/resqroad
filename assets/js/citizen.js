@@ -14,6 +14,7 @@
   }
 
   const maxPhotos = 5;
+  const recentKey = "resqroad-recent-tracks";
   const bulacan = { south: 14.5, north: 15.2, west: 120.3, east: 121.2 };
   const $ = function (selector) {
     return document.querySelector(selector);
@@ -60,6 +61,8 @@
     $$("[data-current-email]").forEach(function (element) {
       element.textContent = citizen.email;
     });
+    const hour = new Date().getHours();
+    $("[data-greeting]").textContent = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
     $("[data-first-name]").textContent = citizen.name.split(" ")[0];
     $("[data-today]").textContent = new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
     const avatar = $("[data-user-avatar]");
@@ -67,41 +70,78 @@
     avatar.dataset.tone = "2";
 
     const reports = myReports();
-    const open = reports.filter(function (report) {
+    const count = function (test) {
+      return reports.filter(test).length;
+    };
+    const open = count(function (report) {
       return store.openStatuses.includes(report.status);
-    }).length;
-    const fixed = reports.filter(function (report) {
+    });
+    const fixed = count(function (report) {
       return report.status === "resolved";
-    }).length;
+    });
+    const closed = count(function (report) {
+      return ["rejected", "duplicate"].includes(report.status);
+    });
     $("#citizen-stats").innerHTML = [
-      { value: reports.length, label: "Reports filed" },
-      { value: open, label: "In progress" },
-      { value: fixed, label: "Fixed" },
+      { label: "Reports filed", value: reports.length, icon: "clipboard-list", tone: "var(--accent)", foot: "Every report you've sent", filter: "all" },
+      { label: "In progress", value: open, icon: "construction", tone: "var(--info)", foot: "Being reviewed or repaired", filter: "open" },
+      { label: "Fixed", value: fixed, icon: "check-circle", tone: "var(--success)", foot: "Repairs verified by the office", filter: "resolved" },
+      { label: "Closed", value: closed, icon: "ban", tone: "var(--st-duplicate)", foot: "Rejected or duplicate reports", filter: "closed" },
     ]
       .map(function (item) {
-        return '<div class="hero-mini-stat"><strong>' + item.value + "</strong><span>" + esc(item.label) + "</span></div>";
+        return (
+          '<button class="card kpi" type="button" data-kpi-filter="' +
+          item.filter +
+          '"><span class="kpi-top"><span class="kpi-label">' +
+          esc(item.label) +
+          '</span><span class="kpi-icon" style="--tone:' +
+          item.tone +
+          '">' +
+          icon(item.icon) +
+          '</span></span><span class="kpi-value">' +
+          item.value +
+          '</span><span class="kpi-foot">' +
+          esc(item.foot) +
+          "</span></button>"
+        );
       })
       .join("");
-    $('[data-count="mine"]').textContent = reports.length;
+    $$('[data-count="mine"]').forEach(function (element) {
+      element.textContent = reports.length || (element.classList.contains("nav-badge") ? "" : "0");
+    });
   }
 
-  /* ---------- Tabs ---------- */
+  /* ---------- Views ---------- */
+
+  const viewDetails = {
+    report: { crumb: "Report a problem", title: "Report a problem" },
+    reports: { crumb: "My reports", title: "My reports" },
+  };
 
   function setTab(name) {
     const tab = name === "reports" ? "reports" : "report";
-    $$("[data-portal-tab]").forEach(function (button) {
-      button.setAttribute("aria-selected", String(button.dataset.portalTab === tab));
-    });
-    $$("[data-portal-panel]").forEach(function (panel) {
-      panel.hidden = panel.dataset.portalPanel !== tab;
-    });
-    $$(".site-nav [data-portal-link]").forEach(function (link) {
-      if (link.dataset.portalLink === tab) {
+    $$(".nav-item[data-portal-tab]").forEach(function (link) {
+      const active = link.dataset.portalTab === tab;
+      link.classList.toggle("is-active", active);
+      if (active) {
         link.setAttribute("aria-current", "page");
       } else {
         link.removeAttribute("aria-current");
       }
     });
+    $$("[data-portal-panel]").forEach(function (panel) {
+      const active = panel.dataset.portalPanel === tab;
+      if (active && panel.hidden) {
+        panel.hidden = false;
+        panel.style.animation = "none";
+        panel.getBoundingClientRect();
+        panel.style.animation = "";
+      } else if (!active) {
+        panel.hidden = true;
+      }
+    });
+    $("#crumb-current").textContent = viewDetails[tab].crumb;
+    document.title = viewDetails[tab].title + " | ResQRoad";
     if (window.location.hash !== "#" + tab) {
       history.replaceState(null, "", "#" + tab);
     }
@@ -184,6 +224,7 @@
     map.setView(ui.mapCenter, 12);
     const L = window.L;
     // Existing open reports, so residents can see what's already been reported.
+    // They're grey so they don't read as a severity color.
     state.reports
       .filter(function (report) {
         return store.openStatuses.includes(report.status) && report.coordinates;
@@ -193,7 +234,7 @@
           radius: 6,
           color: "#fff",
           weight: 2,
-          fillColor: "#cf5c36",
+          fillColor: "#7c7c7c",
           fillOpacity: 0.9,
         })
           .bindTooltip("Already reported: " + report.title, { direction: "top", offset: [0, -6] })
@@ -441,11 +482,16 @@
         const latest = (report.history || []).filter(function (entry) {
           return entry.status !== "note";
         }).slice(-1)[0];
+        // Once a repair is verified, residents see the crew's notes and photos.
         const repairNotes =
-          report.status === "resolved" && report.repair && report.repair.notes
-            ? '<div class="callout"><p class="section-label">What the crew did</p><p class="detail-description">' +
-              esc(report.repair.notes) +
-              "</p></div>"
+          report.status === "resolved" && report.repair
+            ? '<div class="callout"><p class="section-label">What the crew did</p>' +
+              (report.repair.notes ? '<p class="detail-description">' + esc(report.repair.notes) + "</p>" : "") +
+              '<div class="before-after"><div><h4>Before</h4>' +
+              ui.photoGallery(ui.repairPhotos(report, "before"), "Before repair photos") +
+              "</div><div><h4>After</h4>" +
+              ui.photoGallery(ui.repairPhotos(report, "after"), "After repair photos") +
+              "</div></div></div>"
             : "";
         return (
           '<article class="card my-report" style="--i:' +
@@ -484,6 +530,42 @@
       .join("");
   }
 
+  // Quick picks under the search, like the tracker's "Recent" chips: reports
+  // the resident looked up on the tracker first, then their newest reports.
+  function readTracked() {
+    try {
+      const list = JSON.parse(localStorage.getItem(recentKey) || "[]");
+      return Array.isArray(list) ? list : [];
+    } catch (error) {
+      return [];
+    }
+  }
+
+  function renderRecent() {
+    const mine = myReports().map(function (report) {
+      return report.id;
+    });
+    const picks = Array.from(
+      new Set(
+        readTracked()
+          .filter(function (id) {
+            return mine.includes(id);
+          })
+          .concat(mine),
+      ),
+    ).slice(0, 4);
+    const query = $("#my-search").value.trim().toUpperCase();
+    const box = $("#my-recent");
+    box.hidden = picks.length === 0;
+    box.innerHTML =
+      "<span>Recent:</span>" +
+      picks
+        .map(function (id) {
+          return '<button type="button" data-recent="' + esc(id) + '" aria-pressed="' + String(query === id) + '">' + esc(id) + "</button>";
+        })
+        .join("");
+  }
+
   function rememberStatuses() {
     knownStatuses = new Map(
       myReports().map(function (report) {
@@ -496,20 +578,16 @@
     loadState();
     renderHeader();
     renderMyReports();
+    renderRecent();
   }
 
   /* ---------- Events ---------- */
 
-  $$("[data-portal-tab]").forEach(function (button) {
-    button.addEventListener("click", function () {
-      setTab(button.dataset.portalTab);
-    });
-  });
-  $$("[data-portal-link]").forEach(function (link) {
+  $$("[data-portal-tab]").forEach(function (link) {
     link.addEventListener("click", function (event) {
       event.preventDefault();
-      setTab(link.dataset.portalLink);
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      setTab(link.dataset.portalTab);
+      window.scrollTo({ top: 0, behavior: "instant" });
     });
   });
   window.addEventListener("hashchange", function () {
@@ -666,17 +744,51 @@
     }
   });
 
-  $("#my-search").addEventListener("input", ui.debounce(renderMyReports, 120));
-  $("#my-filter").addEventListener("click", function (event) {
-    const chip = event.target.closest("[data-filter]");
+  function setFilter(filter) {
+    myFilter = filter;
+    $$("#my-filter [data-filter]").forEach(function (button) {
+      button.setAttribute("aria-pressed", String(button.dataset.filter === filter));
+    });
+    renderMyReports();
+  }
+
+  $("#my-search").addEventListener(
+    "input",
+    ui.debounce(function () {
+      renderMyReports();
+      renderRecent();
+    }, 120),
+  );
+  $("#my-recent").addEventListener("click", function (event) {
+    const chip = event.target.closest("[data-recent]");
     if (!chip) {
       return;
     }
-    myFilter = chip.dataset.filter;
-    $$("#my-filter [data-filter]").forEach(function (button) {
-      button.setAttribute("aria-pressed", String(button === chip));
-    });
+    // A second click on the active chip clears the search again.
+    $("#my-search").value = chip.getAttribute("aria-pressed") === "true" ? "" : chip.dataset.recent;
     renderMyReports();
+    renderRecent();
+  });
+  $("#my-filter").addEventListener("click", function (event) {
+    const chip = event.target.closest("[data-filter]");
+    if (chip) {
+      setFilter(chip.dataset.filter);
+    }
+  });
+  $("#citizen-stats").addEventListener("click", function (event) {
+    const tile = event.target.closest("[data-kpi-filter]");
+    if (tile) {
+      setFilter(tile.dataset.kpiFilter);
+    }
+  });
+  $("#my-reports").addEventListener("click", function (event) {
+    const photo = event.target.closest("[data-gallery-index]");
+    if (photo) {
+      const images = Array.from(photo.closest("[data-gallery-group]").querySelectorAll("img")).map(function (image) {
+        return { src: image.currentSrc || image.src, alt: image.alt };
+      });
+      ui.openLightbox(images, Number(photo.dataset.galleryIndex), photo);
+    }
   });
 
   // Staff updates from other tabs: refresh and say what changed.

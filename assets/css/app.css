@@ -37,18 +37,6 @@
   color: #cfc6c0;
 }
 
-/* A faint dashed lane line runs down the sidebar edge. */
-.sidebar::after {
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: 1px;
-  background: repeating-linear-gradient(to bottom, rgb(239 200 139 / 18%) 0 14px, transparent 14px 28px);
-  content: "";
-  pointer-events: none;
-}
-
 .sidebar-head {
   min-height: var(--topbar-h);
   padding: 0 0.85rem 0 1.25rem;
@@ -66,12 +54,12 @@
 }
 
 .sidebar-logo-full {
-  width: 9.75rem;
+  width: 11.5rem;
   height: auto;
 }
 
 .sidebar-logo-mark {
-  width: 1.9rem;
+  width: 2.2rem;
   height: auto;
   display: none;
 }
@@ -576,6 +564,11 @@
   margin-top: 1.25rem;
 }
 
+/* A toolbar under a row of tiles starts a new section. */
+.grid + .toolbar {
+  margin-top: 1.5rem;
+}
+
 .grid-kpi {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
@@ -974,6 +967,31 @@ button.crew-row:hover {
   z-index: 1;
 }
 
+/* Marks a card whose preview is the crew's after-repair photo. */
+.rc-tag {
+  position: absolute;
+  top: 0.65rem;
+  right: 0.65rem;
+  z-index: 1;
+  min-height: 1.5rem;
+  padding: 0.12rem 0.55rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border-radius: var(--radius-full);
+  background: rgb(20 17 16 / 72%);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 600;
+  backdrop-filter: blur(4px);
+}
+
+.rc-tag .icon {
+  width: 0.8rem;
+  height: 0.8rem;
+  color: inherit;
+}
+
 .rc-age {
   position: absolute;
   right: 0.65rem;
@@ -1064,7 +1082,7 @@ button.crew-row:hover {
   width: 0.9rem;
   height: 0.9rem;
   margin-top: 0.15rem;
-  color: var(--accent);
+  color: var(--icon);
 }
 
 .rc-loc span {
@@ -1121,7 +1139,7 @@ button.crew-row:hover {
 .rc-crew .icon {
   width: 0.9rem;
   height: 0.9rem;
-  color: var(--accent);
+  color: var(--icon);
 }
 
 .rc-crew span {
@@ -1190,11 +1208,12 @@ button.crew-row:hover {
 }
 
 .detail-block-head h3 .icon {
-  color: var(--accent);
+  color: var(--icon);
 }
 
 .journey-card {
   padding: 1rem 0.75rem 0.6rem;
+  overflow-x: auto;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   background: var(--surface-2);
@@ -1266,12 +1285,12 @@ button.crew-row:hover {
 
 .detail-map {
   height: 100%;
-  min-height: 12rem;
+  min-height: 14rem;
 }
 
 .detail-map .map {
   height: 100%;
-  min-height: 12rem;
+  min-height: 14rem;
 }
 
 .detail-description {
@@ -1409,16 +1428,28 @@ button.crew-row:hover {
   flex-direction: column;
 }
 
-.map-main .map {
+.map-main .card-body {
   flex: 1;
-  height: clamp(26rem, calc(100vh - 19rem), 46rem);
+  display: flex;
+  flex-direction: column;
 }
 
+.map-main .map {
+  flex: 1 0 auto;
+  height: clamp(32rem, calc(100vh - 14rem), 56rem);
+}
+
+.overview-map {
+  height: 24rem;
+}
+
+/* The list matches the map card's height and scrolls; size containment keeps
+   a long list from stretching the row. */
 .map-side {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  max-height: clamp(26rem, calc(100vh - 19rem), 46rem);
+  contain: size;
 }
 
 .map-side .card-body {
@@ -1565,7 +1596,7 @@ button.crew-row:hover {
 
 .form-note .icon {
   margin-top: 0.1rem;
-  color: var(--accent);
+  color: var(--icon);
 }
 
 .form-note code {
@@ -1698,7 +1729,7 @@ button.crew-row:hover {
 }
 
 .repair-form h4 .icon {
-  color: var(--accent);
+  color: var(--icon);
 }
 
 .photo-fields {
@@ -1963,6 +1994,7 @@ button.crew-row:hover {
 
   .map-side {
     max-height: 24rem;
+    contain: none;
   }
 }
 

@@ -18,7 +18,7 @@
   const confirmedStatuses = ["verified", "assigned", "in_progress", "repair_submitted", "resolved"];
   const reviewStatuses = ["submitted", "under_review"];
   const severityRank = { High: 3, Medium: 2, Low: 1 };
-  const severityColors = { High: "#d9443a", Medium: "#d9961e", Low: "#2f9461" };
+  const severityColors = { High: "#d9362b", Medium: "#e8771a", Low: "#e3b100" };
   const brand = { rust: "#cf5c36", green: "#2f9461" };
   const layoutKey = "resqroad-report-layout";
 
@@ -569,7 +569,9 @@
   /* ---------- Report cards ---------- */
 
   function renderReportCard(report, index, mode) {
-    const photos = ui.reportPhotos(report);
+    // Once a crew has submitted a repair, the card previews its after photos.
+    const showsRepair = Boolean(report.repair) && ["repair_submitted", "resolved"].includes(report.status);
+    const photos = showsRepair ? ui.repairPhotos(report, "after") : ui.reportPhotos(report);
     const slides = photos
       .map(function (photo) {
         return ui.photoImg(photo, 'class="rc-photo" style="width:' + 100 / photos.length + "%;flex-basis:" + 100 / photos.length + '%"');
@@ -620,14 +622,13 @@
       "</span>" +
       dots +
       ui.severityBadge(report.severity, { solid: true, className: "rc-sev" }) +
+      (showsRepair ? '<span class="rc-tag">' + icon("wrench") + "Repair photo</span>" : "") +
       '<span class="rc-age">' +
       icon("clock") +
       esc(ui.relativeTime(report.reportedAt)) +
       '</span></span><span class="rc-body"><span class="rc-top"><span class="id-tag">' +
       esc(report.id) +
-      "</span>" +
-      ui.statusPill(report.status) +
-      '</span><strong class="rc-title">' +
+      '</span></span><strong class="rc-title">' +
       esc(report.title) +
       '</strong><span class="rc-loc">' +
       icon("map-pin") +
@@ -1047,9 +1048,7 @@
               esc(report.title) +
               "</strong><small><span>" +
               esc(report.id + " · " + report.road) +
-              "</span>" +
-              ui.statusPill(report.status) +
-              "</small></button></li>"
+              "</span></small></button></li>"
             );
           })
           .join("")
@@ -1377,39 +1376,6 @@
     return decisions;
   }
 
-  function photoGallery(photos, label) {
-    return (
-      '<div class="gallery" aria-label="' +
-      esc(label) +
-      '">' +
-      photos
-        .map(function (photo, index) {
-          return (
-            '<button class="gallery-item" type="button" data-gallery-index="' +
-            index +
-            '" aria-label="View photo ' +
-            (index + 1) +
-            " of " +
-            photos.length +
-            " full size" +
-            (photo.alt ? ": " + esc(photo.alt) : "") +
-            '">' +
-            ui.photoImg(photo) +
-            "</button>"
-          );
-        })
-        .join("") +
-      "</div>"
-    );
-  }
-
-  function repairPhotos(list, label) {
-    const withData = ui.photosWithData(list);
-    if (withData.length) {
-      return '<div data-gallery-group="' + esc(label) + '">' + photoGallery(withData, label + " photos") + "</div>";
-    }
-    return ui.fileChips(list);
-  }
 
   function renderDrawer(reportId) {
     const report = findReport(reportId);
@@ -1439,12 +1405,7 @@
     const hasAssignment = Boolean(report.assignedTo || report.assignedName);
     const canAssign = ["verified", "assigned"].includes(report.status);
 
-    els.drawerMeta.innerHTML =
-      '<span class="id-tag">' +
-      esc(report.id) +
-      "</span>" +
-      ui.statusPill(report.status) +
-      ui.severityBadge(report.severity);
+    els.drawerMeta.innerHTML = '<span class="id-tag">' + esc(report.id) + "</span>" + ui.severityBadge(report.severity);
 
     const assignmentSummary = hasAssignment
       ? '<dl class="facts"><div><dt>Assigned personnel</dt><dd>' +
@@ -1495,9 +1456,9 @@
         '</span></div><div class="callout callout-tone"><p class="detail-description">' +
         esc(report.repair.notes || "No repair notes.") +
         '</p><div class="before-after"><div><h4>Before</h4>' +
-        repairPhotos(report.repair.beforePhotos, "Before") +
+        ui.photoGallery(ui.repairPhotos(report, "before"), "Before repair photos") +
         "</div><div><h4>After</h4>" +
-        repairPhotos(report.repair.afterPhotos, "After") +
+        ui.photoGallery(ui.repairPhotos(report, "after"), "After repair photos") +
         "</div></div></div></section>"
       : "";
 
@@ -1516,9 +1477,9 @@
       icon("camera") +
       'Road damage photos</h3><span class="muted text-sm">' +
       ui.pluralize(photos.length, "photo") +
-      " · select to enlarge</span></div><div data-gallery-group=\"evidence\">" +
-      photoGallery(photos, "Road damage photos") +
-      '</div></section><section class="detail-block detail-columns"><dl class="facts"><div><dt>Severity</dt><dd>' +
+      " · select to enlarge</span></div>" +
+      ui.photoGallery(photos, "Road damage photos") +
+      '</section><section class="detail-block detail-columns"><dl class="facts"><div><dt>Severity</dt><dd>' +
       ui.severityBadge(report.severity) +
       "</dd></div><div><dt>Status</dt><dd>" +
       ui.statusPill(report.status) +
@@ -1579,7 +1540,7 @@
 
     const decisions = reviewActions(report);
     els.drawerActions.innerHTML = decisions.length
-      ? '<p class="footer-note">Decisions are recorded in the report history.</p>' +
+      ? '<p class="footer-note">Decisions are recorded in the report history.</p><div class="drawer-decisions">' +
         decisions
           .map(function (decision) {
             return (
@@ -1593,7 +1554,8 @@
               "</button>"
             );
           })
-          .join("")
+          .join("") +
+        "</div>"
       : "";
   }
 

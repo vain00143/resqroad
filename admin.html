@@ -129,7 +129,7 @@
               <section class="card chart-card" aria-labelledby="trend-title">
                 <div class="card-header">
                   <div>
-                    <h2 class="card-title" id="trend-title">Report activity</h2>
+                    <h2 class="card-title" id="trend-title"><svg data-icon="chart-line"></svg>Report activity</h2>
                     <p class="card-subtitle">New reports and resolved repairs over the last 8 months.</p>
                   </div>
                   <div id="trend-legend"></div>
@@ -139,7 +139,7 @@
               <section class="card" aria-labelledby="attention-title">
                 <div class="card-header">
                   <div>
-                    <h2 class="card-title" id="attention-title">Needs attention</h2>
+                    <h2 class="card-title" id="attention-title"><svg data-icon="alert-circle"></svg>Needs attention</h2>
                     <p class="card-subtitle">Keep report review and repair verification moving.</p>
                   </div>
                 </div>
@@ -151,7 +151,7 @@
               <section class="card" aria-labelledby="recent-title">
                 <div class="card-header">
                   <div>
-                    <h2 class="card-title" id="recent-title">Recent reports</h2>
+                    <h2 class="card-title" id="recent-title"><svg data-icon="clipboard-list"></svg>Recent reports</h2>
                     <p class="card-subtitle">Latest citizen reports and their current status.</p>
                   </div>
                   <button class="link-button" type="button" data-open-queue="all">View all<svg data-icon="arrow-right" class="icon-sm"></svg></button>
@@ -175,7 +175,7 @@
               <section class="card" aria-labelledby="feed-title">
                 <div class="card-header">
                   <div>
-                    <h2 class="card-title" id="feed-title">Live activity</h2>
+                    <h2 class="card-title" id="feed-title"><svg data-icon="activity"></svg>Live activity</h2>
                     <p class="card-subtitle">Latest updates across every report.</p>
                   </div>
                 </div>
@@ -208,7 +208,7 @@
               <section class="card chart-card" aria-labelledby="monthly-title">
                 <div class="card-header">
                   <div>
-                    <h2 class="card-title" id="monthly-title">Reports by month</h2>
+                    <h2 class="card-title" id="monthly-title"><svg data-icon="chart-bar"></svg>Reports by month</h2>
                     <p class="card-subtitle" id="monthly-subtitle">Report submissions and resolved repairs per month.</p>
                   </div>
                   <div id="monthly-legend"></div>
@@ -218,7 +218,7 @@
               <section class="card" aria-labelledby="severity-title">
                 <div class="card-header">
                   <div>
-                    <h2 class="card-title" id="severity-title">Reports by severity</h2>
+                    <h2 class="card-title" id="severity-title"><svg data-icon="alert-triangle"></svg>Reports by severity</h2>
                     <p class="card-subtitle">Reported road damage by severity level.</p>
                   </div>
                 </div>
@@ -229,7 +229,7 @@
               <section class="card" aria-labelledby="status-title">
                 <div class="card-header">
                   <div>
-                    <h2 class="card-title" id="status-title">Status breakdown</h2>
+                    <h2 class="card-title" id="status-title"><svg data-icon="layers"></svg>Status breakdown</h2>
                     <p class="card-subtitle">Where reports in this period are in the workflow.</p>
                   </div>
                 </div>
@@ -238,7 +238,7 @@
               <section class="card" aria-labelledby="location-title">
                 <div class="card-header">
                   <div>
-                    <h2 class="card-title" id="location-title">Top locations</h2>
+                    <h2 class="card-title" id="location-title"><svg data-icon="map-pin"></svg>Top locations</h2>
                     <p class="card-subtitle">Municipalities with the most reports.</p>
                   </div>
                 </div>
@@ -248,7 +248,7 @@
             <section class="card" aria-labelledby="crew-performance-title" style="margin-top: 1.25rem">
               <div class="card-header">
                 <div>
-                  <h2 class="card-title" id="crew-performance-title">Crew performance</h2>
+                  <h2 class="card-title" id="crew-performance-title"><svg data-icon="hard-hat"></svg>Crew performance</h2>
                   <p class="card-subtitle">Assignments and completed repairs for each maintenance crew.</p>
                 </div>
               </div>
@@ -324,7 +324,13 @@
             <p class="results-meta" id="reports-meta" aria-live="polite"></p>
             <div class="report-grid" id="report-rows"></div>
             <div class="card" id="report-table" hidden>
-              <div class="table-wrap">
+              <div class="card-header">
+                <div>
+                  <h2 class="card-title"><svg data-icon="list"></svg>Report list</h2>
+                  <p class="card-subtitle">Select a report to open its details.</p>
+                </div>
+              </div>
+              <div class="card-flush table-wrap">
                 <table class="table">
                   <thead>
                     <tr>
@@ -379,7 +385,7 @@
               <aside class="card sticky-side" aria-labelledby="workload-title">
                 <div class="card-header">
                   <div>
-                    <h2 class="card-title" id="workload-title">Crew workload</h2>
+                    <h2 class="card-title" id="workload-title"><svg data-icon="users"></svg>Crew workload</h2>
                     <p class="card-subtitle">Open jobs per crew. Select a crew to filter its assignments.</p>
                   </div>
                 </div>
@@ -415,14 +421,22 @@
               </select>
             </div>
             <div class="map-layout">
-              <div class="map-main">
-                <div id="admin-map" class="map"></div>
-                <div id="map-legend"></div>
-              </div>
+              <section class="card map-main" aria-labelledby="admin-map-title">
+                <div class="card-header">
+                  <div>
+                    <h2 class="card-title" id="admin-map-title"><svg data-icon="map"></svg>Report map</h2>
+                    <p class="card-subtitle">Select a pin to see the report.</p>
+                  </div>
+                </div>
+                <div class="card-body">
+                  <div id="admin-map" class="map"></div>
+                  <div id="map-legend"></div>
+                </div>
+              </section>
               <aside class="card map-side" aria-labelledby="map-list-title">
                 <div class="card-header">
                   <div>
-                    <h2 class="card-title" id="map-list-title">Reports on the map</h2>
+                    <h2 class="card-title" id="map-list-title"><svg data-icon="list"></svg>Reports on the map</h2>
                     <p class="card-subtitle" id="map-count"></p>
                   </div>
                 </div>
@@ -449,7 +463,7 @@
               <section class="card" aria-labelledby="personnel-title">
                 <div class="card-header">
                   <div>
-                    <h2 class="card-title" id="personnel-title">Road maintenance accounts</h2>
+                    <h2 class="card-title" id="personnel-title"><svg data-icon="hard-hat"></svg>Road maintenance accounts</h2>
                     <p class="card-subtitle">Add maintenance accounts or remove accounts with no open assignments.</p>
                   </div>
                 </div>
@@ -478,7 +492,7 @@
               <section class="card form-card sticky-side" aria-labelledby="add-personnel-title">
                 <div class="card-header">
                   <div>
-                    <h2 class="card-title" id="add-personnel-title">Add maintenance account</h2>
+                    <h2 class="card-title" id="add-personnel-title"><svg data-icon="user-plus"></svg>Add maintenance account</h2>
                     <p class="card-subtitle">Crew members sign in with their work email.</p>
                   </div>
                 </div>
@@ -510,7 +524,7 @@
               <section class="card" aria-labelledby="citizens-title">
                 <div class="card-header">
                   <div>
-                    <h2 class="card-title" id="citizens-title">Citizen accounts</h2>
+                    <h2 class="card-title" id="citizens-title"><svg data-icon="users"></svg>Citizen accounts</h2>
                     <p class="card-subtitle">Citizens register themselves; the admin can only deactivate or reactivate accounts.</p>
                   </div>
                   <label class="input-icon" style="width: min(18rem, 100%)">

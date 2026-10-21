@@ -61,7 +61,7 @@ You need [Node.js](https://nodejs.org/) 20.12 or newer and MySQL 8.0 or newer
 | `citizen.html` | Residents | Report a road problem (title, severity, map pin or GPS, photos) and follow every report you've filed. |
 | `track.html` | Everyone | Look up any report by ID (e.g. `track.html?id=RPT-1048`) and see its public progress. |
 | `admin.html` | Administrator | Dashboard, Analytics & Reports, Review Reports, Assignment, Map, and User management. |
-| `maintenance.html` | Maintenance crews | Overview, assigned jobs (start repairs, submit notes with before/after photos), and job locations. |
+| `maintenance.html` | Maintenance crews | Overview, assigned jobs (start repairs, submit notes with before/after photos), and repair sites. |
 | `admin-login.html`, `maintenance-login.html` | — | Old sign-in addresses; they redirect to `login.html`. |
 
 ## Accounts

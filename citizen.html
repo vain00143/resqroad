@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Report road damage and follow the repairs you've reported." />
     <meta name="theme-color" content="#141110" />
-    <title>My ResQRoad | Report road damage</title>
+    <title>Report a problem | ResQRoad</title>
     <link rel="icon" type="image/png" href="assets/images/resqroad-mark.png" />
     <script>
       (function () {
@@ -31,240 +31,277 @@
     <script src="assets/js/ui.js" defer></script>
     <script src="assets/js/auth.js" defer></script>
     <script src="assets/js/shell.js" defer></script>
-    <script src="assets/js/site.js" defer></script>
     <script src="assets/js/citizen.js" defer></script>
   </head>
-  <body class="site-body" data-required-role="citizen">
+  <body class="app-body" data-required-role="citizen">
     <a class="skip-link" href="#main">Skip to content</a>
-
-    <header class="site-header is-solid">
-      <div class="container site-header-inner">
-        <a class="brand-logo" href="index.html" aria-label="ResQRoad home">
-          <img class="logo-on-light" src="assets/images/resqroad-logotype.png" alt="ResQRoad" width="748" height="127" />
-          <img class="logo-on-dark" src="assets/images/resqroad-logotype-white.png" alt="ResQRoad" width="748" height="127" />
-        </a>
-        <nav class="site-nav" aria-label="Main">
-          <a href="#report" data-portal-link="report">Report a problem</a>
-          <a href="#reports" data-portal-link="reports">My reports</a>
-          <a href="track.html">Track a report</a>
-          <a href="index.html#live-map">Live map</a>
-        </nav>
-        <div class="site-actions">
-          <button class="btn btn-ghost btn-icon theme-toggle" type="button" data-theme-toggle><svg data-icon="sun" class="icon-sun"></svg><svg data-icon="moon" class="icon-moon"></svg></button>
-          <button class="btn btn-ghost" type="button" data-popover-target="citizen-menu" aria-haspopup="menu" aria-expanded="false" aria-controls="citizen-menu">
-            <span class="avatar avatar-sm" data-user-avatar aria-hidden="true"></span>
-            <span class="hide-mobile" data-current-user></span>
-            <svg data-icon="chevron-down" class="icon-sm"></svg>
+    <div class="shell">
+      <aside class="sidebar" id="sidebar" aria-label="Resident navigation">
+        <div class="sidebar-head">
+          <a class="sidebar-brand" href="citizen.html" aria-label="ResQRoad resident portal">
+            <img class="sidebar-logo-full" src="assets/images/resqroad-logotype-white.png" alt="ResQRoad" width="748" height="127" />
+            <img class="sidebar-logo-mark" src="assets/images/resqroad-mark.png" alt="" width="384" height="408" />
+          </a>
+          <button class="sidebar-icon-btn sidebar-collapse" type="button" data-sidebar-collapse aria-controls="sidebar"><svg data-icon="chevrons-left"></svg></button>
+          <button class="sidebar-icon-btn sidebar-close" type="button" data-sidebar-close aria-label="Close navigation"><svg data-icon="x"></svg></button>
+        </div>
+        <div class="sidebar-scroll">
+          <p class="sidebar-section">My ResQRoad</p>
+          <nav class="sidebar-nav" aria-label="My ResQRoad">
+            <a class="nav-item is-active" href="#report" data-portal-tab="report" data-tip="Report a problem" aria-current="page">
+              <svg data-icon="map-pin"></svg><span class="nav-label">Report a problem</span>
+            </a>
+            <a class="nav-item" href="#reports" data-portal-tab="reports" data-tip="My reports">
+              <svg data-icon="clipboard-list"></svg><span class="nav-label">My reports</span><span class="nav-badge" data-count="mine"></span>
+            </a>
+          </nav>
+          <p class="sidebar-section">Explore</p>
+          <nav class="sidebar-nav" aria-label="Explore">
+            <a class="nav-item" href="track.html" data-tip="Track a report"><svg data-icon="search"></svg><span class="nav-label">Track a report</span></a>
+            <a class="nav-item" href="index.html#live-map" data-tip="Live map"><svg data-icon="map"></svg><span class="nav-label">Live map</span></a>
+            <a class="nav-item" href="index.html" data-tip="Public site"><svg data-icon="home"></svg><span class="nav-label">Public site</span></a>
+          </nav>
+        </div>
+        <div class="sidebar-foot">
+          <div class="sidebar-status">
+            <strong><span class="live-dot" aria-hidden="true"></span>Synced with the road office</strong>
+            <span>Status updates from staff appear here right away.</span>
+          </div>
+          <button class="sidebar-user" type="button" data-popover-target="citizen-menu" data-popover-placement="top-start" aria-haspopup="menu" aria-expanded="false" aria-controls="citizen-menu" aria-label="Account menu">
+            <span class="avatar" data-user-avatar aria-hidden="true"></span>
+            <span class="person-copy"><strong data-current-user></strong><span>Resident</span></span>
+            <svg data-icon="chevrons-up-down"></svg>
           </button>
         </div>
+      </aside>
+      <div class="sidebar-scrim" data-sidebar-close></div>
+
+      <div class="main">
+        <header class="topbar">
+          <button class="btn btn-ghost btn-icon topbar-menu" type="button" data-sidebar-open aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar"><svg data-icon="menu"></svg></button>
+          <nav class="breadcrumb" aria-label="Breadcrumb">
+            <span>Resident</span><svg data-icon="chevron-right"></svg><strong id="crumb-current">Report a problem</strong>
+          </nav>
+          <span class="toolbar-spacer"></span>
+          <div class="topbar-actions">
+            <button class="btn btn-ghost btn-icon theme-toggle" type="button" data-theme-toggle><svg data-icon="sun" class="icon-sun"></svg><svg data-icon="moon" class="icon-moon"></svg></button>
+          </div>
+        </header>
+
+        <main class="content" id="main" tabindex="-1">
+          <!-- Report a problem -->
+          <section class="view" data-portal-panel="report" aria-labelledby="report-title">
+            <div class="welcome">
+              <div>
+                <p class="eyebrow" data-today></p>
+                <h1 id="report-title"><span data-greeting>Welcome</span>, <span data-first-name></span></h1>
+                <p>Report road damage in your community and follow every repair you've reported.</p>
+              </div>
+              <div class="welcome-actions">
+                <a class="btn btn-light" href="#reports" data-portal-tab="reports"><svg data-icon="clipboard-list"></svg>My reports<span class="btn-count" data-count="mine">0</span></a>
+              </div>
+            </div>
+
+            <div class="portal-layout" id="report-layout">
+              <form id="report-form" novalidate>
+                <p class="alert alert-error" id="report-error" role="alert" hidden></p>
+
+                <section class="card form-section" data-section="details">
+                  <div class="form-section-head">
+                    <span class="form-step-badge">1</span>
+                    <div>
+                      <h2>What's the problem?</h2>
+                      <p>Give the road damage a short title and tell us how serious it is.</p>
+                    </div>
+                  </div>
+                  <div class="form-section-body">
+                    <label class="field">
+                      <span class="field-label">Title</span>
+                      <input name="title" maxlength="90" placeholder="e.g. Deep pothole near the public market" autocomplete="off" />
+                    </label>
+                    <fieldset class="field severity-field">
+                      <legend class="field-label">Severity</legend>
+                      <div class="choice-grid">
+                        <label class="choice">
+                          <input type="radio" name="severity" value="Low" />
+                          <span class="choice-body">
+                            <span class="choice-title"><span class="sev sev-low">Low</span></span>
+                            <span class="choice-text">Small crack or shallow pothole. Easy to avoid.</span>
+                          </span>
+                        </label>
+                        <label class="choice">
+                          <input type="radio" name="severity" value="Medium" />
+                          <span class="choice-body">
+                            <span class="choice-title"><span class="sev sev-medium">Medium</span></span>
+                            <span class="choice-text">Noticeable damage. Drivers slow down or swerve.</span>
+                          </span>
+                        </label>
+                        <label class="choice">
+                          <input type="radio" name="severity" value="High" />
+                          <span class="choice-body">
+                            <span class="choice-title"><span class="sev sev-high">High</span></span>
+                            <span class="choice-text">Deep pothole or broken lane. A danger to vehicles.</span>
+                          </span>
+                        </label>
+                      </div>
+                    </fieldset>
+                    <label class="field">
+                      <span class="field-label">Description</span>
+                      <textarea name="description" rows="4" maxlength="600" placeholder="Describe the damage, its size, and anything that makes it dangerous."></textarea>
+                      <span class="char-count" data-char-count>0 / 600</span>
+                    </label>
+                  </div>
+                </section>
+
+                <section class="card form-section" data-section="location">
+                  <div class="form-section-head">
+                    <span class="form-step-badge">2</span>
+                    <div>
+                      <h2>Where is it?</h2>
+                      <p>Tap the map to drop a pin on the exact spot, or use your current location.</p>
+                    </div>
+                  </div>
+                  <div class="form-section-body">
+                    <div class="picker">
+                      <div class="picker-bar">
+                        <div class="picker-heading">
+                          <h3 class="card-title"><svg data-icon="map"></svg>Location map</h3>
+                          <span class="picker-status" id="picker-status"><svg data-icon="map-pin"></svg>No location selected yet</span>
+                        </div>
+                        <button class="btn btn-secondary btn-sm" type="button" id="use-location"><svg data-icon="locate"></svg>Use my location</button>
+                      </div>
+                      <div class="map" id="picker-map"></div>
+                      <div class="coords">
+                        <label class="field">
+                          <span class="field-label">Latitude</span>
+                          <input name="latitude" inputmode="decimal" placeholder="14.8474" autocomplete="off" />
+                        </label>
+                        <label class="field">
+                          <span class="field-label">Longitude</span>
+                          <input name="longitude" inputmode="decimal" placeholder="120.8122" autocomplete="off" />
+                        </label>
+                      </div>
+                    </div>
+                    <div class="form-grid">
+                      <label class="field">
+                        <span class="field-label">Road or street</span>
+                        <input name="road" maxlength="80" placeholder="e.g. MacArthur Highway" list="road-suggestions" autocomplete="off" />
+                      </label>
+                      <label class="field">
+                        <span class="field-label">Barangay and municipality</span>
+                        <input name="location" maxlength="80" placeholder="e.g. Guinhawa, Malolos City" list="place-suggestions" autocomplete="off" />
+                      </label>
+                    </div>
+                    <datalist id="road-suggestions"></datalist>
+                    <datalist id="place-suggestions"></datalist>
+                  </div>
+                </section>
+
+                <section class="card form-section" data-section="photos">
+                  <div class="form-section-head">
+                    <span class="form-step-badge">3</span>
+                    <div>
+                      <h2>Add photos <span class="muted" style="font-weight: 400">(optional)</span></h2>
+                      <p>Clear photos help the team verify the damage faster. Add up to five.</p>
+                    </div>
+                  </div>
+                  <div class="form-section-body">
+                    <label class="dropzone">
+                      <input type="file" accept="image/*" multiple id="evidence-input" aria-label="Add photos of the road damage" />
+                      <span class="dropzone-icon"><svg data-icon="camera"></svg></span>
+                      <strong>Add photos of the damage</strong>
+                      <span>Drop images here or browse · JPG, PNG, or HEIC</span>
+                    </label>
+                    <ul class="thumb-list" id="evidence-preview" aria-live="polite"></ul>
+                  </div>
+                </section>
+
+                <div class="card form-submit">
+                  <p><svg data-icon="shield-check" class="icon-sm"></svg> Your name stays private. Only the Road Maintenance Office sees who filed the report.</p>
+                  <button class="btn btn-primary btn-lg" type="submit"><svg data-icon="send"></svg>Submit report</button>
+                </div>
+              </form>
+
+              <aside class="portal-aside">
+                <section class="card" aria-labelledby="tips-title">
+                  <div class="card-header">
+                    <div><h2 class="card-title" id="tips-title"><svg data-icon="sparkles"></svg>Tips for a great report</h2></div>
+                  </div>
+                  <div class="card-body">
+                    <ul class="tips">
+                      <li><svg data-icon="map-pin"></svg><span>Zoom in and place the pin right on the damage, not just the street.</span></li>
+                      <li><svg data-icon="camera"></svg><span>Take one wide photo for context and one close-up of the damage.</span></li>
+                      <li><svg data-icon="alert-triangle"></svg><span>Choose High only when the damage is a danger to vehicles or people.</span></li>
+                      <li><svg data-icon="copy"></svg><span>Grey dots on the map are already reported, so no need to report them again.</span></li>
+                    </ul>
+                  </div>
+                </section>
+                <section class="card" aria-labelledby="next-steps-title">
+                  <div class="card-header">
+                    <div><h2 class="card-title" id="next-steps-title"><svg data-icon="activity"></svg>What happens next</h2></div>
+                  </div>
+                  <div class="card-body">
+                    <ol class="timeline">
+                      <li class="timeline-item"><span class="timeline-dot status-submitted"></span><span class="timeline-title"><strong>Submitted</strong> — you get a report ID to track.</span></li>
+                      <li class="timeline-item"><span class="timeline-dot status-verified"></span><span class="timeline-title"><strong>Verified</strong> — the office confirms the damage.</span></li>
+                      <li class="timeline-item"><span class="timeline-dot status-in_progress"></span><span class="timeline-title"><strong>Repaired</strong> — a road crew fixes it.</span></li>
+                      <li class="timeline-item"><span class="timeline-dot status-resolved"></span><span class="timeline-title"><strong>Resolved</strong> — the repair is verified.</span></li>
+                    </ol>
+                  </div>
+                </section>
+              </aside>
+            </div>
+            <section class="card success-panel" id="report-success" hidden></section>
+          </section>
+
+          <!-- My reports -->
+          <section class="view" data-portal-panel="reports" aria-labelledby="reports-title" hidden>
+            <div class="page-head">
+              <div>
+                <p class="eyebrow">Your reports</p>
+                <h1 class="page-title" id="reports-title">My reports</h1>
+                <p class="page-desc">Follow each report from review to repair. Updates from the road office appear here right away.</p>
+              </div>
+              <div class="page-actions">
+                <a class="btn btn-secondary" href="track.html"><svg data-icon="search"></svg>Track by ID</a>
+                <button class="btn btn-primary" type="button" data-start-report><svg data-icon="plus"></svg>Report a problem</button>
+              </div>
+            </div>
+
+            <div class="grid grid-kpi" id="citizen-stats" aria-label="Report summary"></div>
+
+            <div class="toolbar">
+              <label class="input-icon grow">
+                <span class="visually-hidden">Search my reports</span>
+                <svg data-icon="search"></svg>
+                <input id="my-search" type="search" placeholder="Search by ID, title, or road" autocomplete="off" />
+              </label>
+              <div class="toolbar-group" role="group" aria-label="Filter by progress" id="my-filter">
+                <button class="chip" type="button" data-filter="all" aria-pressed="true">All</button>
+                <button class="chip" type="button" data-filter="open" aria-pressed="false">In progress</button>
+                <button class="chip" type="button" data-filter="resolved" aria-pressed="false">Fixed</button>
+                <button class="chip" type="button" data-filter="closed" aria-pressed="false">Closed</button>
+              </div>
+            </div>
+            <div class="recent-ids portal-recent" id="my-recent" hidden></div>
+            <div id="my-reports"></div>
+          </section>
+        </main>
+
+        <footer class="app-footer">
+          <span>&copy; <span data-current-year></span> ResQRoad · Road Maintenance Office</span>
+          <span><svg data-icon="shield-check" class="icon-sm"></svg>Reports and accounts are stored securely in the ResQRoad database</span>
+        </footer>
       </div>
-    </header>
+    </div>
 
     <div class="popover" id="citizen-menu" role="menu" aria-label="Account" hidden>
       <div class="menu-label" data-current-email></div>
-      <a class="menu-item" role="menuitem" href="#reports" data-portal-link="reports"><svg data-icon="clipboard-list"></svg>My reports</a>
       <a class="menu-item" role="menuitem" href="track.html"><svg data-icon="search"></svg>Track a report</a>
       <a class="menu-item" role="menuitem" href="index.html"><svg data-icon="home"></svg>Public site</a>
+      <button class="menu-item" role="menuitem" type="button" data-theme-toggle><svg data-icon="moon"></svg>Switch theme</button>
       <div class="menu-sep" role="separator"></div>
       <button class="menu-item is-danger" role="menuitem" type="button" data-sign-out="index.html"><svg data-icon="log-out"></svg>Log out</button>
     </div>
-
-    <main id="main">
-      <section class="page-hero">
-        <div class="container container-narrow page-hero-row">
-          <div>
-            <p class="eyebrow" data-today></p>
-            <h1 class="display">Hi, <span data-first-name></span></h1>
-            <p>Report road damage in your community and follow every repair you've reported.</p>
-          </div>
-          <div class="hero-mini-stats" id="citizen-stats"></div>
-        </div>
-      </section>
-
-      <div class="container container-narrow page-body">
-        <div class="tabs portal-tabs" role="tablist" aria-label="Your ResQRoad">
-          <button class="tab" type="button" role="tab" aria-selected="true" data-portal-tab="report"><svg data-icon="map-pin" class="icon-sm"></svg>Report a problem</button>
-          <button class="tab" type="button" role="tab" aria-selected="false" data-portal-tab="reports"><svg data-icon="clipboard-list" class="icon-sm"></svg>My reports<span class="count-badge" data-count="mine">0</span></button>
-        </div>
-
-        <!-- Report a problem -->
-        <section data-portal-panel="report" aria-label="Report a road problem">
-          <div class="portal-layout" id="report-layout">
-            <form id="report-form" novalidate>
-              <p class="alert alert-error" id="report-error" role="alert" hidden></p>
-
-              <section class="card form-section" data-section="details">
-                <div class="form-section-head">
-                  <span class="form-step-badge">1</span>
-                  <div>
-                    <h2>What's the problem?</h2>
-                    <p>Give the road damage a short title and tell us how serious it is.</p>
-                  </div>
-                </div>
-                <div class="form-section-body">
-                  <label class="field">
-                    <span class="field-label">Title</span>
-                    <input name="title" maxlength="90" placeholder="e.g. Deep pothole near the public market" autocomplete="off" />
-                  </label>
-                  <fieldset class="field" style="margin: 0; padding: 0; border: 0">
-                    <legend class="field-label" style="margin-bottom: 0.4rem">Severity</legend>
-                    <div class="choice-grid">
-                      <label class="choice">
-                        <input type="radio" name="severity" value="Low" />
-                        <span class="choice-body">
-                          <span class="choice-title"><span class="sev sev-low"><span class="sev-bars" aria-hidden="true"><i></i><i></i><i></i></span>Low</span></span>
-                          <span class="choice-text">Small crack or shallow pothole. Easy to avoid.</span>
-                        </span>
-                      </label>
-                      <label class="choice">
-                        <input type="radio" name="severity" value="Medium" />
-                        <span class="choice-body">
-                          <span class="choice-title"><span class="sev sev-medium"><span class="sev-bars" aria-hidden="true"><i></i><i></i><i></i></span>Medium</span></span>
-                          <span class="choice-text">Noticeable damage. Drivers slow down or swerve.</span>
-                        </span>
-                      </label>
-                      <label class="choice">
-                        <input type="radio" name="severity" value="High" />
-                        <span class="choice-body">
-                          <span class="choice-title"><span class="sev sev-high"><span class="sev-bars" aria-hidden="true"><i></i><i></i><i></i></span>High</span></span>
-                          <span class="choice-text">Deep pothole or broken lane. A danger to vehicles.</span>
-                        </span>
-                      </label>
-                    </div>
-                  </fieldset>
-                  <label class="field">
-                    <span class="field-label">Description</span>
-                    <textarea name="description" rows="4" maxlength="600" placeholder="Describe the damage, its size, and anything that makes it dangerous."></textarea>
-                    <span class="char-count" data-char-count>0 / 600</span>
-                  </label>
-                </div>
-              </section>
-
-              <section class="card form-section" data-section="location">
-                <div class="form-section-head">
-                  <span class="form-step-badge">2</span>
-                  <div>
-                    <h2>Where is it?</h2>
-                    <p>Tap the map to drop a pin on the exact spot, or use your current location.</p>
-                  </div>
-                </div>
-                <div class="form-section-body">
-                  <div class="picker">
-                    <div class="picker-bar">
-                      <span class="picker-status" id="picker-status"><svg data-icon="map-pin"></svg>No location selected yet</span>
-                      <button class="btn btn-secondary btn-sm" type="button" id="use-location"><svg data-icon="locate"></svg>Use my location</button>
-                    </div>
-                    <div class="map" id="picker-map"></div>
-                    <div class="coords">
-                      <label class="field">
-                        <span class="field-label">Latitude</span>
-                        <input name="latitude" inputmode="decimal" placeholder="14.8474" autocomplete="off" />
-                      </label>
-                      <label class="field">
-                        <span class="field-label">Longitude</span>
-                        <input name="longitude" inputmode="decimal" placeholder="120.8122" autocomplete="off" />
-                      </label>
-                    </div>
-                  </div>
-                  <div class="form-grid">
-                    <label class="field">
-                      <span class="field-label">Road or street</span>
-                      <input name="road" maxlength="80" placeholder="e.g. MacArthur Highway" list="road-suggestions" autocomplete="off" />
-                    </label>
-                    <label class="field">
-                      <span class="field-label">Barangay and municipality</span>
-                      <input name="location" maxlength="80" placeholder="e.g. Guinhawa, Malolos City" list="place-suggestions" autocomplete="off" />
-                    </label>
-                  </div>
-                  <datalist id="road-suggestions"></datalist>
-                  <datalist id="place-suggestions"></datalist>
-                </div>
-              </section>
-
-              <section class="card form-section" data-section="photos">
-                <div class="form-section-head">
-                  <span class="form-step-badge">3</span>
-                  <div>
-                    <h2>Add photos <span class="muted" style="font-weight: 400">(optional)</span></h2>
-                    <p>Clear photos help the team verify the damage faster. Add up to five.</p>
-                  </div>
-                </div>
-                <div class="form-section-body">
-                  <label class="dropzone">
-                    <input type="file" accept="image/*" multiple id="evidence-input" aria-label="Add photos of the road damage" />
-                    <span class="dropzone-icon"><svg data-icon="camera"></svg></span>
-                    <strong>Add photos of the damage</strong>
-                    <span>Drop images here or browse · JPG, PNG, or HEIC</span>
-                  </label>
-                  <ul class="thumb-list" id="evidence-preview" aria-live="polite"></ul>
-                </div>
-              </section>
-
-              <div class="card form-submit">
-                <p><svg data-icon="shield-check" class="icon-sm"></svg> Your name stays private. Only the Road Maintenance Office sees who filed the report.</p>
-                <button class="btn btn-primary btn-lg" type="submit"><svg data-icon="send"></svg>Submit report</button>
-              </div>
-            </form>
-
-            <aside class="portal-aside">
-              <section class="card" aria-labelledby="tips-title">
-                <div class="card-header">
-                  <div><h2 class="card-title" id="tips-title"><svg data-icon="sparkles"></svg>Tips for a great report</h2></div>
-                </div>
-                <div class="card-body">
-                  <ul class="tips">
-                    <li><svg data-icon="map-pin"></svg><span>Zoom in and place the pin right on the damage, not just the street.</span></li>
-                    <li><svg data-icon="camera"></svg><span>Take one wide photo for context and one close-up of the damage.</span></li>
-                    <li><svg data-icon="alert-triangle"></svg><span>Choose High only when the damage is a danger to vehicles or people.</span></li>
-                    <li><svg data-icon="copy"></svg><span>Orange dots on the map are already reported, so no need to report them again.</span></li>
-                  </ul>
-                </div>
-              </section>
-              <section class="card" aria-labelledby="next-steps-title" style="margin-top: 1.25rem">
-                <div class="card-header">
-                  <div><h2 class="card-title" id="next-steps-title">What happens next</h2></div>
-                </div>
-                <div class="card-body">
-                  <ol class="timeline">
-                    <li class="timeline-item"><span class="timeline-dot status-submitted"></span><span class="timeline-title"><strong>Submitted</strong> — you get a report ID to track.</span></li>
-                    <li class="timeline-item"><span class="timeline-dot status-verified"></span><span class="timeline-title"><strong>Verified</strong> — the office confirms the damage.</span></li>
-                    <li class="timeline-item"><span class="timeline-dot status-in_progress"></span><span class="timeline-title"><strong>Repaired</strong> — a road crew fixes it.</span></li>
-                    <li class="timeline-item"><span class="timeline-dot status-resolved"></span><span class="timeline-title"><strong>Resolved</strong> — the repair is verified.</span></li>
-                  </ol>
-                </div>
-              </section>
-            </aside>
-          </div>
-          <section class="card success-panel" id="report-success" hidden></section>
-        </section>
-
-        <!-- My reports -->
-        <section data-portal-panel="reports" aria-label="My reports" hidden>
-          <div class="toolbar">
-            <label class="input-icon grow">
-              <span class="visually-hidden">Search my reports</span>
-              <svg data-icon="search"></svg>
-              <input id="my-search" type="search" placeholder="Search my reports" autocomplete="off" />
-            </label>
-            <div class="toolbar-group" role="group" aria-label="Filter by progress" id="my-filter">
-              <button class="chip" type="button" data-filter="all" aria-pressed="true">All</button>
-              <button class="chip" type="button" data-filter="open" aria-pressed="false">In progress</button>
-              <button class="chip" type="button" data-filter="resolved" aria-pressed="false">Fixed</button>
-              <button class="chip" type="button" data-filter="closed" aria-pressed="false">Closed</button>
-            </div>
-          </div>
-          <div id="my-reports"></div>
-        </section>
-      </div>
-    </main>
-
-    <footer class="site-footer" style="padding-top: 2rem">
-      <div class="container">
-        <div class="footer-bottom" style="margin-top: 0; border-top: 0; padding-top: 0">
-          <span>&copy; <span data-current-year></span> ResQRoad · Road Maintenance Office</span>
-          <span>Reports and accounts are stored securely in the ResQRoad database.</span>
-        </div>
-      </div>
-    </footer>
   </body>
 </html>

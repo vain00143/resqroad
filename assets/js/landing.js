@@ -18,7 +18,7 @@
     repair_submitted: 88,
     resolved: 100,
   };
-  const severityColor = { High: "#d9443a", Medium: "#d9961e", Low: "#2f9461" };
+  const severityColor = { High: "#d9362b", Medium: "#e8771a", Low: "#e3b100" };
 
   let state;
   try {

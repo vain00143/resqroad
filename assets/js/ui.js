@@ -9,6 +9,10 @@
   const icon = window.RoadWatchIcons.svg;
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
   const placeholderPhoto = "assets/images/photo-placeholder.svg";
+  const sampleRepairPhotos = {
+    before: "assets/images/sample-repair-before.svg",
+    after: "assets/images/sample-repair-after.svg",
+  };
   const sampleRoadPhotos = [
     {
       src: "https://npr.brightspotcdn.com/dims4/default/c139ad9/2147483647/strip/true/crop/1024x768%2B0%2B0/resize/880x660%21/quality/90/?url=http%3A%2F%2Fnpr-brightspot.s3.amazonaws.com%2Flegacy%2Fsites%2Fwkar%2Ffiles%2Fpothole.jpg",
@@ -144,7 +148,7 @@
       escapeHtml(value.toLowerCase()) +
       (solid ? " sev-solid" : "") +
       (options && options.className ? " " + options.className : "") +
-      '"><span class="sev-bars" aria-hidden="true"><i></i><i></i><i></i></span>' +
+      '">' +
       escapeHtml(value) +
       (options && options.suffix ? " " + escapeHtml(options.suffix) : "") +
       "</span>"
@@ -208,6 +212,55 @@
     return sampleRoadPhotos.map(function (photo) {
       return { src: photo.src, alt: photo.alt, name: photo.alt };
     });
+  }
+
+  // The crew's before or after repair photos. Uploads that were saved show as
+  // is; sample reports list file names only, so each gets a sample picture.
+  // Uploads that couldn't be saved show a placeholder.
+  function repairPhotos(report, side) {
+    const list = report && report.repair ? report.repair[side === "before" ? "beforePhotos" : "afterPhotos"] : [];
+    const uploaded = photosWithData(list);
+    if (uploaded.length) {
+      return uploaded;
+    }
+    return (list || []).map(function (photo) {
+      const name = photoName(photo);
+      if (report.photosTrimmed) {
+        return { src: placeholderPhoto, alt: name + " (photo not available)", name: name };
+      }
+      return { src: sampleRepairPhotos[side === "before" ? "before" : "after"], alt: name + " (sample photo)", name: name };
+    });
+  }
+
+  // A grid of photo thumbnails. Each opens the lightbox through the page's
+  // click handler, which reads the images in the same [data-gallery-group].
+  function photoGallery(photos, label) {
+    if (!photos.length) {
+      return '<p class="muted text-sm">No photos</p>';
+    }
+    return (
+      '<div class="gallery" data-gallery-group aria-label="' +
+      escapeHtml(label) +
+      '">' +
+      photos
+        .map(function (photo, index) {
+          return (
+            '<button class="gallery-item" type="button" data-gallery-index="' +
+            index +
+            '" aria-label="View photo ' +
+            (index + 1) +
+            " of " +
+            photos.length +
+            " full size" +
+            (photo.alt ? ": " + escapeHtml(photo.alt) : "") +
+            '">' +
+            photoImg(photo) +
+            "</button>"
+          );
+        })
+        .join("") +
+      "</div>"
+    );
   }
 
   function photoImg(photo, extra) {
@@ -1504,6 +1557,8 @@
     initials: initials,
     avatar: avatar,
     reportPhotos: reportPhotos,
+    repairPhotos: repairPhotos,
+    photoGallery: photoGallery,
     photosWithData: photosWithData,
     photoImg: photoImg,
     photoName: photoName,

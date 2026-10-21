@@ -52,7 +52,7 @@
 }
 
 .site-header .brand-logo img {
-  height: 1.6rem;
+  height: 1.9rem;
 }
 
 .site-nav {
@@ -120,6 +120,11 @@
   --btn-border: rgb(255 255 255 / 22%);
   --btn-bg-hover: rgb(255 255 255 / 15%);
   box-shadow: none;
+}
+
+/* Over the dark hero, header icons stay white like the text. */
+.site-header.on-dark:not(.is-solid) .icon {
+  color: inherit;
 }
 
 .site-header.is-solid .logo-on-dark {
@@ -193,19 +198,6 @@
     linear-gradient(180deg, #120f0e, #1a1513);
   color: #efe8e3;
   isolation: isolate;
-}
-
-.hero::before {
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background-image:
-    linear-gradient(rgb(255 255 255 / 3.5%) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(255 255 255 / 3.5%) 1px, transparent 1px);
-  background-size: 56px 56px;
-  mask-image: radial-gradient(80% 70% at 60% 40%, #000 30%, transparent 75%);
-  -webkit-mask-image: radial-gradient(80% 70% at 60% 40%, #000 30%, transparent 75%);
-  content: "";
 }
 
 .hero-grid {
@@ -616,7 +608,7 @@
 }
 
 .live-grid .map {
-  height: clamp(24rem, 50vw, 32rem);
+  height: clamp(28rem, 55vw, 38rem);
 }
 
 .live-side {
@@ -839,6 +831,10 @@
   --btn-bg-hover: var(--rr-cream);
 }
 
+.cta-card.is-brand .icon {
+  color: inherit;
+}
+
 .track-form {
   margin-top: 1.25rem;
   display: flex;
@@ -948,21 +944,8 @@
   isolation: isolate;
 }
 
-.auth-aside::before {
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background-image:
-    linear-gradient(rgb(255 255 255 / 3.5%) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(255 255 255 / 3.5%) 1px, transparent 1px);
-  background-size: 48px 48px;
-  mask-image: radial-gradient(90% 70% at 50% 40%, #000 30%, transparent 80%);
-  -webkit-mask-image: radial-gradient(90% 70% at 50% 40%, #000 30%, transparent 80%);
-  content: "";
-}
-
 .auth-aside .brand-logo img {
-  height: 1.75rem;
+  height: 2.05rem;
 }
 
 .auth-aside h2 {
@@ -1123,7 +1106,7 @@
 }
 
 .auth-role .icon {
-  color: var(--accent);
+  color: var(--icon);
 }
 
 .auth-role strong {
@@ -1206,41 +1189,6 @@
   color: rgb(255 255 255 / 70%);
 }
 
-.page-hero-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 1.5rem;
-}
-
-.hero-mini-stats {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.6rem;
-}
-
-.hero-mini-stat {
-  min-width: 7rem;
-  padding: 0.7rem 1rem;
-  border: 1px solid rgb(255 255 255 / 10%);
-  border-radius: var(--radius-md);
-  background: rgb(255 255 255 / 5%);
-}
-
-.hero-mini-stat strong {
-  display: block;
-  color: #fff;
-  font-size: 1.4rem;
-  font-weight: 700;
-  line-height: 1.15;
-}
-
-.hero-mini-stat span {
-  color: rgb(255 255 255 / 60%);
-  font-size: 0.75rem;
-}
-
 .page-body {
   position: relative;
   margin-top: clamp(-3.5rem, -5vw, -2.5rem);
@@ -1248,12 +1196,7 @@
 }
 
 /* ---------- Citizen portal ---------- */
-
-.portal-tabs {
-  margin-bottom: 1.25rem;
-  box-shadow: var(--shadow-md);
-  background: var(--surface);
-}
+/* The portal uses the workspace shell from app.css; these are its views. */
 
 .portal-layout {
   display: grid;
@@ -1264,11 +1207,24 @@
 
 .portal-aside {
   position: sticky;
-  top: 90px;
+  top: calc(var(--topbar-h) + 1.25rem);
+  display: grid;
+  gap: 1.25rem;
+}
+
+.severity-field {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.severity-field legend {
+  margin-bottom: 0.4rem;
+  padding: 0;
 }
 
 .portal-aside .card-title .icon {
-  color: var(--accent);
+  color: var(--icon);
 }
 
 .form-section {
@@ -1337,7 +1293,7 @@
 }
 
 .picker .map {
-  height: 21rem;
+  height: 25rem;
   cursor: crosshair;
 }
 
@@ -1353,6 +1309,12 @@
   gap: 0.6rem;
 }
 
+.picker-heading {
+  min-width: 0;
+  display: grid;
+  gap: 0.15rem;
+}
+
 .picker-status {
   display: inline-flex;
   align-items: center;
@@ -1364,6 +1326,10 @@
 .picker-status.is-set {
   color: var(--success);
   font-weight: 500;
+}
+
+.picker-status.is-set .icon {
+  color: inherit;
 }
 
 .coords {
@@ -1417,7 +1383,7 @@
 
 .tips .icon {
   margin-top: 0.15rem;
-  color: var(--accent);
+  color: var(--icon);
 }
 
 .success-panel {
@@ -1476,7 +1442,7 @@
 }
 
 .my-report {
-  margin-bottom: 1rem;
+  margin-bottom: 1.25rem;
   overflow: hidden;
   animation: rise-in 0.45s var(--ease-out) both;
   animation-delay: calc(var(--i, 0) * 40ms);
@@ -1512,6 +1478,7 @@
 .my-report-body {
   padding: 0 1.25rem 1.15rem;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 1rem;
 }
 
@@ -1595,7 +1562,7 @@
 
 .track-columns .map {
   height: 100%;
-  min-height: 16rem;
+  min-height: 19rem;
 }
 
 .recent-ids {
@@ -1622,20 +1589,51 @@
   background: rgb(255 255 255 / 12%);
 }
 
+/* The same chips under the My reports search, on a regular surface. */
+.portal-recent {
+  margin: -0.35rem 0 1.15rem;
+  color: var(--text-3);
+}
+
+.portal-recent button {
+  border-color: var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.portal-recent button:hover {
+  background: var(--hover);
+}
+
+.portal-recent button[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  background: var(--selected);
+  color: var(--heading);
+}
+
 /* ---------- Responsive ---------- */
 
-@media (max-width: 1100px) {
-  .feature-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .live-grid,
+/* The portal form shares the row with the sidebar, so its tips column drops
+   below the form sooner than other two-column layouts. */
+@media (max-width: 1280px) {
   .portal-layout {
     grid-template-columns: minmax(0, 1fr);
   }
 
   .portal-aside {
     position: static;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+    align-items: start;
+  }
+}
+
+@media (max-width: 1100px) {
+  .feature-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .live-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .footer-grid {
