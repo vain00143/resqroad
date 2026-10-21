@@ -1,0 +1,260 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&amp;display=swap');
+text { font-family: Poppins, 'Segoe UI', Arial, sans-serif; }
+.title { font-size: 30px; font-weight: 700; fill: #110e0c; }
+.sub { font-size: 15px; fill: #5d5550; }
+.tname { font-size: 17px; font-weight: 600; fill: #ffffff; }
+.tnote { font-size: 12.5px; fill: #fdf6ec; opacity: 0.85; }
+.col { font-size: 13.5px; fill: #2b2522; }
+.col.pk { font-weight: 600; }
+.type { font-family: 'Cascadia Mono', Consolas, 'Courier New', monospace; font-size: 12px; fill: #766d67; }
+.badge { font-size: 9.5px; font-weight: 700; letter-spacing: 0.4px; }
+.rel { fill: none; stroke: #974328; stroke-width: 1.6; }
+.rlabel { font-size: 12.5px; fill: #5d5550; }
+.legend { font-size: 13px; fill: #5d5550; }
+</style>
+<defs>
+<marker id="many" viewBox="0 0 16 16" markerWidth="16" markerHeight="16" refX="16" refY="8" orient="auto-start-reverse" markerUnits="userSpaceOnUse">
+<path d="M0 8 L16 1 M0 8 L16 8 M0 8 L16 15" fill="none" stroke="#974328" stroke-width="1.6"/>
+</marker>
+<marker id="one" viewBox="0 0 16 16" markerWidth="16" markerHeight="16" refX="16" refY="8" orient="auto" markerUnits="userSpaceOnUse">
+<path d="M9 1 L9 15" fill="none" stroke="#974328" stroke-width="1.8"/>
+</marker>
+</defs>
+<rect width="1600" height="900" fill="#f6f3f0"/>
+<text x="60" y="56" class="title">ResQRoad database</text>
+<text x="60" y="84" class="sub">MySQL 8.0 · database resqroad · 6 tables · InnoDB, utf8mb4 · times in UTC</text>
+<g transform="translate(1020 40)">
+<rect x="0" y="0" width="28" height="16" rx="4" fill="#b34f2f"/><text x="14" y="12" class="badge" fill="#fff" text-anchor="middle">PK</text>
+<text x="36" y="13" class="legend">primary key</text>
+<rect x="128" y="0" width="28" height="16" rx="4" fill="#efc88b"/><text x="142" y="12" class="badge" fill="#7b3621" text-anchor="middle">FK</text>
+<text x="164" y="13" class="legend">foreign key</text>
+<rect x="254" y="0" width="28" height="16" rx="4" fill="#fff" stroke="#b34f2f"/><text x="268" y="12" class="badge" fill="#b34f2f" text-anchor="middle">UQ</text>
+<text x="290" y="13" class="legend">unique</text>
+<path d="M0 44 H120" class="rel" marker-start="url(#many)" marker-end="url(#one)"/>
+<text x="132" y="49" class="legend">many  →  one   (e.g. many reports belong to one user)</text>
+</g>
+<path d="M60 479.5 H34 V162.5 H60" class="rel" marker-start="url(#many)" marker-end="url(#one)"/>
+<path d="M610 267.5 H520 V162.5 H420" class="rel" marker-start="url(#many)" marker-end="url(#one)"/>
+<path d="M610 484.5 H520 V162.5 H420" class="rel" marker-start="url(#many)" marker-end="url(#one)"/>
+<path d="M610 764.5 H520 V162.5 H420" class="rel" marker-start="url(#many)" marker-end="url(#one)"/>
+<path d="M990 183.5 H1090 V162.5 H1180" class="rel" marker-start="url(#many)" marker-end="url(#one)"/>
+<path d="M990 421.5 H1090 V162.5 H1180" class="rel" marker-start="url(#many)" marker-end="url(#one)"/>
+<path d="M990 617.5 H1090 V162.5 H1180" class="rel" marker-start="url(#many)" marker-end="url(#one)"/>
+<path d="M1180 351.5 H1150 V845 H450 V162.5 H420" class="rel" marker-start="url(#many)" marker-end="url(#one)"/>
+<path d="M1180 372.5 H1130 V862 H470 V162.5 H420" class="rel" marker-start="url(#many)" marker-end="url(#one)"/>
+<text x="800" y="889" class="rlabel" text-anchor="middle">reports.reporter_id → the resident who filed it    ·    reports.assigned_to → the assigned maintenance crew</text>
+<g>
+<rect x="60" y="104" width="360" height="268" rx="10" fill="#ffffff" stroke="#dcd3cb"/>
+<path d="M60 148 V114 a10 10 0 0 1 10 -10 H410 a10 10 0 0 1 10 10 V148 Z" fill="#b34f2f"/>
+<text x="76" y="132" class="tname">users</text>
+<text x="404" y="132" class="tnote" text-anchor="end">accounts</text>
+<rect x="72" y="154.5" width="28" height="16" rx="4" fill="#b34f2f"/>
+<text x="86" y="166.5" class="badge" fill="#ffffff" text-anchor="middle">PK</text>
+<text x="110" y="167" class="col pk">id</text>
+<text x="406" y="167" class="type" text-anchor="end">INT</text>
+<rect x="61" y="173" width="358" height="21" fill="#fbf9f7"/>
+<text x="110" y="188" class="col">name</text>
+<text x="406" y="188" class="type" text-anchor="end">VARCHAR(80)</text>
+<rect x="72" y="196.5" width="28" height="16" rx="4" fill="#ffffff" stroke="#b34f2f"/>
+<text x="86" y="208.5" class="badge" fill="#b34f2f" text-anchor="middle">UQ</text>
+<text x="110" y="209" class="col">email</text>
+<text x="406" y="209" class="type" text-anchor="end">VARCHAR(120)</text>
+<rect x="61" y="215" width="358" height="21" fill="#fbf9f7"/>
+<text x="110" y="230" class="col">password_hash</text>
+<text x="406" y="230" class="type" text-anchor="end">VARCHAR(100)</text>
+<text x="110" y="251" class="col">role</text>
+<text x="406" y="251" class="type" text-anchor="end">ENUM</text>
+<rect x="61" y="257" width="358" height="21" fill="#fbf9f7"/>
+<text x="110" y="272" class="col">team</text>
+<text x="406" y="272" class="type" text-anchor="end">VARCHAR(80)</text>
+<text x="110" y="293" class="col">active</text>
+<text x="406" y="293" class="type" text-anchor="end">TINYINT(1)</text>
+<rect x="61" y="299" width="358" height="21" fill="#fbf9f7"/>
+<text x="110" y="314" class="col">created_at</text>
+<text x="406" y="314" class="type" text-anchor="end">DATETIME(3)</text>
+<text x="110" y="335" class="col">updated_at</text>
+<text x="406" y="335" class="type" text-anchor="end">DATETIME(3)</text>
+<rect x="61" y="341" width="358" height="21" fill="#fbf9f7"/>
+<text x="110" y="356" class="col">deleted_at</text>
+<text x="406" y="356" class="type" text-anchor="end">DATETIME(3)</text>
+</g>
+<g>
+<rect x="60" y="400" width="360" height="205" rx="10" fill="#ffffff" stroke="#dcd3cb"/>
+<path d="M60 444 V410 a10 10 0 0 1 10 -10 H410 a10 10 0 0 1 10 10 V444 Z" fill="#b34f2f"/>
+<text x="76" y="428" class="tname">sessions</text>
+<text x="404" y="428" class="tnote" text-anchor="end">signed-in devices</text>
+<rect x="72" y="450.5" width="28" height="16" rx="4" fill="#b34f2f"/>
+<text x="86" y="462.5" class="badge" fill="#ffffff" text-anchor="middle">PK</text>
+<text x="110" y="463" class="col pk">token_hash</text>
+<text x="406" y="463" class="type" text-anchor="end">CHAR(64)</text>
+<rect x="61" y="469" width="358" height="21" fill="#fbf9f7"/>
+<rect x="72" y="471.5" width="28" height="16" rx="4" fill="#efc88b"/>
+<text x="86" y="483.5" class="badge" fill="#7b3621" text-anchor="middle">FK</text>
+<text x="110" y="484" class="col">user_id</text>
+<text x="406" y="484" class="type" text-anchor="end">INT</text>
+<text x="110" y="505" class="col">client</text>
+<text x="406" y="505" class="type" text-anchor="end">VARCHAR(20)</text>
+<rect x="61" y="511" width="358" height="21" fill="#fbf9f7"/>
+<text x="110" y="526" class="col">user_agent</text>
+<text x="406" y="526" class="type" text-anchor="end">VARCHAR(255)</text>
+<text x="110" y="547" class="col">created_at</text>
+<text x="406" y="547" class="type" text-anchor="end">DATETIME(3)</text>
+<rect x="61" y="553" width="358" height="21" fill="#fbf9f7"/>
+<text x="110" y="568" class="col">last_seen_at</text>
+<text x="406" y="568" class="type" text-anchor="end">DATETIME(3)</text>
+<text x="110" y="589" class="col">expires_at</text>
+<text x="406" y="589" class="type" text-anchor="end">DATETIME(3)</text>
+</g>
+<g>
+<rect x="610" y="104" width="380" height="226" rx="10" fill="#ffffff" stroke="#dcd3cb"/>
+<path d="M610 148 V114 a10 10 0 0 1 10 -10 H980 a10 10 0 0 1 10 10 V148 Z" fill="#b34f2f"/>
+<text x="626" y="132" class="tname">report_history</text>
+<text x="974" y="132" class="tnote" text-anchor="end">workflow timeline</text>
+<rect x="622" y="154.5" width="28" height="16" rx="4" fill="#b34f2f"/>
+<text x="636" y="166.5" class="badge" fill="#ffffff" text-anchor="middle">PK</text>
+<text x="660" y="167" class="col pk">id</text>
+<text x="976" y="167" class="type" text-anchor="end">INT</text>
+<rect x="611" y="173" width="378" height="21" fill="#fbf9f7"/>
+<rect x="622" y="175.5" width="28" height="16" rx="4" fill="#efc88b"/>
+<text x="636" y="187.5" class="badge" fill="#7b3621" text-anchor="middle">FK</text>
+<text x="660" y="188" class="col">report_id</text>
+<text x="976" y="188" class="type" text-anchor="end">INT</text>
+<text x="660" y="209" class="col">status</text>
+<text x="976" y="209" class="type" text-anchor="end">VARCHAR(20)</text>
+<rect x="611" y="215" width="378" height="21" fill="#fbf9f7"/>
+<text x="660" y="230" class="col">description</text>
+<text x="976" y="230" class="type" text-anchor="end">VARCHAR(255)</text>
+<text x="660" y="251" class="col">actor</text>
+<text x="976" y="251" class="type" text-anchor="end">VARCHAR(80)</text>
+<rect x="611" y="257" width="378" height="21" fill="#fbf9f7"/>
+<rect x="622" y="259.5" width="28" height="16" rx="4" fill="#efc88b"/>
+<text x="636" y="271.5" class="badge" fill="#7b3621" text-anchor="middle">FK</text>
+<text x="660" y="272" class="col">actor_id</text>
+<text x="976" y="272" class="type" text-anchor="end">INT</text>
+<text x="660" y="293" class="col">note</text>
+<text x="976" y="293" class="type" text-anchor="end">TEXT</text>
+<rect x="611" y="299" width="378" height="21" fill="#fbf9f7"/>
+<text x="660" y="314" class="col">created_at</text>
+<text x="976" y="314" class="type" text-anchor="end">DATETIME(3)</text>
+</g>
+<g>
+<rect x="610" y="342" width="380" height="184" rx="10" fill="#ffffff" stroke="#dcd3cb"/>
+<path d="M610 386 V352 a10 10 0 0 1 10 -10 H980 a10 10 0 0 1 10 10 V386 Z" fill="#b34f2f"/>
+<text x="626" y="370" class="tname">report_notes</text>
+<text x="974" y="370" class="tnote" text-anchor="end">staff-only notes</text>
+<rect x="622" y="392.5" width="28" height="16" rx="4" fill="#b34f2f"/>
+<text x="636" y="404.5" class="badge" fill="#ffffff" text-anchor="middle">PK</text>
+<text x="660" y="405" class="col pk">id</text>
+<text x="976" y="405" class="type" text-anchor="end">INT</text>
+<rect x="611" y="411" width="378" height="21" fill="#fbf9f7"/>
+<rect x="622" y="413.5" width="28" height="16" rx="4" fill="#efc88b"/>
+<text x="636" y="425.5" class="badge" fill="#7b3621" text-anchor="middle">FK</text>
+<text x="660" y="426" class="col">report_id</text>
+<text x="976" y="426" class="type" text-anchor="end">INT</text>
+<text x="660" y="447" class="col">note</text>
+<text x="976" y="447" class="type" text-anchor="end">TEXT</text>
+<rect x="611" y="453" width="378" height="21" fill="#fbf9f7"/>
+<text x="660" y="468" class="col">actor</text>
+<text x="976" y="468" class="type" text-anchor="end">VARCHAR(80)</text>
+<rect x="622" y="476.5" width="28" height="16" rx="4" fill="#efc88b"/>
+<text x="636" y="488.5" class="badge" fill="#7b3621" text-anchor="middle">FK</text>
+<text x="660" y="489" class="col">actor_id</text>
+<text x="976" y="489" class="type" text-anchor="end">INT</text>
+<rect x="611" y="495" width="378" height="21" fill="#fbf9f7"/>
+<text x="660" y="510" class="col">created_at</text>
+<text x="976" y="510" class="type" text-anchor="end">DATETIME(3)</text>
+</g>
+<g>
+<rect x="610" y="538" width="380" height="289" rx="10" fill="#ffffff" stroke="#dcd3cb"/>
+<path d="M610 582 V548 a10 10 0 0 1 10 -10 H980 a10 10 0 0 1 10 10 V582 Z" fill="#b34f2f"/>
+<text x="626" y="566" class="tname">photos</text>
+<text x="974" y="566" class="tnote" text-anchor="end">evidence and repair photos</text>
+<rect x="622" y="588.5" width="28" height="16" rx="4" fill="#b34f2f"/>
+<text x="636" y="600.5" class="badge" fill="#ffffff" text-anchor="middle">PK</text>
+<text x="660" y="601" class="col pk">id</text>
+<text x="976" y="601" class="type" text-anchor="end">INT</text>
+<rect x="611" y="607" width="378" height="21" fill="#fbf9f7"/>
+<rect x="622" y="609.5" width="28" height="16" rx="4" fill="#efc88b"/>
+<text x="636" y="621.5" class="badge" fill="#7b3621" text-anchor="middle">FK</text>
+<text x="660" y="622" class="col">report_id</text>
+<text x="976" y="622" class="type" text-anchor="end">INT</text>
+<text x="660" y="643" class="col">kind</text>
+<text x="976" y="643" class="type" text-anchor="end">ENUM</text>
+<rect x="611" y="649" width="378" height="21" fill="#fbf9f7"/>
+<text x="660" y="664" class="col">name</text>
+<text x="976" y="664" class="type" text-anchor="end">VARCHAR(160)</text>
+<text x="660" y="685" class="col">file_path</text>
+<text x="976" y="685" class="type" text-anchor="end">VARCHAR(255)</text>
+<rect x="611" y="691" width="378" height="21" fill="#fbf9f7"/>
+<text x="660" y="706" class="col">mime_type</text>
+<text x="976" y="706" class="type" text-anchor="end">VARCHAR(40)</text>
+<text x="660" y="727" class="col">size_bytes</text>
+<text x="976" y="727" class="type" text-anchor="end">INT</text>
+<rect x="611" y="733" width="378" height="21" fill="#fbf9f7"/>
+<text x="660" y="748" class="col">sort_order</text>
+<text x="976" y="748" class="type" text-anchor="end">TINYINT</text>
+<rect x="622" y="756.5" width="28" height="16" rx="4" fill="#efc88b"/>
+<text x="636" y="768.5" class="badge" fill="#7b3621" text-anchor="middle">FK</text>
+<text x="660" y="769" class="col">uploaded_by</text>
+<text x="976" y="769" class="type" text-anchor="end">INT</text>
+<rect x="611" y="775" width="378" height="21" fill="#fbf9f7"/>
+<text x="660" y="790" class="col">created_at</text>
+<text x="976" y="790" class="type" text-anchor="end">DATETIME(3)</text>
+<text x="660" y="811" class="col">replaced_at</text>
+<text x="976" y="811" class="type" text-anchor="end">DATETIME(3)</text>
+</g>
+<g>
+<rect x="1180" y="104" width="380" height="394" rx="10" fill="#ffffff" stroke="#dcd3cb"/>
+<path d="M1180 148 V114 a10 10 0 0 1 10 -10 H1550 a10 10 0 0 1 10 10 V148 Z" fill="#b34f2f"/>
+<text x="1196" y="132" class="tname">reports</text>
+<text x="1544" y="132" class="tnote" text-anchor="end">road damage reports</text>
+<rect x="1192" y="154.5" width="28" height="16" rx="4" fill="#b34f2f"/>
+<text x="1206" y="166.5" class="badge" fill="#ffffff" text-anchor="middle">PK</text>
+<text x="1230" y="167" class="col pk">id</text>
+<text x="1546" y="167" class="type" text-anchor="end">INT</text>
+<rect x="1181" y="173" width="378" height="21" fill="#fbf9f7"/>
+<text x="1230" y="188" class="col">title</text>
+<text x="1546" y="188" class="type" text-anchor="end">VARCHAR(120)</text>
+<text x="1230" y="209" class="col">road</text>
+<text x="1546" y="209" class="type" text-anchor="end">VARCHAR(120)</text>
+<rect x="1181" y="215" width="378" height="21" fill="#fbf9f7"/>
+<text x="1230" y="230" class="col">location</text>
+<text x="1546" y="230" class="type" text-anchor="end">VARCHAR(160)</text>
+<text x="1230" y="251" class="col">latitude</text>
+<text x="1546" y="251" class="type" text-anchor="end">DECIMAL(9,6)</text>
+<rect x="1181" y="257" width="378" height="21" fill="#fbf9f7"/>
+<text x="1230" y="272" class="col">longitude</text>
+<text x="1546" y="272" class="type" text-anchor="end">DECIMAL(9,6)</text>
+<text x="1230" y="293" class="col">severity</text>
+<text x="1546" y="293" class="type" text-anchor="end">ENUM</text>
+<rect x="1181" y="299" width="378" height="21" fill="#fbf9f7"/>
+<text x="1230" y="314" class="col">description</text>
+<text x="1546" y="314" class="type" text-anchor="end">TEXT</text>
+<text x="1230" y="335" class="col">status</text>
+<text x="1546" y="335" class="type" text-anchor="end">ENUM</text>
+<rect x="1181" y="341" width="378" height="21" fill="#fbf9f7"/>
+<rect x="1192" y="343.5" width="28" height="16" rx="4" fill="#efc88b"/>
+<text x="1206" y="355.5" class="badge" fill="#7b3621" text-anchor="middle">FK</text>
+<text x="1230" y="356" class="col">reporter_id</text>
+<text x="1546" y="356" class="type" text-anchor="end">INT</text>
+<rect x="1192" y="364.5" width="28" height="16" rx="4" fill="#efc88b"/>
+<text x="1206" y="376.5" class="badge" fill="#7b3621" text-anchor="middle">FK</text>
+<text x="1230" y="377" class="col">assigned_to</text>
+<text x="1546" y="377" class="type" text-anchor="end">INT</text>
+<rect x="1181" y="383" width="378" height="21" fill="#fbf9f7"/>
+<text x="1230" y="398" class="col">assigned_name</text>
+<text x="1546" y="398" class="type" text-anchor="end">VARCHAR(80)</text>
+<text x="1230" y="419" class="col">repair_notes</text>
+<text x="1546" y="419" class="type" text-anchor="end">TEXT</text>
+<rect x="1181" y="425" width="378" height="21" fill="#fbf9f7"/>
+<text x="1230" y="440" class="col">repair_submitted_at</text>
+<text x="1546" y="440" class="type" text-anchor="end">DATETIME(3)</text>
+<text x="1230" y="461" class="col">reported_at</text>
+<text x="1546" y="461" class="type" text-anchor="end">DATETIME(3)</text>
+<rect x="1181" y="467" width="378" height="21" fill="#fbf9f7"/>
+<text x="1230" y="482" class="col">updated_at</text>
+<text x="1546" y="482" class="type" text-anchor="end">DATETIME(3)</text>
+</g>
+</svg>

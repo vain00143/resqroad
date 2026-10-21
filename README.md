@@ -134,6 +134,19 @@ Administrators can also add internal notes, which only administrators can read.
 The schema is in `database/schema.sql` (`npm run db:setup` applies it; it's
 safe to run again). All times are stored in UTC.
 
+- **ER diagram**: `docs/database-er-diagram.png` (for slides and documents)
+  and `docs/database-er-diagram.svg` (scalable) show every table, column, key,
+  and relationship.
+- **Database file with sample data**: `database/resqroad-sample-data.sql` is a
+  complete MySQL export of the schema plus the `npm run seed` sample data (12
+  fictional accounts, 21 reports with their history). Load it on a computer
+  with no `resqroad` database from the MySQL prompt
+  (`mysql -u root -p`) with
+  `source C:/path/to/Project/database/resqroad-sample-data.sql`; it refuses to
+  overwrite an existing `resqroad` database.
+
+![ResQRoad database ER diagram](docs/database-er-diagram.png)
+
 | Table | What it holds |
 | --- | --- |
 | `users` | Every account: `name`, `email` (unique), `password_hash` (bcrypt), `role` (`admin` \| `maintenance` \| `citizen`), `team` (crews), `active`, `created_at`, `deleted_at` (deleted crew accounts). |
@@ -257,6 +270,8 @@ server/live.js                Live updates over WebSocket
 server/auth.js                Passwords, sessions, role checks, sign-in limits
 server/db.js, config.js       MySQL connection and .env settings
 database/schema.sql           MySQL tables
+database/resqroad-sample-data.sql  The schema plus sample data, as a MySQL export
+docs/database-er-diagram.*    ER diagram of the database (PNG and SVG)
 tools/db-setup.js             npm run db:setup
 tools/create-admin.js         npm run create-admin
 tools/seed.js, seed-data.js   npm run seed (sample accounts and reports)
