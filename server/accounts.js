@@ -4,7 +4,7 @@ import express from "express";
 import {
   HttpError,
   checkAttempts,
-  checkPassword,
+  verifyPassword,
   clearFailures,
   clearedCookie,
   createSession,
@@ -187,7 +187,7 @@ accountRoutes.post("/auth/register", async function (request, response) {
 accountRoutes.post("/auth/password", requireRole(), async function (request, response) {
   const body = request.body || {};
   const row = await one("SELECT * FROM users WHERE id = ?", [request.user.id]);
-  if (!row || !(await checkPassword(String(body.currentPassword || ""), row.password_hash))) {
+  if (!row || !(await verifyPassword(row, String(body.currentPassword || "")))) {
     throw new HttpError(400, "Your current password is incorrect.");
   }
   const password = validatePassword(body.newPassword);

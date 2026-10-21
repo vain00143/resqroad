@@ -1,6 +1,6 @@
 // Copies the data from the old Firebase project (Cloud Firestore) into MySQL:
-// reports with their full history, internal notes, photos (saved as image
-// files in storage/photos/), and accounts.
+// accounts, reports with their full history, internal notes, and photos
+// (saved as image files in storage/photos/).
 //
 //   npm run import:firebase
 //       Asks for the Firebase administrator's email and password, then copies
@@ -11,13 +11,16 @@
 //       the crew's name is kept).
 //   Add --replace to delete the reports already in MySQL first.
 //
-// Firebase never reveals passwords, so imported accounts get a new temporary
-// password (printed once at the end) — except the administrator who signs in
-// here, who keeps the password typed in. Accounts whose email already exists
-// in MySQL are linked and keep their current password.
+// Everyone keeps their Firebase email and password. Firebase never reveals
+// passwords, so each imported account is marked to check its password with
+// Firebase the first time that person signs in here; the server then stores
+// it in MySQL (see verifyPassword in server/auth.js). Accounts whose email
+// already exists in MySQL switch to their Firebase password too.
+//
+// FIREBASE_ADMIN_EMAIL and FIREBASE_ADMIN_PASSWORD can be set instead of
+// typing them (used by the tests, as are FIRESTORE_URL and FIREBASE_AUTH_URL).
 
-import crypto from "node:crypto";
-import { hashPassword } from "../server/auth.js";
+import { firebasePasswordPrefix, hashPassword } from "../server/auth.js";
 import { explainDatabaseError, pool, query, setupDatabase, transaction } from "../server/db.js";
 import { checkPhotos, removePhotoFiles, savePhotos } from "../server/photos.js";
 import { firebaseConfig } from "../firebase/firebase-config.js";
@@ -26,7 +29,9 @@ import { ask, askHidden } from "./prompt.js";
 const publicOnly = process.argv.includes("--public-only");
 const replace = process.argv.includes("--replace");
 const documentsUrl =
-  "https://firestore.googleapis.com/v1/projects/" + firebaseConfig.projectId + "/databases/(default)/documents/";
+  (process.env.FIRESTORE_URL ||
+    "https://firestore.googleapis.com/v1/projects/" + firebaseConfig.projectId + "/databases/(default)/documents") + "/";
+const signInUrl = process.env.FIREBASE_AUTH_URL || "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword";
 
 /* ---------- Reading Firestore over its REST API ---------- */
 
@@ -72,14 +77,11 @@ async function readCollection(name, idToken) {
 }
 
 async function firebaseSignIn(email, password) {
-  const response = await fetch(
-    "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=" + firebaseConfig.apiKey,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: email, password: password, returnSecureToken: true }),
-    },
-  );
+  const response = await fetch(signInUrl + "?key=" + firebaseConfig.apiKey, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: email, password: password, returnSecureToken: true }),
+  });
   const body = await response.json();
   if (!response.ok) {
     throw new Error("Firebase sign-in failed: " + ((body.error && body.error.message) || response.status));
@@ -94,34 +96,33 @@ function toDate(value) {
   return date && !Number.isNaN(date.getTime()) ? date : new Date();
 }
 
-function temporaryPassword() {
-  return "Rq" + crypto.randomInt(1000, 9999) + crypto.randomBytes(3).toString("hex");
-}
-
-// Creates (or links) MySQL accounts for the Firebase users; returns a map
-// from Firebase user ID to MySQL user ID.
+// Creates (or links) MySQL accounts for the Firebase users, each keeping its
+// Firebase password; returns a map from Firebase user ID to MySQL user ID.
 async function importUsers(users, admin) {
   const ids = new Map();
-  const created = [];
   for (const user of users) {
     const email = String(user.email || "").trim().toLowerCase();
     if (!email) {
       continue;
     }
+    // The administrator running the import typed their password, so it can
+    // be stored right away; everyone else's is checked at their first sign-in.
+    const passwordHash =
+      admin && user.id === admin.uid ? await hashPassword(admin.password) : firebasePasswordPrefix + user.id;
     const existing = await query("SELECT id FROM users WHERE email = ?", [email]);
     if (existing[0]) {
+      await query("UPDATE users SET password_hash = ? WHERE id = ?", [passwordHash, existing[0].id]);
+      await query("DELETE FROM sessions WHERE user_id = ?", [existing[0].id]);
       ids.set(user.id, existing[0].id);
-      console.log("  linked   " + email + " (keeps its MySQL password)");
+      console.log("  linked   " + email + " (now signs in with the Firebase password)");
       continue;
     }
-    const isAdmin = admin && user.id === admin.uid;
-    const password = isAdmin ? admin.password : temporaryPassword();
     const result = await query(
       "INSERT INTO users (name, email, password_hash, role, team, active, created_at, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
       [
         String(user.name || email).slice(0, 80),
         email,
-        await hashPassword(password),
+        passwordHash,
         ["admin", "maintenance", "citizen"].includes(user.role) ? user.role : "citizen",
         user.team || null,
         user.active === false || user.deleted ? 0 : 1,
@@ -130,12 +131,9 @@ async function importUsers(users, admin) {
       ],
     );
     ids.set(user.id, result.insertId);
-    console.log("  created  " + email);
-    if (!isAdmin && !user.deleted) {
-      created.push([email, user.role, password]);
-    }
+    console.log("  created  " + email + (user.deleted ? " (deleted crew account)" : user.active === false ? " (deactivated)" : ""));
   }
-  return { ids: ids, created: created };
+  return ids;
 }
 
 // Turns Firestore photo references into photo rows; uploaded photos (data
@@ -169,8 +167,8 @@ async function main() {
   let admin = null;
   if (!publicOnly) {
     console.log("Sign in with the Firebase administrator account (needed to copy accounts and notes).");
-    const email = (await ask("Firebase admin email: ")).toLowerCase();
-    const password = await askHidden("Password: ");
+    const email = (process.env.FIREBASE_ADMIN_EMAIL || (await ask("Firebase admin email: "))).trim().toLowerCase();
+    const password = process.env.FIREBASE_ADMIN_PASSWORD || (await askHidden("Password: "));
     const session = await firebaseSignIn(email, password);
     admin = { uid: session.uid, idToken: session.idToken, password: password };
   }
@@ -186,7 +184,7 @@ async function main() {
   console.log("  " + reports.length + " reports, " + photos.length + " uploaded photos, " + users.length + " accounts, " + notes.length + " notes");
 
   console.log("Accounts");
-  const accounts = admin ? await importUsers(users, admin) : { ids: new Map(), created: [] };
+  const accounts = { ids: admin ? await importUsers(users, admin) : new Map() };
   if (!admin) {
     console.log("  skipped  (--public-only)");
   }
@@ -265,12 +263,8 @@ async function main() {
   }
   await query("ALTER TABLE reports AUTO_INCREMENT = " + (highest + 1));
   console.log("  saved    " + reports.length + " reports and " + saved.length + " photo files");
-
-  if (accounts.created.length) {
-    console.log("\nTemporary passwords for the imported accounts (shown only once; share each one privately):");
-    accounts.created.forEach(function ([email, role, password]) {
-      console.log("  " + email.padEnd(36) + " " + String(role).padEnd(12) + " " + password);
-    });
+  if (admin) {
+    console.log("\nDone. Everyone signs in with their usual Firebase email and password.");
   }
 }
 

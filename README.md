@@ -187,7 +187,10 @@ verifies, and assigns it, the crew starts and submits the repair, the
 administrator sends it back once, and then resolves it, with every other
 device receiving each step live. It also checks the permission rules, photo
 storage, duplicate detection, sign-in for the website and the app,
-deactivation, crew accounts, and that server files are never served.
+deactivation, crew accounts, and that server files are never served. A second
+test runs `npm run import:firebase` against a fake Firebase on this computer
+(database `resqroad_import_test`) and checks that people then sign in with
+their Firebase passwords.
 
 ## Moving data from Firebase
 
@@ -200,11 +203,21 @@ npm run import:firebase                    # signs in as the Firebase admin; cop
 npm run import:firebase -- --public-only   # no sign-in: reports, history, and photos only
 ```
 
-Add `--replace` to delete the reports already in MySQL first. Firebase never
-reveals passwords, so imported accounts get new temporary passwords that the
-tool prints once (the administrator who signs in keeps the password typed in).
-Accounts whose email already exists in MySQL are linked and keep their
-password. Photos stored in Firestore become image files in `storage/photos/`.
+Add `--replace` to delete the reports already in MySQL first. Photos stored in
+Firestore become image files in `storage/photos/`.
+
+**Everyone keeps their Firebase email and password**; nobody needs a new
+account. Firebase never reveals passwords, so each imported account is marked
+to have its password checked with Firebase **once**, the first time that
+person signs in to the new site. The server then stores the password in MySQL
+(bcrypt), and Firebase isn't involved for that account again. The administrator
+who runs the import is moved over immediately. Accounts whose email already
+exists in MySQL switch to their Firebase password too.
+
+Keep the Firebase project until everyone has signed in once. To see who
+hasn't yet: `SELECT email FROM users WHERE password_hash LIKE 'firebase:%';`.
+An administrator can give anyone left over a new temporary password
+(`POST /api/users/:id/password`).
 
 ## Deploying
 
@@ -248,7 +261,8 @@ tools/db-setup.js             npm run db:setup
 tools/create-admin.js         npm run create-admin
 tools/seed.js, seed-data.js   npm run seed (sample accounts and reports)
 tools/import-firebase.js      npm run import:firebase
-tests/workflow.test.js        npm test
+tests/workflow.test.js        npm test: the whole workflow end to end
+tests/firebase-import.test.js npm test: Firebase import and password carry-over
 docs/API.md                   API for the mobile app
 firebase/                     The previous Firebase configuration (reference)
 assets/css/core.css           Design tokens, base styles, shared components

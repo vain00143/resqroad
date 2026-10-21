@@ -8,6 +8,7 @@ import crypto from "node:crypto";
 import bcrypt from "bcryptjs";
 import { config } from "./config.js";
 import { one, query } from "./db.js";
+import { firebaseConfig } from "../firebase/firebase-config.js";
 
 export const cookieName = "resqroad_session";
 const dayMs = 24 * 60 * 60 * 1000;
@@ -34,10 +35,66 @@ export function checkPassword(password, hash) {
 // as a wrong password.
 const dummyHash = bcrypt.hashSync("resqroad-timing-guard", 10);
 
+// Accounts copied from Firebase (`npm run import:firebase`) keep their
+// Firebase password: their password_hash is "firebase:<Firebase user ID>"
+// until the person first signs in here. That sign-in is checked once with
+// Firebase, and the password is then stored as a bcrypt hash like any other.
+export const firebasePasswordPrefix = "firebase:";
+const firebaseSignInUrl =
+  process.env.FIREBASE_AUTH_URL || "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword";
+
+async function firebasePasswordMatches(email, password) {
+  let response;
+  try {
+    response = await fetch(firebaseSignInUrl + "?key=" + encodeURIComponent(firebaseConfig.apiKey), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: email, password: password, returnSecureToken: true }),
+      signal: AbortSignal.timeout(10000),
+    });
+  } catch (error) {
+    throw new HttpError(503, "Your password couldn't be checked right now. Check the server's internet connection and try again.");
+  }
+  if (response.ok) {
+    return true;
+  }
+  const body = await response.json().catch(function () {
+    return {};
+  });
+  const code = String((body.error && body.error.message) || "");
+  if (code.startsWith("TOO_MANY_ATTEMPTS")) {
+    throw new HttpError(429, "Too many attempts. Wait a few minutes and try again.");
+  }
+  if (response.status >= 500) {
+    throw new HttpError(503, "Your password couldn't be checked right now. Try again in a minute.");
+  }
+  return false;
+}
+
+// Checks a password against an account row (bcrypt, or a Firebase password
+// that hasn't been moved over yet).
+export async function verifyPassword(row, password) {
+  if (String(row.password_hash).startsWith(firebasePasswordPrefix)) {
+    if (!(await firebasePasswordMatches(row.email, password))) {
+      return false;
+    }
+    await query("UPDATE users SET password_hash = ? WHERE id = ? AND password_hash = ?", [
+      await hashPassword(password),
+      row.id,
+      row.password_hash,
+    ]);
+    return true;
+  }
+  return checkPassword(password, row.password_hash);
+}
+
 export async function verifyLogin(email, password) {
   const user = await one("SELECT * FROM users WHERE email = ?", [email]);
-  const matches = await checkPassword(password, user ? user.password_hash : dummyHash);
-  return user && matches ? user : null;
+  if (!user) {
+    await checkPassword(password, dummyHash);
+    return null;
+  }
+  return (await verifyPassword(user, password)) ? user : null;
 }
 
 export function validatePassword(password) {
