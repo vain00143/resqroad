@@ -9,14 +9,14 @@ import { timeAgo } from "@/lib/format";
 import type { Report } from "@/lib/reports";
 import { radius, useTheme } from "@/theme";
 
-// A report in a list; opens the report's page.
-export function ReportRow({ report }: { report: Report }) {
+// A report in a list; opens the report's page (crews open the job page).
+export function ReportRow({ report, onPress }: { report: Report; onPress?: () => void }) {
   const { colors } = useTheme();
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={report.id + ", " + report.title}
-      onPress={() => router.push({ pathname: "/reports/[id]", params: { id: report.id } })}
+      onPress={onPress ?? (() => router.push({ pathname: "/reports/[id]", params: { id: report.id } }))}
       style={({ pressed }) => [
         styles.row,
         { backgroundColor: pressed ? colors.surface3 : colors.surface, borderColor: colors.border },

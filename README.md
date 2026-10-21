@@ -264,6 +264,15 @@ residents can register in the app. Administrators are pointed to the website.
   Open, Resolved, and Closed filters), and **Track** (any report by ID, also
   available signed out from the welcome screen). Each report's page shows its
   progress, photos, location, any repair, and every decision with its note.
+- **Maintenance crews** have three tabs: **Home** (their numbers and what's
+  up next), **My jobs** (Active, Awaiting review, Completed, and All, in the
+  website's order: repairs underway first, then by severity), and **Map**
+  (every job, with active ones as pins; tap one for directions). A job's page
+  has **Directions** (Google Maps), **Start repair**, and the repair form:
+  notes plus before and after photos (at least one of each), with a
+  confirmation before sending. When an administrator asks for more work, the
+  note appears at the top and the previous repair stays visible. Unsent notes
+  and photos are kept while the crew looks at other screens.
 - **Maps** are the website's Leaflet + OpenStreetMap maps running in a WebView,
   so no map API key is needed (the phone needs internet for the map tiles).
   Open reports appear as grey dots on the reporting map.

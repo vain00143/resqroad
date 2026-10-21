@@ -25,10 +25,12 @@ type Props = {
   // The main thing to do next, shown under the numbers.
   action?: ReactNode;
   comingNext?: string;
+  // Where a list row leads; the report's page by default.
+  onOpen?: (report: Report) => void;
 };
 
 // The signed-in home screen shared by residents and crews.
-export function HomeScaffold({ subtitle, stats, listTitle, reports, emptyText, action, comingNext }: Props) {
+export function HomeScaffold({ subtitle, stats, listTitle, reports, emptyText, action, comingNext, onOpen }: Props) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const { user, loaded, connection, refresh, signOut } = useSession();
@@ -82,7 +84,7 @@ export function HomeScaffold({ subtitle, stats, listTitle, reports, emptyText, a
               <AppText variant="eyebrow">{listTitle}</AppText>
               {loaded && reports.length === 0 ? <AppText tone="text2">{emptyText}</AppText> : null}
               {reports.map((report) => (
-                <ReportRow key={report.id} report={report} />
+                <ReportRow key={report.id} report={report} onPress={onOpen ? () => onOpen(report) : undefined} />
               ))}
             </View>
 

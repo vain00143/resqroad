@@ -18,7 +18,8 @@ async function shrink(asset: ImagePicker.ImagePickerAsset, index: number): Promi
   const context = ImageManipulator.manipulate(asset.uri);
   const { width, height } = asset;
   if (!width || !height || Math.max(width, height) > longestSide) {
-    context.resize(width >= height ? { width: longestSide, height: null } : { width: null, height: longestSide });
+    // Give only one side; the web version breaks on an explicit null.
+    context.resize(width >= height ? { width: longestSide } : { height: longestSide });
   }
   const image = await context.renderAsync();
   const saved = await image.saveAsync({ compress: 0.75, format: SaveFormat.JPEG });
