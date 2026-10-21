@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Create a free ResQRoad resident account to report road damage and track repairs." />
+    <meta name="theme-color" content="#141110" />
+    <title>Create an account | ResQRoad</title>
+    <link rel="icon" type="image/png" href="assets/images/resqroad-mark.png" />
+    <script>
+      (function () {
+        try {
+          var saved = localStorage.getItem("resqroad-theme");
+          var dark = saved === "dark" || (saved !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+          document.documentElement.dataset.theme = dark ? "dark" : "light";
+        } catch (error) {
+          document.documentElement.dataset.theme = "light";
+        }
+      })();
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="assets/css/core.css" />
+    <link rel="stylesheet" href="assets/css/site.css" />
+    <script src="assets/js/icons.js" defer></script>
+    <script src="assets/js/data-store.js" defer></script>
+    <script src="assets/js/ui.js" defer></script>
+    <script src="assets/js/auth.js" defer></script>
+    <script src="assets/js/shell.js" defer></script>
+    <script src="assets/js/register.js" defer></script>
+  </head>
+  <body class="site-body">
+    <div class="auth">
+      <aside class="auth-aside" aria-label="Why create an account">
+        <a class="brand-logo" href="index.html" aria-label="ResQRoad home">
+          <img src="assets/images/resqroad-logotype-white.png" alt="ResQRoad" width="748" height="127" />
+        </a>
+        <div>
+          <h2 class="display">Be the reason a road <span class="accent">gets fixed.</span></h2>
+          <p>A free resident account lets you report road damage in under a minute and follow every repair from start to finish.</p>
+          <ul class="auth-points">
+            <li>
+              <span class="point-icon"><svg data-icon="camera"></svg></span>
+              <div><strong>Report with photos</strong><span>Pin the exact spot and attach up to five photos.</span></div>
+            </li>
+            <li>
+              <span class="point-icon"><svg data-icon="activity"></svg></span>
+              <div><strong>Follow every step</strong><span>See when your report is verified, assigned, and repaired.</span></div>
+            </li>
+            <li>
+              <span class="point-icon"><svg data-icon="shield-check"></svg></span>
+              <div><strong>Your details stay private</strong><span>Your name is never shown on the public map or tracker.</span></div>
+            </li>
+          </ul>
+        </div>
+        <div class="auth-aside-foot">
+          <span>&copy; <span data-current-year></span> ResQRoad</span>
+          <span>Road Maintenance Office</span>
+        </div>
+      </aside>
+
+      <main class="auth-main" id="main">
+        <div class="auth-top">
+          <a class="brand-logo" href="index.html" aria-label="ResQRoad home">
+            <img class="logo-on-light" src="assets/images/resqroad-logotype.png" alt="ResQRoad" width="748" height="127" />
+            <img class="logo-on-dark" src="assets/images/resqroad-logotype-white.png" alt="ResQRoad" width="748" height="127" />
+          </a>
+          <div class="toolbar-group">
+            <a class="btn btn-ghost btn-sm" href="index.html"><svg data-icon="arrow-left" class="icon-sm"></svg>Home</a>
+            <button class="btn btn-ghost btn-icon btn-sm theme-toggle" type="button" data-theme-toggle><svg data-icon="sun" class="icon-sun"></svg><svg data-icon="moon" class="icon-moon"></svg></button>
+          </div>
+        </div>
+
+        <div class="auth-card">
+          <p class="eyebrow">Resident account</p>
+          <h1 id="register-title">Create your account</h1>
+          <p class="lede">Free for every resident. Staff accounts are created by the administrator.</p>
+          <p class="alert alert-error" id="register-error" role="alert" hidden></p>
+          <form id="register-form" class="auth-form" aria-labelledby="register-title" novalidate>
+            <label class="field">
+              <span class="field-label">Full name</span>
+              <span class="input-icon">
+                <svg data-icon="user"></svg>
+                <input type="text" name="name" autocomplete="name" placeholder="Juan Dela Cruz" maxlength="80" required />
+              </span>
+            </label>
+            <label class="field">
+              <span class="field-label">Email</span>
+              <span class="input-icon">
+                <svg data-icon="mail"></svg>
+                <input type="email" name="email" autocomplete="email" placeholder="you@example.com" maxlength="120" required />
+              </span>
+            </label>
+            <label class="field">
+              <span class="field-label">Password</span>
+              <span class="input-icon password-field">
+                <svg data-icon="lock"></svg>
+                <input type="password" name="password" autocomplete="new-password" placeholder="At least 8 characters" required aria-describedby="password-hint" />
+                <button class="password-toggle" type="button" data-toggle-password aria-label="Show password" aria-pressed="false"><svg data-icon="eye"></svg></button>
+              </span>
+              <span class="strength" id="password-strength" data-score="0" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+              <span class="field-hint" id="password-hint">Use 8 or more characters with at least one letter and one number.</span>
+            </label>
+            <label class="field">
+              <span class="field-label">Confirm password</span>
+              <span class="input-icon">
+                <svg data-icon="lock"></svg>
+                <input type="password" name="confirm" autocomplete="new-password" placeholder="Type your password again" required />
+              </span>
+            </label>
+            <button class="btn btn-primary btn-lg btn-block" type="submit">Create account<svg data-icon="arrow-right"></svg></button>
+          </form>
+          <p class="auth-switch">Already have an account? <a href="login.html" id="login-link">Log in</a></p>
+        </div>
+      </main>
+    </div>
+  </body>
+</html>

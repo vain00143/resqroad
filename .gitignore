@@ -1,0 +1,14 @@
+# Unrelated Flutter class project that lives in the same folder.
+student_login_registration/
+
+# Local editor and tooling settings.
+.vscode/
+.claude/
+CLAUDE.md
+
+# Operating system and tooling clutter.
+Thumbs.db
+desktop.ini
+.DS_Store
+node_modules/
+*.log

@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="ResQRoad is a road damage reporting and maintenance management system. Report potholes and road damage, track every repair, and see roads get fixed." />
+    <meta name="theme-color" content="#141110" />
+    <meta property="og:title" content="ResQRoad — Report road damage. Track every repair." />
+    <meta property="og:description" content="Citizens report road problems, and the Road Maintenance Office tracks, prioritizes, and resolves them." />
+    <meta property="og:image" content="assets/images/resqroad-logotype.png" />
+    <title>ResQRoad | Road damage reporting and repair tracking</title>
+    <link rel="icon" type="image/png" href="assets/images/resqroad-mark.png" />
+    <script>
+      (function () {
+        try {
+          var saved = localStorage.getItem("resqroad-theme");
+          var dark = saved === "dark" || (saved !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+          document.documentElement.dataset.theme = dark ? "dark" : "light";
+        } catch (error) {
+          document.documentElement.dataset.theme = "light";
+        }
+      })();
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <link rel="stylesheet" href="assets/css/core.css" />
+    <link rel="stylesheet" href="assets/css/site.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="" defer></script>
+    <script src="assets/js/icons.js" defer></script>
+    <script src="assets/js/data-store.js" defer></script>
+    <script src="assets/js/ui.js" defer></script>
+    <script src="assets/js/auth.js" defer></script>
+    <script src="assets/js/shell.js" defer></script>
+    <script src="assets/js/site.js" defer></script>
+    <script src="assets/js/landing.js" defer></script>
+  </head>
+  <body class="site-body">
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <header class="site-header on-dark" data-transparent>
+      <div class="container site-header-inner">
+        <a class="brand-logo" href="index.html" aria-label="ResQRoad home">
+          <img class="logo-on-light" src="assets/images/resqroad-logotype.png" alt="ResQRoad" width="748" height="127" />
+          <img class="logo-on-dark" src="assets/images/resqroad-logotype-white.png" alt="ResQRoad" width="748" height="127" />
+        </a>
+        <nav class="site-nav" aria-label="Main">
+          <a href="#how-it-works">How it works</a>
+          <a href="#live-map">Live map</a>
+          <a href="#for-lgu">For LGU teams</a>
+          <a href="track.html">Track a report</a>
+        </nav>
+        <div class="site-actions">
+          <button class="btn btn-ghost btn-icon theme-toggle" type="button" data-theme-toggle><svg data-icon="sun" class="icon-sun"></svg><svg data-icon="moon" class="icon-moon"></svg></button>
+          <a class="btn btn-secondary hide-mobile" href="login.html" data-signed-out><svg data-icon="log-in"></svg>Sign in</a>
+          <a class="btn btn-secondary hide-mobile" href="login.html" data-signed-in data-workspace-link hidden><svg data-icon="dashboard"></svg><span data-workspace-label>Open workspace</span></a>
+          <a class="btn btn-primary hide-mobile" href="login.html?next=report" data-report-link><svg data-icon="map-pin"></svg>Report a problem</a>
+          <button class="btn btn-ghost btn-icon site-menu-button" type="button" data-site-menu aria-expanded="false" aria-controls="mobile-nav" aria-label="Open menu"><svg data-icon="menu"></svg></button>
+        </div>
+      </div>
+    </header>
+    <nav class="mobile-nav" id="mobile-nav" aria-label="Mobile" hidden>
+      <a href="#how-it-works">How it works</a>
+      <a href="#live-map">Live map</a>
+      <a href="#for-lgu">For LGU teams</a>
+      <a href="track.html">Track a report</a>
+      <a class="btn btn-secondary btn-block" href="login.html" data-signed-out><svg data-icon="log-in"></svg>Sign in</a>
+      <a class="btn btn-secondary btn-block" href="login.html" data-signed-in data-workspace-link hidden><svg data-icon="dashboard"></svg><span data-workspace-label>Open workspace</span></a>
+      <a class="btn btn-primary btn-block" href="login.html?next=report" data-report-link><svg data-icon="map-pin"></svg>Report a problem</a>
+    </nav>
+
+    <main id="main">
+      <!-- Hero -->
+      <section class="hero" aria-labelledby="hero-title">
+        <div class="container hero-grid">
+          <div>
+            <p class="eyebrow"><span class="live-dot" aria-hidden="true"></span>Road Maintenance Office · Live</p>
+            <h1 class="display" id="hero-title">Safer roads start with <span class="accent">one report.</span></h1>
+            <p class="hero-lede">
+              ResQRoad connects residents with the LGU's Road Maintenance Office. Pin a pothole on the map, follow every step of the
+              repair, and watch your community's roads get fixed.
+            </p>
+            <div class="hero-actions">
+              <a class="btn btn-primary btn-lg" href="login.html?next=report" data-report-link><svg data-icon="map-pin"></svg>Report a road problem</a>
+              <a class="btn btn-light btn-lg" href="track.html"><svg data-icon="search"></svg>Track a report</a>
+            </div>
+            <ul class="hero-trust">
+              <li><svg data-icon="check-circle"></svg>Free for every resident</li>
+              <li><svg data-icon="bell"></svg>Updates at every step</li>
+              <li><svg data-icon="shield-check"></svg>Verified by the LGU</li>
+            </ul>
+          </div>
+
+          <div class="hero-visual" aria-hidden="true">
+            <div class="preview-map">
+              <div class="preview-map-bar"><i></i><i></i><i></i><span>ResQRoad · Live report map</span></div>
+              <div class="preview-map-canvas" id="hero-map">
+                <svg viewBox="0 0 400 320" preserveAspectRatio="none">
+                  <path class="road" d="M-20 250 C 80 200, 140 260, 220 160 S 340 70, 430 40" />
+                  <path class="road" d="M-20 90 C 90 140, 150 80, 230 110 S 360 250, 430 200" />
+                  <path class="road" d="M110 -20 C 140 90, 190 170, 210 340" />
+                  <path class="road" d="M320 -20 C 300 80, 320 190, 390 340" />
+                  <path class="road road-main" d="M-20 170 C 80 140, 150 160, 220 175 S 330 190, 430 100" />
+                </svg>
+              </div>
+            </div>
+            <div class="preview-card preview-toast">
+              <span class="preview-toast-icon"><svg data-icon="check-circle"></svg></span>
+              <div><strong id="hero-toast-title">Repair verified</strong><span id="hero-toast-text">A reported pothole was fixed</span></div>
+            </div>
+            <div class="preview-card preview-report" id="hero-report">
+              <img src="assets/images/photo-placeholder.svg" alt="" referrerpolicy="no-referrer" data-fallback id="hero-report-photo" />
+              <div>
+                <span class="id-tag" id="hero-report-id">RPT-0000</span>
+                <strong id="hero-report-title">Road damage report</strong>
+                <span id="hero-report-status"></span>
+                <div class="preview-progress"><span id="hero-report-progress"></span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="container">
+          <div class="hero-stats" id="hero-stats">
+            <div class="hero-stat"><strong data-count-up="0" id="stat-reports">0</strong><span>Reports filed</span></div>
+            <div class="hero-stat"><strong data-count-up="0" id="stat-fixed">0</strong><span>Repairs completed</span></div>
+            <div class="hero-stat"><strong id="stat-days">0</strong><span>Average time to fix</span></div>
+            <div class="hero-stat"><strong data-count-up="0" id="stat-crews">0</strong><span>Active road crews</span></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- How it works -->
+      <section class="section" id="how-it-works" aria-labelledby="how-title">
+        <div class="container">
+          <div class="section-head is-center">
+            <p class="eyebrow">How it works</p>
+            <h2 class="display" id="how-title">From pothole to fixed, in four steps</h2>
+            <p>Every report follows the same transparent workflow, so you always know where your report stands and who is working on it.</p>
+          </div>
+          <ol class="steps">
+            <li class="step">
+              <span class="step-num" aria-hidden="true">01</span>
+              <span class="step-icon"><svg data-icon="camera"></svg></span>
+              <h3>Report</h3>
+              <p>Snap a photo, drop a pin on the exact spot, and describe the damage. It takes about a minute.</p>
+            </li>
+            <li class="step">
+              <span class="step-num" aria-hidden="true">02</span>
+              <span class="step-icon"><svg data-icon="shield-check"></svg></span>
+              <h3>Verify</h3>
+              <p>The Road Maintenance Office reviews your report, checks for duplicates, and confirms the damage.</p>
+            </li>
+            <li class="step">
+              <span class="step-num" aria-hidden="true">03</span>
+              <span class="step-icon"><svg data-icon="hard-hat"></svg></span>
+              <h3>Repair</h3>
+              <p>A maintenance crew is assigned, fixes the road, and submits before-and-after photos.</p>
+            </li>
+            <li class="step">
+              <span class="step-num" aria-hidden="true">04</span>
+              <span class="step-icon"><svg data-icon="check-circle"></svg></span>
+              <h3>Resolve</h3>
+              <p>An administrator verifies the repair and closes the report. You can follow it all on the tracker.</p>
+            </li>
+          </ol>
+        </div>
+      </section>
+
+      <!-- Live map -->
+      <section class="section section-surface" id="live-map" aria-labelledby="live-title">
+        <div class="container">
+          <div class="section-head">
+            <p class="eyebrow">Live map</p>
+            <h2 class="display" id="live-title">See what's being fixed near you</h2>
+            <p>Verified road damage across Bulacan, color-coded by severity. Select a pin to see its status or follow its progress.</p>
+          </div>
+          <div class="live-grid">
+            <div>
+              <div class="map" id="public-map"></div>
+              <div id="public-legend"></div>
+            </div>
+            <div class="live-side">
+              <div class="status-strip" id="status-strip"></div>
+              <section class="card" aria-labelledby="fixed-title">
+                <div class="card-header">
+                  <div>
+                    <h3 class="card-title" id="fixed-title">Recently fixed</h3>
+                    <p class="card-subtitle">Repairs verified by the Road Maintenance Office.</p>
+                  </div>
+                </div>
+                <div class="card-body"><ul class="fixed-list" id="fixed-list"></ul></div>
+              </section>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- For LGU teams -->
+      <section class="section section-dark" id="for-lgu" aria-labelledby="lgu-title">
+        <div class="container">
+          <div class="section-head">
+            <p class="eyebrow">For LGU teams</p>
+            <h2 class="display" id="lgu-title">One command center for road maintenance</h2>
+            <p>Administrators and road crews work from the same live data, from the first report to the verified repair.</p>
+          </div>
+          <div class="feature-grid">
+            <article class="feature">
+              <span class="feature-icon"><svg data-icon="clipboard-check"></svg></span>
+              <h3>Review queue</h3>
+              <p>Verify, reject, or merge duplicate reports with a full audit trail and internal notes.</p>
+            </article>
+            <article class="feature">
+              <span class="feature-icon"><svg data-icon="hard-hat"></svg></span>
+              <h3>Crew assignment</h3>
+              <p>Assign verified damage to the right crew, balanced by each crew's open workload.</p>
+            </article>
+            <article class="feature">
+              <span class="feature-icon"><svg data-icon="wrench"></svg></span>
+              <h3>Field workspace</h3>
+              <p>Crews see their jobs on a map, get directions, and submit before-and-after photos.</p>
+            </article>
+            <article class="feature">
+              <span class="feature-icon"><svg data-icon="chart-bar"></svg></span>
+              <h3>Analytics &amp; export</h3>
+              <p>Track resolution rates, repair times, and hotspots. Export everything to CSV.</p>
+            </article>
+          </div>
+          <div class="feature-cta">
+            <a class="btn btn-light" href="login.html"><svg data-icon="log-in"></svg>Staff sign in</a>
+            <span>Administrators and maintenance crews use the same sign-in.</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Track + CTA -->
+      <section class="section" aria-label="Track a report or file a new one">
+        <div class="container split-cta">
+          <div class="cta-card">
+            <p class="eyebrow">Track a report</p>
+            <h2>Already reported something?</h2>
+            <p>Enter your report ID to see where it is in the repair process. No sign-in needed.</p>
+            <form class="track-form" action="track.html" method="get" id="track-form">
+              <label class="input-icon">
+                <span class="visually-hidden">Report ID</span>
+                <svg data-icon="hash"></svg>
+                <input name="id" type="text" placeholder="e.g. RPT-1048" autocomplete="off" required maxlength="12" />
+              </label>
+              <button class="btn btn-primary btn-lg" type="submit">Track<svg data-icon="arrow-right"></svg></button>
+            </form>
+          </div>
+          <div class="cta-card is-brand">
+            <p class="eyebrow" style="color: var(--rr-100)">Spotted a pothole?</p>
+            <h2>Report it in under a minute.</h2>
+            <p>Your report goes straight to the Road Maintenance Office, and you'll see every update until it's fixed.</p>
+            <a class="btn btn-lg" href="login.html?next=report" data-report-link style="margin-top: 0.5rem"><svg data-icon="map-pin"></svg>Report a road problem</a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="container">
+        <div class="footer-grid">
+          <div class="footer-brand">
+            <img src="assets/images/resqroad-logotype-white.png" alt="ResQRoad" width="748" height="127" />
+            <p>Road damage reporting and maintenance management for local government. Citizens report, the Road Maintenance Office resolves.</p>
+          </div>
+          <div>
+            <h3>Residents</h3>
+            <ul>
+              <li><a href="login.html?next=report" data-report-link>Report a problem</a></li>
+              <li><a href="track.html">Track a report</a></li>
+              <li><a href="register.html">Create an account</a></li>
+            </ul>
+          </div>
+          <div>
+            <h3>Staff</h3>
+            <ul>
+              <li><a href="login.html">Staff sign in</a></li>
+              <li><a href="#for-lgu">Features</a></li>
+            </ul>
+          </div>
+          <div>
+            <h3>Explore</h3>
+            <ul>
+              <li><a href="#how-it-works">How it works</a></li>
+              <li><a href="#live-map">Live map</a></li>
+            </ul>
+          </div>
+        </div>
+        <div class="footer-bottom">
+          <span>&copy; <span data-current-year></span> ResQRoad · Road Maintenance Office</span>
+          <span>Prototype — reports and accounts are stored in this browser only.</span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

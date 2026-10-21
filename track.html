@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Track a ResQRoad road damage report with its report ID and see every step of the repair." />
+    <meta name="theme-color" content="#141110" />
+    <title>Track a report | ResQRoad</title>
+    <link rel="icon" type="image/png" href="assets/images/resqroad-mark.png" />
+    <script>
+      (function () {
+        try {
+          var saved = localStorage.getItem("resqroad-theme");
+          var dark = saved === "dark" || (saved !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+          document.documentElement.dataset.theme = dark ? "dark" : "light";
+        } catch (error) {
+          document.documentElement.dataset.theme = "light";
+        }
+      })();
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <link rel="stylesheet" href="assets/css/core.css" />
+    <link rel="stylesheet" href="assets/css/site.css" />
+    <link rel="stylesheet" href="assets/css/app.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="" defer></script>
+    <script src="assets/js/icons.js" defer></script>
+    <script src="assets/js/data-store.js" defer></script>
+    <script src="assets/js/ui.js" defer></script>
+    <script src="assets/js/auth.js" defer></script>
+    <script src="assets/js/shell.js" defer></script>
+    <script src="assets/js/site.js" defer></script>
+    <script src="assets/js/track.js" defer></script>
+  </head>
+  <body class="site-body">
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <header class="site-header is-solid">
+      <div class="container site-header-inner">
+        <a class="brand-logo" href="index.html" aria-label="ResQRoad home">
+          <img class="logo-on-light" src="assets/images/resqroad-logotype.png" alt="ResQRoad" width="748" height="127" />
+          <img class="logo-on-dark" src="assets/images/resqroad-logotype-white.png" alt="ResQRoad" width="748" height="127" />
+        </a>
+        <nav class="site-nav" aria-label="Main">
+          <a href="index.html#how-it-works">How it works</a>
+          <a href="index.html#live-map">Live map</a>
+          <a href="track.html" aria-current="page">Track a report</a>
+        </nav>
+        <div class="site-actions">
+          <button class="btn btn-ghost btn-icon theme-toggle" type="button" data-theme-toggle><svg data-icon="sun" class="icon-sun"></svg><svg data-icon="moon" class="icon-moon"></svg></button>
+          <a class="btn btn-secondary hide-mobile" href="login.html" data-signed-out><svg data-icon="log-in"></svg>Sign in</a>
+          <a class="btn btn-secondary hide-mobile" href="login.html" data-signed-in data-workspace-link hidden><svg data-icon="dashboard"></svg><span data-workspace-label>Open workspace</span></a>
+          <a class="btn btn-primary hide-mobile" href="login.html?next=report" data-report-link><svg data-icon="map-pin"></svg>Report a problem</a>
+          <button class="btn btn-ghost btn-icon site-menu-button" type="button" data-site-menu aria-expanded="false" aria-controls="mobile-nav" aria-label="Open menu"><svg data-icon="menu"></svg></button>
+        </div>
+      </div>
+    </header>
+    <nav class="mobile-nav" id="mobile-nav" aria-label="Mobile" hidden>
+      <a href="index.html">Home</a>
+      <a href="index.html#live-map">Live map</a>
+      <a class="btn btn-secondary btn-block" href="login.html" data-signed-out><svg data-icon="log-in"></svg>Sign in</a>
+      <a class="btn btn-secondary btn-block" href="login.html" data-signed-in data-workspace-link hidden><svg data-icon="dashboard"></svg><span data-workspace-label>Open workspace</span></a>
+      <a class="btn btn-primary btn-block" href="login.html?next=report" data-report-link><svg data-icon="map-pin"></svg>Report a problem</a>
+    </nav>
+
+    <main id="main">
+      <section class="page-hero">
+        <div class="container container-narrow">
+          <p class="eyebrow">Report tracker</p>
+          <h1 class="display">Track a report</h1>
+          <p>Enter the report ID you received when you filed a report to see where it is in the repair process.</p>
+          <form class="track-hero-form" id="track-form" role="search">
+            <label class="input-icon">
+              <span class="visually-hidden">Report ID</span>
+              <svg data-icon="hash"></svg>
+              <input name="id" id="track-input" type="text" placeholder="Report ID, e.g. RPT-1048" autocomplete="off" maxlength="12" />
+            </label>
+            <button class="btn btn-primary btn-lg" type="submit">Track report<svg data-icon="arrow-right"></svg></button>
+          </form>
+          <div class="recent-ids" id="recent-ids" hidden></div>
+        </div>
+      </section>
+
+      <div class="container container-narrow page-body">
+        <div id="track-result" aria-live="polite"></div>
+      </div>
+    </main>
+
+    <footer class="site-footer" style="padding-top: 2rem">
+      <div class="container">
+        <div class="footer-bottom" style="margin-top: 0; border-top: 0; padding-top: 0">
+          <span>&copy; <span data-current-year></span> ResQRoad · Road Maintenance Office</span>
+          <span>Reporter names and internal notes are never shown on the tracker.</span>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

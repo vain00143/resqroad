@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="View assigned pothole repairs and record road maintenance progress." />
+    <meta name="theme-color" content="#141110" />
+    <title>Road maintenance workspace | ResQRoad</title>
+    <link rel="icon" type="image/png" href="assets/images/resqroad-mark.png" />
+    <script>
+      (function () {
+        try {
+          var saved = localStorage.getItem("resqroad-theme");
+          var dark = saved === "dark" || (saved !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+          document.documentElement.dataset.theme = dark ? "dark" : "light";
+        } catch (error) {
+          document.documentElement.dataset.theme = "light";
+        }
+      })();
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <link rel="stylesheet" href="assets/css/core.css" />
+    <link rel="stylesheet" href="assets/css/app.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="" defer></script>
+    <script src="assets/js/icons.js" defer></script>
+    <script src="assets/js/data-store.js" defer></script>
+    <script src="assets/js/ui.js" defer></script>
+    <script src="assets/js/auth.js" defer></script>
+    <script src="assets/js/menus.js" defer></script>
+    <script src="assets/js/shell.js" defer></script>
+    <script src="assets/js/maintenance.js" defer></script>
+  </head>
+  <body class="app-body" data-required-role="maintenance">
+    <a class="skip-link" href="#main">Skip to content</a>
+    <div class="shell">
+      <aside class="sidebar" id="sidebar" aria-label="Maintenance navigation">
+        <div class="sidebar-head">
+          <a class="sidebar-brand" href="maintenance.html" aria-label="ResQRoad maintenance workspace">
+            <img class="sidebar-logo-full" src="assets/images/resqroad-logotype-white.png" alt="ResQRoad" width="748" height="127" />
+            <img class="sidebar-logo-mark" src="assets/images/resqroad-mark.png" alt="" width="384" height="408" />
+          </a>
+          <button class="sidebar-icon-btn sidebar-collapse" type="button" data-sidebar-collapse aria-controls="sidebar"><svg data-icon="chevrons-left"></svg></button>
+          <button class="sidebar-icon-btn sidebar-close" type="button" data-sidebar-close aria-label="Close navigation"><svg data-icon="x"></svg></button>
+        </div>
+        <div class="sidebar-scroll">
+          <p class="sidebar-section">Workspace</p>
+          <nav class="sidebar-nav" aria-label="Maintenance workspace sections">
+            <button class="nav-item is-active" type="button" data-crew-view="overview" data-tip="Overview" aria-current="page">
+              <svg data-icon="dashboard"></svg><span class="nav-label">Overview</span>
+            </button>
+            <button class="nav-item" type="button" data-crew-view="jobs" data-tip="My assigned jobs">
+              <svg data-icon="wrench"></svg><span class="nav-label">My assigned jobs</span><span class="nav-badge is-hot" data-nav-count="jobs"></span>
+            </button>
+            <button class="nav-item" type="button" data-crew-view="map" data-tip="Locations">
+              <svg data-icon="map-pin"></svg><span class="nav-label">Locations</span>
+            </button>
+          </nav>
+          <p class="sidebar-section">More</p>
+          <nav class="sidebar-nav" aria-label="More">
+            <a class="nav-item" href="index.html" data-tip="Public site"><svg data-icon="home"></svg><span class="nav-label">Public site</span></a>
+          </nav>
+        </div>
+        <div class="sidebar-foot">
+          <div class="sidebar-status">
+            <strong><span class="live-dot" aria-hidden="true"></span>Synced with dispatch</strong>
+            <span>New assignments appear here automatically.</span>
+          </div>
+          <button class="sidebar-user" type="button" data-popover-target="user-menu" data-popover-placement="top-start" aria-haspopup="menu" aria-expanded="false" aria-controls="user-menu" aria-label="Account menu">
+            <span class="avatar" data-user-avatar aria-hidden="true">RM</span>
+            <span class="person-copy"><strong data-current-user></strong><span data-current-team>Road maintenance</span></span>
+            <svg data-icon="chevrons-up-down"></svg>
+          </button>
+        </div>
+      </aside>
+      <div class="sidebar-scrim" data-sidebar-close></div>
+
+      <div class="main">
+        <header class="topbar">
+          <button class="btn btn-ghost btn-icon topbar-menu" type="button" data-sidebar-open aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar"><svg data-icon="menu"></svg></button>
+          <nav class="breadcrumb" aria-label="Breadcrumb">
+            <span>Maintenance</span><svg data-icon="chevron-right"></svg><strong id="crumb-current">Overview</strong>
+          </nav>
+          <button class="search-trigger" type="button" data-cmdk-open aria-label="Search my jobs">
+            <svg data-icon="search"></svg><span>Search my jobs…</span>
+            <span class="kbd-group" aria-hidden="true"><span class="kbd" data-kbd-mod>Ctrl</span><span class="kbd">K</span></span>
+          </button>
+          <div class="topbar-actions">
+            <button class="btn btn-ghost btn-icon theme-toggle" type="button" data-theme-toggle><svg data-icon="sun" class="icon-sun"></svg><svg data-icon="moon" class="icon-moon"></svg></button>
+            <button class="btn btn-ghost btn-icon" type="button" data-notif-toggle aria-label="Notifications"><svg data-icon="bell"></svg></button>
+          </div>
+        </header>
+
+        <main class="content" id="main" tabindex="-1">
+          <!-- Overview -->
+          <section class="view" data-crew-view-panel="overview" id="maintenance-overview" aria-labelledby="overview-title">
+            <div class="welcome">
+              <div>
+                <p class="eyebrow" data-today></p>
+                <h1 id="overview-title"><span data-greeting>Welcome</span>, <span data-first-name></span></h1>
+                <p id="overview-summary">Manage your assigned jobs and submit completed repairs.</p>
+              </div>
+              <div class="welcome-actions">
+                <button class="btn btn-light" type="button" data-switch-view="map"><svg data-icon="map-pin"></svg>Job locations</button>
+                <button class="btn btn-primary" type="button" data-switch-view="jobs"><svg data-icon="wrench"></svg>My jobs<span class="btn-count" data-count="active">0</span></button>
+              </div>
+            </div>
+
+            <div class="grid grid-kpi" id="job-summary" aria-label="Job overview"></div>
+
+            <div class="grid grid-2-1">
+              <section class="card" aria-labelledby="next-title">
+                <div class="card-header">
+                  <div>
+                    <h2 class="card-title" id="next-title">Up next</h2>
+                    <p class="card-subtitle">Your highest-priority job right now.</p>
+                  </div>
+                </div>
+                <div id="next-job"></div>
+              </section>
+              <section class="card" aria-labelledby="crew-activity-title">
+                <div class="card-header">
+                  <div>
+                    <h2 class="card-title" id="crew-activity-title">Recent updates</h2>
+                    <p class="card-subtitle">Assignments and reviews on your jobs.</p>
+                  </div>
+                </div>
+                <div class="card-body feed" id="crew-activity"></div>
+              </section>
+            </div>
+
+            <section class="card" style="margin-top: 1.25rem" aria-labelledby="overview-map-title">
+              <div class="card-header">
+                <div>
+                  <h2 class="card-title" id="overview-map-title">My assigned locations</h2>
+                  <p class="card-subtitle">Select a marker to jump to that repair assignment.</p>
+                </div>
+                <button class="link-button" type="button" data-switch-view="map">Full map<svg data-icon="arrow-right" class="icon-sm"></svg></button>
+              </div>
+              <div class="card-body">
+                <div class="map" id="maintenance-map" style="height: 20rem"></div>
+                <div id="overview-legend"></div>
+              </div>
+            </section>
+          </section>
+
+          <!-- Jobs -->
+          <section class="view" data-crew-view-panel="jobs" id="maintenance-jobs" aria-labelledby="jobs-title" hidden>
+            <div class="page-head">
+              <div>
+                <p class="eyebrow" id="job-description">Jobs currently assigned to you</p>
+                <h1 class="page-title" id="jobs-title">My assigned jobs</h1>
+                <p class="page-desc">Start repairs, add repair notes with before-and-after photos, and submit them for administrator verification.</p>
+              </div>
+              <div class="tabs" role="tablist" aria-label="Job status">
+                <button class="tab" type="button" role="tab" aria-selected="true" data-job-tab="active">Active<span class="count-badge" data-count="active">0</span></button>
+                <button class="tab" type="button" role="tab" aria-selected="false" data-job-tab="review">Awaiting review<span class="count-badge" data-count="review">0</span></button>
+                <button class="tab" type="button" role="tab" aria-selected="false" data-job-tab="done">Completed<span class="count-badge" data-count="done">0</span></button>
+                <button class="tab" type="button" role="tab" aria-selected="false" data-job-tab="all">All<span class="count-badge" data-count="all">0</span></button>
+              </div>
+            </div>
+            <div class="toolbar">
+              <label class="input-icon grow">
+                <span class="visually-hidden">Search my jobs</span>
+                <svg data-icon="search"></svg>
+                <input id="job-search" type="search" placeholder="Search by report, road, or location" autocomplete="off" />
+              </label>
+            </div>
+            <div class="job-list" id="job-list"></div>
+          </section>
+
+          <!-- Map -->
+          <section class="view" data-crew-view-panel="map" id="maintenance-locations" aria-labelledby="locations-title" hidden>
+            <div class="page-head">
+              <div>
+                <p class="eyebrow">Field work</p>
+                <h1 class="page-title" id="locations-title">Job locations</h1>
+                <p class="page-desc">Every repair assigned to you. Select a pin, then open the job.</p>
+              </div>
+            </div>
+            <div class="map-layout">
+              <div class="map-main">
+                <div class="map" id="crew-map"></div>
+                <div id="crew-map-legend"></div>
+              </div>
+              <aside class="card map-side" aria-labelledby="crew-map-list-title">
+                <div class="card-header">
+                  <div>
+                    <h2 class="card-title" id="crew-map-list-title">My jobs</h2>
+                    <p class="card-subtitle" id="crew-map-count"></p>
+                  </div>
+                </div>
+                <div class="card-body"><ul class="map-list" id="crew-map-list"></ul></div>
+              </aside>
+            </div>
+          </section>
+        </main>
+
+        <footer class="app-footer">
+          <span>&copy; <span data-current-year></span> ResQRoad · Road Maintenance Office</span>
+          <span><svg data-icon="shield-check" class="icon-sm"></svg>Prototype — data is stored in this browser only</span>
+        </footer>
+      </div>
+    </div>
+
+    <div class="popover" id="user-menu" role="menu" aria-label="Account" hidden>
+      <div class="menu-label" data-current-email></div>
+      <a class="menu-item" role="menuitem" href="index.html"><svg data-icon="home"></svg>Public site</a>
+      <button class="menu-item" role="menuitem" type="button" data-theme-toggle><svg data-icon="moon"></svg>Switch theme</button>
+      <div class="menu-sep" role="separator"></div>
+      <button class="menu-item is-danger" role="menuitem" type="button" data-sign-out="login.html"><svg data-icon="log-out"></svg>Log out</button>
+    </div>
+  </body>
+</html>
