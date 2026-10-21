@@ -242,7 +242,25 @@ npx expo start
 ```
 
 Scan the QR code with **Expo Go** on an Android phone on the same Wi-Fi, or
-press `w` to open it in a browser. The app follows the brand in
+press `w` to open it in a browser.
+
+**Server address.** The app talks to the server started with `npm start`.
+Copy `mobile/.env.example` to `mobile/.env` and set `EXPO_PUBLIC_API_URL` to
+the address the server prints for other devices (for example
+`http://192.168.1.13:8000`). That address changes when the laptop joins
+another network, so it can also be changed in the app under **Server
+settings** on the sign-in screen ("Save and test connection" checks it). The
+phone must be on the same Wi-Fi, and Node.js must be allowed through Windows
+Firewall. For the browser preview, use `http://localhost:8000` and add
+`http://localhost:8081` to `CORS_ORIGINS` in the server's `.env`.
+
+Residents and maintenance crews sign in with their website accounts, and new
+residents can register in the app. Administrators are pointed to the website.
+The sign-in token is kept in the phone's secure storage; live updates arrive
+over the same WebSocket as the website, and the app reconnects and catches up
+after losing the connection.
+
+The app follows the brand in
 `assets/css/core.css` (tokens in `mobile/src/theme/tokens.ts`), and its icons
 and splash screen are made from the Q mark. Headlines use the static
 Archivo Expanded ExtraBold file in `mobile/assets/fonts/` (SIL Open Font

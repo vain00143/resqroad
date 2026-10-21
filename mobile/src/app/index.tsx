@@ -1,4 +1,4 @@
-import { Link, router } from "expo-router";
+import { Link, Redirect, router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -6,6 +6,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AppText } from "@/components/AppText";
 import { Button } from "@/components/Button";
 import { Logotype } from "@/components/Logotype";
+import { Notice } from "@/components/Notice";
+import { useSession } from "@/lib/session";
 import { brand, radius, useTheme } from "@/theme";
 
 // The first screen: the same dark brand panel as the website's sign-in page,
@@ -13,8 +15,13 @@ import { brand, radius, useTheme } from "@/theme";
 export default function Welcome() {
   const { scheme, colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const { status, user, notice } = useSession();
   // In dark mode the sheet is nearly as dark as the panel, so outline it.
   const sheetEdge = scheme === "dark" ? colors.borderStrong : "transparent";
+
+  if (status === "signedIn" && user) {
+    return <Redirect href={user.role === "maintenance" ? "/crew" : "/resident"} />;
+  }
 
   return (
     <View style={styles.root}>
@@ -45,6 +52,8 @@ export default function Welcome() {
           { backgroundColor: colors.surface, borderColor: sheetEdge, paddingBottom: insets.bottom + 20 },
         ]}
       >
+        {/* Why the last session ended, e.g. signed out elsewhere or deactivated. */}
+        {notice ? <Notice message={notice} /> : null}
         <Button label="Log in" size="lg" onPress={() => router.push("/login")} />
         <Button
           label="Create a resident account"
