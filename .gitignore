@@ -15,3 +15,7 @@ node_modules/
 
 # Firebase deploy cache.
 .firebase/
+
+# Local settings and uploaded photos.
+.env
+storage/

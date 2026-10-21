@@ -1,5 +1,5 @@
-/* Sign-in for ResQRoad, backed by Firebase Authentication. One sign-in form
-   serves everyone: the account's profile in Firestore decides whether it is
+/* Sign-in for ResQRoad, checked by the ResQRoad server. One sign-in form
+   serves everyone: the account's role in the database decides whether it is
    the administrator, a maintenance crew member, or a resident. */
 (function () {
   "use strict";

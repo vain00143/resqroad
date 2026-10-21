@@ -1,6 +1,6 @@
-/* Resident registration. Creates a Firebase account plus a resident profile,
-   signs the person in, and opens the citizen portal (straight to the report
-   form when they came to report). */
+/* Resident registration. Creates a resident account on the server, signs the
+   person in, and opens the citizen portal (straight to the report form when
+   they came to report). */
 (async function () {
   "use strict";
 

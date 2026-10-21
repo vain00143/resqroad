@@ -2090,10 +2090,11 @@
         name: values.get("name"),
         email: values.get("email"),
         team: values.get("team"),
+        password: values.get("password"),
       })
       .then(function (person) {
         els.personnelForm.reset();
-        ui.showMessage(person.name + "'s maintenance account was added. They sign in with crew123.", "success");
+        ui.showMessage(person.name + "'s maintenance account was added.", "success");
         render();
       })
       .catch(function (error) {

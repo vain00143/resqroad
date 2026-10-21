@@ -1,148 +1,167 @@
-// Creates the ResQRoad demo accounts and sample reports in Firebase.
+// Loads the ResQRoad sample accounts and reports into MySQL, for demos and
+// testing. Real deployments start with `npm run create-admin` instead.
 //
-//   npm run seed            create missing accounts; add sample reports only
-//                           if the database has none yet
-//   npm run seed -- --reset also delete every report, note, and photo, then
-//                           reload the sample reports (accounts are kept)
-//
-// Runs as the administrator, so the first run on a brand-new project needs
-// the bootstrap rules (see README.md, "Setting up a new Firebase project").
+//   npm run seed            create missing sample accounts; add the sample
+//                           reports only if there are no reports yet
+//   npm run seed -- --reset also delete every report, note, and photo
+//                           (including uploaded files), then reload the
+//                           sample reports (accounts are kept)
 
-import { initializeApp } from "firebase/app";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, signOut } from "firebase/auth";
-import { getFirestore, collection, doc, getDoc, getDocs, writeBatch } from "firebase/firestore";
-import { firebaseConfig } from "../assets/js/firebase-config.js";
+import { hashPassword } from "../server/auth.js";
+import { explainDatabaseError, pool, query, setupDatabase, transaction } from "../server/db.js";
+import { removePhotoFiles } from "../server/photos.js";
 import { accounts, sampleReports, daysAgo } from "./seed-data.js";
 
 const reset = process.argv.includes("--reset");
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
 
-async function ensureAccount(email, password, name) {
-  try {
-    const credential = await createUserWithEmailAndPassword(auth, email, password);
-    await updateProfile(credential.user, { displayName: name });
-    console.log("  created  " + email);
-    return credential.user.uid;
-  } catch (error) {
-    if (error.code !== "auth/email-already-in-use") {
-      throw error;
-    }
-    const credential = await signInWithEmailAndPassword(auth, email, password);
-    console.log("  exists   " + email);
-    return credential.user.uid;
-  } finally {
-    await signOut(auth);
-  }
+function toDate(value) {
+  return new Date(value);
 }
 
-async function deleteAll(name) {
-  const snapshot = await getDocs(collection(db, name));
-  let batch = writeBatch(db);
-  let count = 0;
-  for (const item of snapshot.docs) {
-    batch.delete(item.ref);
-    count += 1;
-    if (count % 400 === 0) {
-      await batch.commit();
-      batch = writeBatch(db);
-    }
+async function ensureAccount(account) {
+  const rows = await query("SELECT id FROM users WHERE email = ?", [account.email]);
+  if (rows[0]) {
+    console.log("  exists   " + account.email);
+    return rows[0].id;
   }
-  await batch.commit();
-  console.log("  cleared  " + name + " (" + count + ")");
+  const result = await query(
+    "INSERT INTO users (name, email, password_hash, role, team, active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    [
+      account.name,
+      account.email,
+      await hashPassword(account.password),
+      account.role,
+      account.team || null,
+      account.active === false ? 0 : 1,
+      toDate(account.createdAt),
+    ],
+  );
+  console.log("  created  " + account.email);
+  return result.insertId;
 }
 
 async function main() {
+  await setupDatabase();
+
   console.log("Accounts");
-  const uids = { citizens: {}, crews: {} };
-  uids.admin = await ensureAccount(accounts.admin.email, accounts.admin.password, accounts.admin.name);
-  for (const crew of accounts.crews) {
-    uids.crews[crew.key] = await ensureAccount(crew.email, accounts.crewPassword, crew.name);
-  }
-  for (const citizen of accounts.citizens) {
-    uids.citizens[citizen.email] = await ensureAccount(citizen.email, accounts.citizenPassword, citizen.name);
-  }
-
-  await signInWithEmailAndPassword(auth, accounts.admin.email, accounts.admin.password);
-
-  console.log("Profiles");
-  const profiles = writeBatch(db);
-  profiles.set(doc(db, "users", uids.admin), {
+  const ids = { citizens: {}, crews: {} };
+  ids.admin = await ensureAccount({
     name: accounts.admin.name,
     email: accounts.admin.email,
+    password: accounts.admin.password,
     role: "admin",
-    active: true,
     createdAt: daysAgo(300),
   });
   for (const crew of accounts.crews) {
-    profiles.set(doc(db, "users", uids.crews[crew.key]), {
+    ids.crews[crew.key] = await ensureAccount({
       name: crew.name,
       email: crew.email,
-      team: crew.team,
+      password: accounts.crewPassword,
       role: "maintenance",
-      active: true,
+      team: crew.team,
       createdAt: daysAgo(290),
     });
-    profiles.set(doc(db, "crews", uids.crews[crew.key]), { name: crew.name, team: crew.team });
   }
   for (const citizen of accounts.citizens) {
-    profiles.set(doc(db, "users", uids.citizens[citizen.email]), {
+    ids.citizens[citizen.email] = await ensureAccount({
       name: citizen.name,
       email: citizen.email,
+      password: accounts.citizenPassword,
       role: "citizen",
       active: citizen.active,
       createdAt: daysAgo(citizen.joinedDaysAgo),
     });
   }
-  await profiles.commit();
-  console.log("  saved    " + (1 + accounts.crews.length * 2 + accounts.citizens.length) + " documents");
 
   console.log("Reports");
-  if (reset) {
-    await deleteAll("reports");
-    await deleteAll("notes");
-    await deleteAll("photos");
-  } else {
-    const existing = await getDocs(collection(db, "reports"));
-    if (!existing.empty) {
-      console.log("  skipped  " + existing.size + " reports already exist (use --reset to reload samples)");
-      process.exit(0);
-    }
+  const [{ count }] = await query("SELECT COUNT(*) AS count FROM reports");
+  if (count > 0 && !reset) {
+    console.log("  skipped  " + count + " reports already exist (use --reset to reload samples)");
+    return;
   }
 
-  const reports = writeBatch(db);
+  const samples = sampleReports();
   let highest = 1000;
-  for (const sample of sampleReports()) {
-    const crew = sample.crewKey ? accounts.crews.find((item) => item.key === sample.crewKey) : null;
-    const report = Object.assign({}, sample, {
-      reporterId: uids.citizens[sample.reporterEmail] || null,
-      assignedTo: crew ? uids.crews[crew.key] : null,
-      assignedName: crew ? crew.name : null,
-      updatedAt: new Date().toISOString(),
-    });
-    delete report.reporterEmail;
-    delete report.crewKey;
-    reports.set(doc(db, "reports", report.id), report);
-    highest = Math.max(highest, Number(report.id.replace("RPT-", "")));
-  }
-  const counterRef = doc(db, "counters", "reports");
-  const counter = await getDoc(counterRef);
-  if (reset || !counter.exists() || counter.data().next < highest) {
-    reports.set(counterRef, { next: highest });
-  }
-  await reports.commit();
-  console.log("  saved    " + sampleReports().length + " sample reports");
-  process.exit(0);
+  await transaction(async function (connection) {
+    if (reset) {
+      const [files] = await connection.query("SELECT file_path FROM photos WHERE file_path IS NOT NULL");
+      await connection.query("DELETE FROM reports");
+      await removePhotoFiles(files);
+      console.log("  cleared  " + count + " reports and " + files.length + " uploaded photos");
+    }
+    for (const sample of samples) {
+      const number = Number(sample.id.replace("RPT-", ""));
+      highest = Math.max(highest, number);
+      const crew = sample.crewKey ? accounts.crews.find((item) => item.key === sample.crewKey) : null;
+      const crewId = crew ? ids.crews[crew.key] : null;
+      const reporterId = ids.citizens[sample.reporterEmail] || null;
+      const updatedAt = sample.history.length ? sample.history[sample.history.length - 1].at : sample.reportedAt;
+      await connection.query(
+        "INSERT INTO reports (id, title, road, location, latitude, longitude, severity, description, status, reporter_id, " +
+          "assigned_to, assigned_name, repair_notes, repair_submitted_at, reported_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        [
+          number,
+          sample.title,
+          sample.road,
+          sample.location,
+          sample.coordinates.lat,
+          sample.coordinates.lng,
+          sample.severity,
+          sample.description,
+          sample.status,
+          reporterId,
+          crewId,
+          crew ? crew.name : null,
+          sample.repair ? sample.repair.notes : null,
+          sample.repair ? toDate(sample.repair.submittedAt) : null,
+          toDate(sample.reportedAt),
+          toDate(updatedAt),
+        ],
+      );
+      const actorIds = { "Admin User": ids.admin, Administrator: ids.admin };
+      accounts.crews.forEach(function (item) {
+        actorIds[item.name] = ids.crews[item.key];
+      });
+      for (const entry of sample.history) {
+        await connection.query(
+          "INSERT INTO report_history (report_id, status, description, actor, actor_id, note, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+          [
+            number,
+            entry.status,
+            entry.description,
+            entry.actor,
+            actorIds[entry.actor] || (entry.status === "submitted" ? reporterId : null),
+            entry.note || null,
+            toDate(entry.at),
+          ],
+        );
+      }
+      // Sample photos are file names only; the website shows stock road photos.
+      const photos = sample.evidencePhotos
+        .map((name) => ["evidence", name])
+        .concat(sample.repair ? sample.repair.beforePhotos.map((name) => ["before", name]) : [])
+        .concat(sample.repair ? sample.repair.afterPhotos.map((name) => ["after", name]) : []);
+      for (const [index, [kind, name]] of photos.entries()) {
+        await connection.query("INSERT INTO photos (report_id, kind, name, sort_order, created_at) VALUES (?, ?, ?, ?, ?)", [
+          number,
+          kind,
+          name,
+          index,
+          toDate(sample.reportedAt),
+        ]);
+      }
+    }
+  });
+  // New reports continue after the highest sample number (RPT-1054, ...).
+  await query("ALTER TABLE reports AUTO_INCREMENT = " + (highest + 1));
+  console.log("  saved    " + samples.length + " sample reports");
 }
 
-main().catch(function (error) {
-  console.error("\nSeeding failed:", error.code || "", error.message);
-  if (error.code === "auth/operation-not-allowed" || error.code === "auth/configuration-not-found") {
-    console.error("Turn on Email/Password sign-in in the Firebase console first (Authentication > Sign-in method).");
-  }
-  if (error.code === "permission-denied") {
-    console.error("The admin profile may not exist yet. Deploy the bootstrap rules first (see README.md).");
-  }
-  process.exit(1);
-});
+main()
+  .catch(function (error) {
+    console.error("\nSeeding failed: " + explainDatabaseError(error));
+    process.exitCode = 1;
+  })
+  .finally(function () {
+    return pool.end();
+  });

@@ -931,10 +931,11 @@
     }, 1500);
   }
 
-  // Shrinks a photo to a JPEG data URL small enough to keep in localStorage.
+  // Shrinks a photo to a JPEG data URL for the preview; the store uploads it
+  // to the server's photo storage when the form is sent.
   function readImageFile(file, options) {
-    const maxSize = (options && options.maxSize) || 960;
-    const quality = (options && options.quality) || 0.72;
+    const maxSize = (options && options.maxSize) || 1600;
+    const quality = (options && options.quality) || 0.82;
     return new Promise(function (resolve, reject) {
       if (!file || !/^image\//.test(file.type)) {
         reject(new Error(file ? file.name + " is not an image." : "Choose an image."));

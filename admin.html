@@ -81,7 +81,7 @@
         <div class="sidebar-foot">
           <div class="sidebar-status">
             <strong><span class="live-dot" aria-hidden="true"></span>Workspace synced</strong>
-            <span>Connected to the cloud database. Updates appear live.</span>
+            <span>Connected to the ResQRoad server. Updates appear live on every device.</span>
           </div>
           <button class="sidebar-user" type="button" data-popover-target="user-menu" data-popover-placement="top-start" aria-haspopup="menu" aria-expanded="false" aria-controls="user-menu" aria-label="Account menu">
             <span class="avatar" data-tone="2" aria-hidden="true">AU</span>
@@ -496,7 +496,11 @@
                     <input name="team" required maxlength="80" placeholder="e.g. East road crew" list="crew-suggestions" />
                     <datalist id="crew-suggestions"></datalist>
                   </label>
-                  <p class="form-note"><svg data-icon="info"></svg><span>New accounts sign in with the default password <code>crew123</code>.</span></p>
+                  <label class="field">
+                    <span class="field-label">Temporary password</span>
+                    <input name="password" type="text" required minlength="8" maxlength="128" autocomplete="off" placeholder="At least 8 characters, a letter and a number" />
+                  </label>
+                  <p class="form-note"><svg data-icon="info"></svg><span>Share the temporary password with the crew member privately.</span></p>
                   <button class="btn btn-primary btn-block" type="submit"><svg data-icon="user-plus"></svg>Add maintenance account</button>
                 </form>
               </section>
@@ -544,7 +548,7 @@
 
         <footer class="app-footer">
           <span>&copy; <span data-current-year></span> ResQRoad · Road Maintenance Office</span>
-          <span><svg data-icon="shield-check" class="icon-sm"></svg>Connected to the ResQRoad cloud database</span>
+          <span><svg data-icon="shield-check" class="icon-sm"></svg>Connected to the ResQRoad database</span>
         </footer>
       </div>
     </div>

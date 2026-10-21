@@ -1,18 +1,26 @@
 {
   "name": "resqroad",
-  "version": "2.0.0",
+  "version": "3.0.0",
   "private": true,
-  "description": "Road damage reporting and maintenance management system (web).",
+  "description": "Road damage reporting and maintenance management system: website, API, and live updates backed by MySQL.",
   "type": "module",
+  "engines": {
+    "node": ">=20.12"
+  },
   "scripts": {
     "start": "node serve.js",
+    "dev": "node --watch serve.js",
+    "db:setup": "node tools/db-setup.js",
+    "create-admin": "node tools/create-admin.js",
     "seed": "node tools/seed.js",
-    "deploy": "firebase deploy --only hosting,firestore",
-    "deploy:hosting": "firebase deploy --only hosting",
-    "deploy:rules": "firebase deploy --only firestore:rules",
-    "deploy:bootstrap-rules": "firebase deploy --only firestore:rules --config firebase.bootstrap.json"
+    "import:firebase": "node tools/import-firebase.js",
+    "test": "node --test --test-concurrency=1 tests/*.test.js"
   },
-  "devDependencies": {
-    "firebase": "12.19.0"
+  "dependencies": {
+    "bcryptjs": "3.0.3",
+    "express": "5.2.1",
+    "multer": "2.4.0",
+    "mysql2": "3.24.5",
+    "ws": "8.22.0"
   }
 }

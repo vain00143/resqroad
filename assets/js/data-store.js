@@ -1,46 +1,16 @@
-/* ResQRoad data store, backed by Firebase (Authentication + Cloud Firestore).
+/* ResQRoad data store, backed by the ResQRoad server (MySQL database, JSON
+   API under /api, live updates over a WebSocket).
 
-   Pages keep using the same RoadWatchStore API as before. Firestore listeners
-   keep an in-memory copy of the data up to date in real time, so reads stay
-   synchronous: call `await RoadWatchStore.ready()` once, then getState()
-   always returns the latest data. Changes are applied to the local copy
-   immediately and then saved; if the server rejects a change, the listener
-   restores the real data and the person sees an error message.
+   Pages keep using the same RoadWatchStore API as before. The store keeps an
+   in-memory copy of the data that the server keeps up to date in real time,
+   on every device, so reads stay synchronous: call `await
+   RoadWatchStore.ready()` once, then getState() always returns the latest
+   data. Most changes are applied to the local copy immediately and then
+   saved; if the server rejects a change, the real data is restored and the
+   person sees an error message.
 
-   Collections (see firestore.rules and README.md for the full schema):
-     users/{uid}      private profile: name, email, role, active, team
-     crews/{uid}      public crew directory: name, team
-     reports/{RPT-n}  report, status, assignment, repair, and history
-     notes/{id}       internal staff notes on reports (admins only)
-     photos/{id}      resized photos as data URLs
-     counters/reports next report number */
-
-import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
-import {
-  getAuth,
-  onAuthStateChanged,
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  signOut as firebaseSignOut,
-  updateProfile,
-} from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
-import {
-  getFirestore,
-  collection,
-  doc,
-  onSnapshot,
-  getDoc,
-  setDoc,
-  updateDoc,
-  deleteDoc,
-  runTransaction,
-  writeBatch,
-} from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
-import { firebaseConfig } from "./firebase-config.js";
-
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
+   The server decides what each account may see and do (see server/ and
+   README.md for the database schema and the API). */
 
 const openStatuses = ["submitted", "under_review", "verified", "assigned", "in_progress", "repair_submitted"];
 const closedStatuses = ["resolved", "rejected", "duplicate"];
@@ -56,34 +26,61 @@ const statuses = {
   rejected: "Rejected",
   duplicate: "Duplicate",
 };
-const defaultCrewPassword = "crew123";
+
+/* ---------- Server requests ---------- */
+
+const apiBase = "/api/";
+
+async function api(path, options) {
+  const settings = options || {};
+  const init = { method: settings.method || "GET", credentials: "same-origin", headers: {} };
+  if (settings.json !== undefined) {
+    init.headers["Content-Type"] = "application/json";
+    init.body = JSON.stringify(settings.json);
+  } else if (settings.form) {
+    init.body = settings.form;
+  }
+  let response;
+  try {
+    response = await fetch(apiBase + path, init);
+  } catch (error) {
+    throw new Error("Can't reach the ResQRoad server. Check your internet connection.");
+  }
+  let body = null;
+  try {
+    body = await response.json();
+  } catch (error) {
+    body = null;
+  }
+  if (!response.ok) {
+    const failure = new Error((body && body.error) || "Something went wrong. Try again.");
+    failure.status = response.status;
+    if (body && body.duplicateId) {
+      failure.duplicateId = body.duplicateId;
+    }
+    throw failure;
+  }
+  return body || {};
+}
 
 /* ---------- Live cache ---------- */
 
 const cache = {
-  profile: null, // { uid, name, email, role, active, team }
+  profile: null, // { id, name, email, role, active, team, createdAt }
   reports: new Map(),
   crews: new Map(),
   users: new Map(), // admins only
-  notes: [], // admins only
-  photos: new Map(),
 };
 const changeListeners = new Set();
 let derived = null;
-let unsubscribers = [];
-let authGeneration = 0;
 let resolveReady;
 const readyPromise = new Promise(function (resolve) {
   resolveReady = resolve;
 });
 let emitScheduled = false;
 
-function markDirty() {
-  derived = null;
-}
-
 function emit() {
-  markDirty();
+  derived = null;
   if (emitScheduled) {
     return;
   }
@@ -100,139 +97,181 @@ function emit() {
   });
 }
 
-function stopListeners() {
-  unsubscribers.forEach(function (unsubscribe) {
-    unsubscribe();
-  });
-  unsubscribers = [];
-}
-
-// Subscribes to a collection or document; resolves after the first snapshot
-// (or the first error, so a denied listener never blocks the page).
-function listen(target, apply) {
-  return new Promise(function (resolve) {
-    let settled = false;
-    const unsubscribe = onSnapshot(
-      target,
-      function (snapshot) {
-        apply(snapshot);
-        emit();
-        if (!settled) {
-          settled = true;
-          resolve();
-        }
-      },
-      function (error) {
-        console.error("ResQRoad live data stopped.", error);
-        if (!settled) {
-          settled = true;
-          resolve();
-        }
-      },
-    );
-    unsubscribers.push(unsubscribe);
-  });
-}
-
-function mapCollection(map, snapshot) {
+function setMap(map, list) {
   map.clear();
-  snapshot.forEach(function (item) {
-    map.set(item.id, Object.assign({ id: item.id }, item.data()));
+  (list || []).forEach(function (item) {
+    map.set(item.id, item);
   });
 }
 
-async function startListeners() {
-  const waits = [
-    listen(collection(db, "reports"), function (snapshot) {
-      mapCollection(cache.reports, snapshot);
-    }),
-    listen(collection(db, "crews"), function (snapshot) {
-      mapCollection(cache.crews, snapshot);
-    }),
-  ];
-  const profile = cache.profile;
-  if (profile && profile.active) {
-    waits.push(
-      listen(collection(db, "photos"), function (snapshot) {
-        mapCollection(cache.photos, snapshot);
-      }),
-    );
-    if (profile.role === "admin") {
-      waits.push(
-        listen(collection(db, "users"), function (snapshot) {
-          mapCollection(cache.users, snapshot);
-        }),
-        listen(collection(db, "notes"), function (snapshot) {
-          cache.notes = [];
-          snapshot.forEach(function (item) {
-            cache.notes.push(Object.assign({ id: item.id }, item.data()));
-          });
-        }),
-      );
-    }
-    // Watch your own profile so a deactivated account is signed out at once.
-    listen(doc(db, "users", profile.uid), function (snapshot) {
-      const data = snapshot.exists() ? snapshot.data() : null;
-      if (!data || data.deleted || data.active === false) {
-        cache.profile = null;
-        firebaseSignOut(auth).catch(function () {});
-        return;
-      }
-      cache.profile = Object.assign({ uid: profile.uid }, data);
-    });
+// Keeps the newest copy of a report. `force` is for the server's answer to
+// this page's own change.
+function putReport(report, force) {
+  const current = cache.reports.get(report.id);
+  if (!force && current && current.updatedAt && report.updatedAt && Date.parse(current.updatedAt) > Date.parse(report.updatedAt)) {
+    return;
   }
-  // Don't hang forever without a connection.
-  await Promise.race([
-    Promise.all(waits),
-    new Promise(function (resolve) {
-      setTimeout(resolve, 10000);
-    }),
-  ]);
+  cache.reports.set(report.id, report);
 }
 
-onAuthStateChanged(auth, async function (user) {
-  const generation = ++authGeneration;
-  stopListeners();
-  cache.profile = null;
-  cache.users.clear();
-  cache.notes = [];
-  if (user) {
-    try {
-      const snapshot = await getDoc(doc(db, "users", user.uid));
-      const data = snapshot.exists() ? snapshot.data() : null;
-      if (data && !data.deleted && data.active !== false) {
-        cache.profile = Object.assign({ uid: user.uid }, data);
-      }
-    } catch (error) {
-      console.error("Could not load the ResQRoad profile.", error);
+function applyAccounts(message) {
+  setMap(cache.crews, message.crews);
+  if (message.users) {
+    setMap(cache.users, message.users);
+  }
+}
+
+let lastLoad = 0;
+
+async function loadState() {
+  lastLoad = Date.now();
+  const state = await api("state");
+  const previous = cache.reports;
+  cache.profile = state.user || null;
+  cache.reports = new Map();
+  (state.reports || []).forEach(function (report) {
+    const current = previous.get(report.id);
+    const keepCurrent = current && Date.parse(current.updatedAt) > Date.parse(report.updatedAt);
+    cache.reports.set(report.id, keepCurrent ? current : report);
+  });
+  setMap(cache.crews, state.crews);
+  setMap(cache.users, state.users || []);
+  emit();
+}
+
+function resync() {
+  return loadState().catch(function (error) {
+    console.error("Could not refresh ResQRoad data.", error);
+  });
+}
+
+/* ---------- Live updates (WebSocket) ---------- */
+
+let socket = null;
+let connectedOnce = false;
+let retryDelay = 1000;
+let retryTimer = null;
+let firstHello = null;
+
+function liveUrl() {
+  return (window.location.protocol === "https:" ? "wss://" : "ws://") + window.location.host + apiBase + "live";
+}
+
+function onLiveMessage(event) {
+  let message;
+  try {
+    message = JSON.parse(event.data);
+  } catch (error) {
+    return;
+  }
+  if (message.type === "hello") {
+    retryDelay = 1000;
+    if (firstHello) {
+      firstHello();
+      firstHello = null;
+    } else {
+      // Reconnected: catch up on anything missed while offline.
+      resync();
     }
+    connectedOnce = true;
+  } else if (message.type === "report" && message.report) {
+    putReport(message.report);
+    emit();
+  } else if (message.type === "accounts") {
+    applyAccounts(message);
+    emit();
+  } else if (message.type === "signed-out") {
+    // Signed out on this device or another one, or the account was
+    // deactivated: reload as a visitor (protected pages then redirect).
+    cache.profile = null;
+    cache.users.clear();
+    resync();
   }
-  if (generation !== authGeneration) {
+}
+
+function scheduleReconnect() {
+  if (retryTimer) {
     return;
   }
-  await startListeners();
-  if (generation !== authGeneration) {
+  retryTimer = window.setTimeout(function () {
+    retryTimer = null;
+    connectLive();
+  }, retryDelay);
+  retryDelay = Math.min(retryDelay * 2, 15000);
+  // Still refresh now and then if live updates can't connect at all.
+  if (connectedOnce && Date.now() - lastLoad > 20000) {
+    resync();
+  }
+}
+
+function connectLive() {
+  if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
     return;
+  }
+  try {
+    socket = new WebSocket(liveUrl());
+  } catch (error) {
+    scheduleReconnect();
+    return;
+  }
+  socket.addEventListener("message", onLiveMessage);
+  socket.addEventListener("close", function () {
+    socket = null;
+    if (firstHello) {
+      firstHello();
+      firstHello = null;
+    }
+    scheduleReconnect();
+  });
+}
+
+function reconnectNow() {
+  if (!socket) {
+    window.clearTimeout(retryTimer);
+    retryTimer = null;
+    retryDelay = 1000;
+    connectLive();
+  }
+}
+
+document.addEventListener("visibilitychange", function () {
+  if (document.visibilityState === "visible") {
+    reconnectNow();
+  }
+});
+window.addEventListener("online", reconnectNow);
+
+// Connect first, then load, so no change can slip in between.
+async function start() {
+  await new Promise(function (resolve) {
+    firstHello = resolve;
+    window.setTimeout(resolve, 2500);
+    connectLive();
+  });
+  firstHello = null;
+  try {
+    await loadState();
+  } catch (error) {
+    console.error("Could not load ResQRoad data.", error);
+    document.addEventListener("DOMContentLoaded", function () {
+      if (window.RoadWatchUI) {
+        window.RoadWatchUI.showMessage(error.message, "error");
+      }
+    });
+    if (window.RoadWatchUI && document.readyState !== "loading") {
+      window.RoadWatchUI.showMessage(error.message, "error");
+    }
   }
   resolveReady();
-  emit();
-});
+}
+
+start();
 
 function ready() {
   return readyPromise;
 }
 
 /* ---------- Derived state for pages ---------- */
-
-function resolvePhotos(list) {
-  return (list || []).map(function (photo) {
-    if (photo && typeof photo === "object" && photo.photoId) {
-      const stored = cache.photos.get(photo.photoId);
-      return stored && stored.src ? { name: photo.name, src: stored.src } : photo.name;
-    }
-    return photo;
-  });
-}
 
 function citizenName(reporterId) {
   if (!reporterId) {
@@ -242,44 +281,28 @@ function citizenName(reporterId) {
   if (user) {
     return user.name;
   }
-  if (cache.profile && cache.profile.uid === reporterId) {
+  if (cache.profile && cache.profile.id === reporterId) {
     return cache.profile.name;
   }
   return "Resident";
 }
 
 function buildState() {
-  const notesByReport = new Map();
-  cache.notes.forEach(function (note) {
-    if (!notesByReport.has(note.reportId)) {
-      notesByReport.set(note.reportId, []);
-    }
-    notesByReport.get(note.reportId).push({
-      status: "note",
-      description: "Added an internal note.",
-      actor: note.actor,
-      at: note.at,
-      note: note.note,
-    });
-  });
-
   const reports = Array.from(cache.reports.values())
     .map(function (raw) {
-      const history = (raw.history || []).concat(notesByReport.get(raw.id) || []);
+      const notes = (raw.notes || []).map(function (note) {
+        return { status: "note", description: "Added an internal note.", actor: note.actor, at: note.at, note: note.note };
+      });
+      const history = (raw.history || []).concat(notes);
       history.sort(function (first, second) {
         return Date.parse(first.at) - Date.parse(second.at);
       });
-      return Object.assign({}, raw, {
-        reporter: citizenName(raw.reporterId),
-        evidencePhotos: resolvePhotos(raw.evidencePhotos),
-        repair: raw.repair
-          ? Object.assign({}, raw.repair, {
-              beforePhotos: resolvePhotos(raw.repair.beforePhotos),
-              afterPhotos: resolvePhotos(raw.repair.afterPhotos),
-            })
-          : null,
+      const report = Object.assign({}, raw, {
+        reporter: raw.reporter || citizenName(raw.reporterId),
         history: history,
       });
+      delete report.notes;
+      return report;
     })
     .sort(function (first, second) {
       return Date.parse(second.reportedAt) - Date.parse(first.reportedAt);
@@ -288,12 +311,13 @@ function buildState() {
   const personnel = Array.from(cache.crews.values())
     .map(function (crew) {
       const user = cache.users.get(crew.id);
+      const own = cache.profile && cache.profile.id === crew.id ? cache.profile : null;
       return {
         id: crew.id,
         name: crew.name,
         team: crew.team,
-        email: user ? user.email : crew.id === (cache.profile && cache.profile.uid) ? cache.profile.email : "",
-        createdAt: user ? user.createdAt : null,
+        email: user ? user.email : own ? own.email : "",
+        createdAt: user ? user.createdAt : own ? own.createdAt : null,
       };
     })
     .sort(function (first, second) {
@@ -304,7 +328,7 @@ function buildState() {
   if (cache.profile && cache.profile.role === "admin") {
     citizens = Array.from(cache.users.values())
       .filter(function (user) {
-        return user.role === "citizen";
+        return user.role === "citizen" && !user.deleted;
       })
       .map(function (user) {
         return { id: user.id, name: user.name, email: user.email, active: user.active !== false, createdAt: user.createdAt };
@@ -315,7 +339,7 @@ function buildState() {
   } else if (cache.profile && cache.profile.role === "citizen") {
     citizens = [
       {
-        id: cache.profile.uid,
+        id: cache.profile.id,
         name: cache.profile.name,
         email: cache.profile.email,
         active: cache.profile.active !== false,
@@ -347,46 +371,37 @@ function getReport(reportId) {
 
 /* ---------- Helpers for changes ---------- */
 
-const authMessages = {
-  "auth/invalid-credential": "Incorrect email or password.",
-  "auth/invalid-login-credentials": "Incorrect email or password.",
-  "auth/wrong-password": "Incorrect email or password.",
-  "auth/user-not-found": "Incorrect email or password.",
-  "auth/invalid-email": "Enter a valid email address.",
-  "auth/user-disabled": "This account has been disabled.",
-  "auth/too-many-requests": "Too many attempts. Wait a moment and try again.",
-  "auth/network-request-failed": "Can't reach the server. Check your internet connection.",
-  "auth/email-already-in-use": "An account already uses this email.",
-  "auth/weak-password": "Use at least 8 characters with a letter and a number.",
-  "auth/operation-not-allowed": "Email sign-in isn't enabled for this project yet.",
-};
-
-function friendlyError(error) {
-  if (error && authMessages[error.code]) {
-    return new Error(authMessages[error.code]);
+function showError(message) {
+  if (window.RoadWatchUI) {
+    window.RoadWatchUI.showMessage(message, "error");
   }
-  if (error && error.code === "permission-denied") {
-    return new Error("You don't have permission to do that. Sign in again and retry.");
-  }
-  if (error && error.code === "unavailable") {
-    return new Error("Can't reach the database. Check your internet connection.");
-  }
-  return error instanceof Error ? error : new Error("Something went wrong. Try again.");
 }
 
-// Saves in the background; the live listener restores the real data if the
-// save is rejected, and the person is told what happened.
-function persist(promise) {
-  return promise.then(
-    function () {
+// Fetches the real copy of a report (after a rejected change).
+function restoreReport(reportId) {
+  return api("reports/" + encodeURIComponent(reportId))
+    .then(function (body) {
+      putReport(body.report, true);
+      emit();
+    })
+    .catch(function () {
+      return resync();
+    });
+}
+
+// Saves a report change in the background; the server's copy replaces the
+// local one, or the real data comes back if the change was rejected.
+function saveReportChange(reportId, request) {
+  return request.then(
+    function (body) {
+      putReport(body.report, true);
+      emit();
       return true;
     },
     function (error) {
       console.error("Could not save the ResQRoad change.", error);
-      const message = friendlyError(error).message;
-      if (window.RoadWatchUI) {
-        window.RoadWatchUI.showMessage(message, "error");
-      }
+      showError(error.message);
+      restoreReport(reportId);
       return false;
     },
   );
@@ -425,51 +440,28 @@ function historyEntry(status, description, actor, note) {
   return entry;
 }
 
-// Applies `fields` to the cached report right away, then saves them.
-function saveReport(report, fields) {
-  report.updatedAt = now();
+// Shows a change right away (until the server's copy arrives).
+function applyLocally(report, fields, entry) {
+  const updated = Object.assign({}, report, fields);
+  if (entry) {
+    updated.history = (report.history || []).concat([entry]);
+  }
+  cache.reports.set(report.id, updated);
   emit();
-  const data = { updatedAt: report.updatedAt };
-  fields.forEach(function (field) {
-    data[field] = report[field] === undefined ? null : report[field];
-  });
-  return persist(updateDoc(doc(db, "reports", report.id), data));
+  return updated;
 }
 
 function isEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value);
 }
 
-function photoRefs(photos, reportId, kind) {
-  const uploads = [];
-  const refs = (photos || []).map(function (photo) {
+// Photos chosen on the page are resized data URLs; upload them as files.
+async function appendPhotos(form, field, photos) {
+  for (const photo of photos || []) {
     if (photo && typeof photo === "object" && photo.src) {
-      const ref = doc(collection(db, "photos"));
-      const record = {
-        reportId: reportId,
-        kind: kind,
-        name: photo.name,
-        src: photo.src,
-        uploadedBy: cache.profile.uid,
-        createdAt: now(),
-      };
-      cache.photos.set(ref.id, Object.assign({ id: ref.id }, record));
-      uploads.push([ref, record]);
-      return { name: photo.name, photoId: ref.id };
+      const blob = await (await fetch(photo.src)).blob();
+      form.append(field, blob, photo.name || "photo.jpg");
     }
-    return typeof photo === "string" ? photo : photo.name;
-  });
-  return { refs: refs, uploads: uploads };
-}
-
-async function uploadPhotos(uploads) {
-  // Each photo is its own document (under 1 MB); batches keep requests small.
-  for (let index = 0; index < uploads.length; index += 4) {
-    const batch = writeBatch(db);
-    uploads.slice(index, index + 4).forEach(function (item) {
-      batch.set(item[0], item[1]);
-    });
-    await batch.commit();
   }
 }
 
@@ -481,12 +473,16 @@ function setStatus(reportId, status, description, actor, note) {
   }
   requireRole(["admin"]);
   const report = rawReport(reportId);
-  report.status = status;
-  report.history = (report.history || []).concat([
-    historyEntry(status, description, actorName(actor), note ? String(note).trim() : ""),
-  ]);
-  saveReport(report, ["status", "history"]);
-  return report;
+  const cleanNote = note ? String(note).trim() : "";
+  const updated = applyLocally(report, { status: status }, historyEntry(status, description, actorName(actor), cleanNote));
+  saveReportChange(
+    reportId,
+    api("reports/" + reportId + "/status", {
+      method: "POST",
+      json: { status: status, description: description, note: cleanNote },
+    }),
+  );
+  return updated;
 }
 
 function addNote(reportId, text, actor) {
@@ -498,12 +494,10 @@ function addNote(reportId, text, actor) {
     throw new Error("Keep notes under 1,000 characters.");
   }
   requireRole(["admin"]);
-  rawReport(reportId);
-  const ref = doc(collection(db, "notes"));
+  const report = rawReport(reportId);
   const record = { reportId: reportId, note: note, actor: actorName(actor), at: now() };
-  cache.notes.push(Object.assign({ id: ref.id }, record));
-  emit();
-  persist(setDoc(ref, record));
+  applyLocally(report, { notes: (report.notes || []).concat([{ id: "pending", note: note, actor: record.actor, at: record.at }]) });
+  saveReportChange(reportId, api("reports/" + reportId + "/notes", { method: "POST", json: { note: note } }));
   return record;
 }
 
@@ -517,14 +511,13 @@ function assignReport(reportId, personnelId) {
   if (!crew) {
     throw new Error("Choose an available maintenance person.");
   }
-  report.assignedTo = personnelId;
-  report.assignedName = crew.name;
-  report.status = "assigned";
-  report.history = (report.history || []).concat([
-    historyEntry("assigned", "Assigned to " + crew.name + ".", "Administrator"),
-  ]);
-  saveReport(report, ["assignedTo", "assignedName", "status", "history"]);
-  return report;
+  const updated = applyLocally(
+    report,
+    { assignedTo: personnelId, assignedName: crew.name, status: "assigned" },
+    historyEntry("assigned", "Assigned to " + crew.name + ".", actorName()),
+  );
+  saveReportChange(reportId, api("reports/" + reportId + "/assign", { method: "POST", json: { crewId: personnelId } }));
+  return updated;
 }
 
 function startRepair(reportId, personnelId) {
@@ -533,10 +526,9 @@ function startRepair(reportId, personnelId) {
   if (report.assignedTo !== personnelId || report.status !== "assigned") {
     throw new Error("This job is no longer assigned to you.");
   }
-  report.status = "in_progress";
-  report.history = (report.history || []).concat([historyEntry("in_progress", "Repair work started.", actorName())]);
-  saveReport(report, ["status", "history"]);
-  return report;
+  const updated = applyLocally(report, { status: "in_progress" }, historyEntry("in_progress", "Repair work started.", actorName()));
+  saveReportChange(reportId, api("reports/" + reportId + "/start", { method: "POST" }));
+  return updated;
 }
 
 async function submitRepair(reportId, personnelId, repair) {
@@ -545,28 +537,14 @@ async function submitRepair(reportId, personnelId, repair) {
   if (report.assignedTo !== personnelId || report.status !== "in_progress") {
     throw new Error("This repair is no longer assigned to you.");
   }
-  const before = photoRefs(repair.beforePhotos, reportId, "before");
-  const after = photoRefs(repair.afterPhotos, reportId, "after");
-  try {
-    await uploadPhotos(before.uploads.concat(after.uploads));
-  } catch (error) {
-    throw friendlyError(error);
-  }
-  report.status = "repair_submitted";
-  report.repair = {
-    notes: String(repair.notes || "").trim(),
-    beforePhotos: before.refs,
-    afterPhotos: after.refs,
-    submittedAt: now(),
-  };
-  report.history = (report.history || []).concat([
-    historyEntry("repair_submitted", "Repair submitted for admin verification.", actorName()),
-  ]);
-  const saved = await saveReport(report, ["status", "repair", "history"]);
-  if (!saved) {
-    throw new Error("The repair couldn't be submitted. Try again.");
-  }
-  return report;
+  const form = new FormData();
+  form.append("notes", String(repair.notes || "").trim());
+  await appendPhotos(form, "before", repair.beforePhotos);
+  await appendPhotos(form, "after", repair.afterPhotos);
+  const body = await api("reports/" + reportId + "/repair", { method: "POST", form: form });
+  putReport(body.report, true);
+  emit();
+  return getReport(reportId) || body.report;
 }
 
 async function addReport(input) {
@@ -603,7 +581,8 @@ async function addReport(input) {
     throw new Error("Choose no more than five evidence photos.");
   }
 
-  // A pothole can come back after a repair, so only open reports count.
+  // Quick check against the reports already on screen; the server checks
+  // again when the report is saved.
   const duplicate = Array.from(cache.reports.values()).find(function (report) {
     return (
       openStatuses.includes(report.status) &&
@@ -619,58 +598,19 @@ async function addReport(input) {
     throw error;
   }
 
-  const counterRef = doc(db, "counters", "reports");
-  const base = {
-    title: title,
-    road: road,
-    location: location,
-    coordinates: { lat: Math.round(latitude * 1e6) / 1e6, lng: Math.round(longitude * 1e6) / 1e6 },
-    severity: severity,
-    description: description,
-    reporterId: cache.profile.uid,
-    reportedAt: now(),
-    evidencePhotos: [],
-    status: "submitted",
-    assignedTo: null,
-    assignedName: null,
-    repair: null,
-    history: [historyEntry("submitted", "Report received from a citizen.", cache.profile.name)],
-  };
-
-  let reportId;
-  try {
-    reportId = await runTransaction(db, async function (transaction) {
-      const counter = await transaction.get(counterRef);
-      const next = (counter.exists() ? counter.data().next : 1000) + 1;
-      const id = "RPT-" + next;
-      transaction.update(counterRef, { next: next });
-      transaction.set(doc(db, "reports", id), Object.assign({ id: id }, base));
-      return id;
-    });
-  } catch (error) {
-    throw friendlyError(error);
-  }
-
-  const evidence = photoRefs(photos, reportId, "evidence");
-  let photosSaved = true;
-  try {
-    await uploadPhotos(evidence.uploads);
-    if (evidence.refs.length) {
-      await updateDoc(doc(db, "reports", reportId), { evidencePhotos: evidence.refs });
-    }
-  } catch (error) {
-    console.error("Could not upload the report photos.", error);
-    photosSaved = false;
-  }
-
-  const report = Object.assign({ id: reportId }, base, { evidencePhotos: evidence.refs });
-  cache.reports.set(reportId, report);
+  const form = new FormData();
+  form.append("title", title);
+  form.append("road", road);
+  form.append("location", location);
+  form.append("description", description);
+  form.append("severity", severity);
+  form.append("latitude", String(latitude));
+  form.append("longitude", String(longitude));
+  await appendPhotos(form, "photos", photos);
+  const body = await api("reports", { method: "POST", form: form });
+  putReport(body.report, true);
   emit();
-  const result = getReport(reportId) || report;
-  if (!photosSaved) {
-    result.photosTrimmed = true;
-  }
-  return result;
+  return getReport(body.report.id) || body.report;
 }
 
 /* ---------- Accounts ---------- */
@@ -691,23 +631,10 @@ async function registerCitizen(input) {
   if (password.length < 8 || !/[A-Za-z]/.test(password) || !/\d/.test(password)) {
     throw new Error("Use at least 8 characters with a letter and a number.");
   }
-  let credential;
-  try {
-    credential = await createUserWithEmailAndPassword(auth, email, password);
-    await updateProfile(credential.user, { displayName: name });
-  } catch (error) {
-    if (error.code === "auth/email-already-in-use") {
-      throw new Error("An account already uses this email. Sign in instead.");
-    }
-    throw friendlyError(error);
-  }
-  const profile = { name: name, email: email, role: "citizen", active: true, createdAt: now() };
-  try {
-    await setDoc(doc(db, "users", credential.user.uid), profile);
-  } catch (error) {
-    throw friendlyError(error);
-  }
-  return Object.assign({ id: credential.user.uid }, profile);
+  const body = await api("auth/register", { method: "POST", json: { name: name, email: email, password: password } });
+  cache.profile = body.user;
+  emit();
+  return body.user;
 }
 
 async function addPersonnel(input) {
@@ -715,38 +642,22 @@ async function addPersonnel(input) {
   const name = String(input.name || "").trim();
   const email = String(input.email || "").trim().toLowerCase();
   const team = String(input.team || "").trim();
+  const password = String(input.password || "");
   if (!name || !email || !team) {
     throw new Error("Enter a name, email, and maintenance team.");
   }
   if (!isEmail(email)) {
     throw new Error("Enter a valid email address.");
   }
-
-  // A second Firebase app creates the account without signing the admin out.
-  const provisioning = initializeApp(firebaseConfig, "provisioning-" + Date.now());
-  const provisioningAuth = getAuth(provisioning);
-  let uid;
-  try {
-    const credential = await createUserWithEmailAndPassword(provisioningAuth, email, defaultCrewPassword);
-    await updateProfile(credential.user, { displayName: name });
-    uid = credential.user.uid;
-  } catch (error) {
-    throw friendlyError(error);
-  } finally {
-    await firebaseSignOut(provisioningAuth).catch(function () {});
-    await deleteApp(provisioning).catch(function () {});
+  if (password.length < 8 || !/[A-Za-z]/.test(password) || !/\d/.test(password)) {
+    throw new Error("Use a temporary password of at least 8 characters with a letter and a number.");
   }
-
-  const createdAt = now();
-  const batch = writeBatch(db);
-  batch.set(doc(db, "users", uid), { name: name, email: email, team: team, role: "maintenance", active: true, createdAt: createdAt });
-  batch.set(doc(db, "crews", uid), { name: name, team: team });
-  try {
-    await batch.commit();
-  } catch (error) {
-    throw friendlyError(error);
-  }
-  return { id: uid, name: name, email: email, team: team, createdAt: createdAt };
+  const body = await api("users", { method: "POST", json: { name: name, email: email, team: team, password: password } });
+  const user = body.user;
+  cache.users.set(user.id, Object.assign({ deleted: false }, user));
+  cache.crews.set(user.id, { id: user.id, name: user.name, team: user.team });
+  emit();
+  return { id: user.id, name: user.name, email: user.email, team: user.team, createdAt: user.createdAt };
 }
 
 async function deletePersonnel(personnelId) {
@@ -761,22 +672,13 @@ async function deletePersonnel(personnelId) {
   if (hasOpenAssignments) {
     throw new Error("Reassign or finish this person's open jobs before deleting the account.");
   }
-  // The sign-in account stays in Firebase Authentication, but without an
-  // active profile it can no longer open any workspace.
-  const batch = writeBatch(db);
-  batch.update(doc(db, "users", personnelId), { active: false, deleted: true, deletedAt: now() });
-  batch.delete(doc(db, "crews", personnelId));
-  cache.reports.forEach(function (report) {
-    if (report.assignedTo === personnelId) {
-      report.assignedName = crew.name;
-      batch.update(doc(db, "reports", report.id), { assignedName: crew.name });
-    }
-  });
-  try {
-    await batch.commit();
-  } catch (error) {
-    throw friendlyError(error);
+  await api("users/" + encodeURIComponent(personnelId), { method: "DELETE" });
+  cache.crews.delete(personnelId);
+  const user = cache.users.get(personnelId);
+  if (user) {
+    cache.users.set(personnelId, Object.assign({}, user, { active: false, deleted: true }));
   }
+  emit();
   return Object.assign({ id: personnelId }, crew);
 }
 
@@ -786,16 +688,25 @@ function setCitizenActive(citizenId, active) {
   if (!user || user.role !== "citizen") {
     throw new Error("This citizen account is no longer available.");
   }
-  user.active = Boolean(active);
+  const previous = user.active;
+  const updated = Object.assign({}, user, { active: Boolean(active) });
+  cache.users.set(citizenId, updated);
   emit();
-  persist(updateDoc(doc(db, "users", citizenId), { active: user.active }));
-  return { id: citizenId, name: user.name, email: user.email, active: user.active };
+  api("users/" + encodeURIComponent(citizenId), { method: "PATCH", json: { active: updated.active } }).catch(function (error) {
+    showError(error.message);
+    const current = cache.users.get(citizenId);
+    if (current) {
+      cache.users.set(citizenId, Object.assign({}, current, { active: previous }));
+      emit();
+    }
+  });
+  return { id: citizenId, name: user.name, email: user.email, active: updated.active };
 }
 
 /* ---------- Queries ---------- */
 
 function reporterName(report) {
-  return citizenName(report.reporterId);
+  return report.reporter || citizenName(report.reporterId);
 }
 
 function reportsByCitizen(citizen, state) {
@@ -815,30 +726,15 @@ async function signIn(email, password) {
   if (!normalized || !password) {
     throw new Error("Enter your email and password.");
   }
-  let credential;
-  try {
-    credential = await signInWithEmailAndPassword(auth, normalized, password);
-  } catch (error) {
-    throw friendlyError(error);
-  }
-  const snapshot = await getDoc(doc(db, "users", credential.user.uid)).catch(function () {
-    return null;
-  });
-  const data = snapshot && snapshot.exists() ? snapshot.data() : null;
-  if (!data || data.deleted) {
-    await firebaseSignOut(auth);
-    throw new Error("This account is no longer active. Contact the Road Maintenance Office.");
-  }
-  if (data.active === false) {
-    await firebaseSignOut(auth);
-    throw new Error("This account has been deactivated. Contact the Road Maintenance Office to reactivate it.");
-  }
-  return toUser(Object.assign({ uid: credential.user.uid }, data));
+  const body = await api("auth/login", { method: "POST", json: { email: normalized, password: password } });
+  cache.profile = body.user;
+  emit();
+  return toUser(body.user);
 }
 
 function toUser(profile) {
   return profile
-    ? { role: profile.role, userId: profile.uid, name: profile.name, team: profile.team || "", email: profile.email }
+    ? { role: profile.role, userId: profile.id, name: profile.name, team: profile.team || "", email: profile.email }
     : null;
 }
 
@@ -846,8 +742,13 @@ function currentUser() {
   return toUser(cache.profile);
 }
 
-function signOut() {
-  return firebaseSignOut(auth);
+async function signOut() {
+  try {
+    await api("auth/logout", { method: "POST" });
+  } finally {
+    cache.profile = null;
+    cache.users.clear();
+  }
 }
 
 window.RoadWatchStore = {

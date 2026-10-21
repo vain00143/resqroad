@@ -1,4 +1,4 @@
-// Sample accounts and reports loaded into Firestore by tools/seed.js.
+// Sample accounts and reports loaded into MySQL by tools/seed.js.
 // Dates are relative to when the seed runs, so the demo always looks current.
 
 export const accounts = {
