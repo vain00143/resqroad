@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -22,11 +22,13 @@ type Props = {
   listTitle: string;
   reports: Report[];
   emptyText: string;
-  comingNext: string;
+  // The main thing to do next, shown under the numbers.
+  action?: ReactNode;
+  comingNext?: string;
 };
 
 // The signed-in home screen shared by residents and crews.
-export function HomeScaffold({ subtitle, stats, listTitle, reports, emptyText, comingNext }: Props) {
+export function HomeScaffold({ subtitle, stats, listTitle, reports, emptyText, action, comingNext }: Props) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const { user, loaded, connection, refresh, signOut } = useSession();
@@ -74,6 +76,8 @@ export function HomeScaffold({ subtitle, stats, listTitle, reports, emptyText, c
               ))}
             </View>
 
+            {action}
+
             <View style={styles.section}>
               <AppText variant="eyebrow">{listTitle}</AppText>
               {loaded && reports.length === 0 ? <AppText tone="text2">{emptyText}</AppText> : null}
@@ -82,12 +86,14 @@ export function HomeScaffold({ subtitle, stats, listTitle, reports, emptyText, c
               ))}
             </View>
 
-            <View style={[styles.next, { backgroundColor: colors.primarySoft }]}>
-              <Icon name="sparkles" size={18} color={colors.primarySoftText} />
-              <AppText variant="caption" color={colors.primarySoftText} style={styles.nextText}>
-                {comingNext}
-              </AppText>
-            </View>
+            {comingNext ? (
+              <View style={[styles.next, { backgroundColor: colors.primarySoft }]}>
+                <Icon name="sparkles" size={18} color={colors.primarySoftText} />
+                <AppText variant="caption" color={colors.primarySoftText} style={styles.nextText}>
+                  {comingNext}
+                </AppText>
+              </View>
+            ) : null}
           </>
         )}
 

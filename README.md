@@ -256,6 +256,17 @@ Firewall. For the browser preview, use `http://localhost:8000` and add
 
 Residents and maintenance crews sign in with their website accounts, and new
 residents can register in the app. Administrators are pointed to the website.
+
+- **Residents** have four tabs: **Home** (their numbers and latest reports),
+  **Report** (the same three-part form as the website: title, severity, and
+  description; a map pin or "Use my location"; up to five photos from the
+  camera or gallery, shrunk to 1600 px before upload), **My reports** (with
+  Open, Resolved, and Closed filters), and **Track** (any report by ID, also
+  available signed out from the welcome screen). Each report's page shows its
+  progress, photos, location, any repair, and every decision with its note.
+- **Maps** are the website's Leaflet + OpenStreetMap maps running in a WebView,
+  so no map API key is needed (the phone needs internet for the map tiles).
+  Open reports appear as grey dots on the reporting map.
 The sign-in token is kept in the phone's secure storage; live updates arrive
 over the same WebSocket as the website, and the app reconnects and catches up
 after losing the connection.

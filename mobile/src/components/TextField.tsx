@@ -41,6 +41,7 @@ export const TextField = forwardRef<TextInputInstance, Props>(function TextField
       <View
         style={[
           styles.box,
+          props.multiline && styles.multilineBox,
           { backgroundColor: colors.surface, borderColor: focused ? colors.focus : colors.borderStrong },
         ]}
       >
@@ -50,7 +51,8 @@ export const TextField = forwardRef<TextInputInstance, Props>(function TextField
           placeholderTextColor={colors.placeholder}
           selectionColor={colors.accent}
           secureTextEntry={password && hidden}
-          style={[styles.input, noWebOutline, { color: colors.text }, style]}
+          textAlignVertical={props.multiline ? "top" : undefined}
+          style={[styles.input, props.multiline && styles.multilineInput, noWebOutline, { color: colors.text }, style]}
           onFocus={(event) => {
             setFocused(true);
             onFocus?.(event);
@@ -95,4 +97,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.regular,
     fontSize: 15,
   },
+  multilineBox: { alignItems: "flex-start", paddingVertical: 12 },
+  multilineInput: { minHeight: 96, lineHeight: 21 },
 });

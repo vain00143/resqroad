@@ -1,5 +1,5 @@
-import { Placeholder } from "@/components/Placeholder";
+import { TrackLookup } from "@/components/TrackLookup";
 
 export default function Track() {
-  return <Placeholder step="Step 3" title="Track a report" />;
+  return <TrackLookup />;
 }

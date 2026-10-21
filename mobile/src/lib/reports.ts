@@ -26,6 +26,35 @@ export const statusLabels: Record<ReportStatus, string> = {
   duplicate: "Duplicate",
 };
 
+export const openStatuses: ReportStatus[] = [
+  "submitted",
+  "under_review",
+  "verified",
+  "assigned",
+  "in_progress",
+  "repair_submitted",
+];
+
+// The happy path a report moves along; rejected and duplicate end it early.
+export const workflow: ReportStatus[] = [...openStatuses, "resolved"];
+
+export function isOpen(status: ReportStatus) {
+  return openStatuses.includes(status);
+}
+
+// Reports must be inside Bulacan (the server checks the same box).
+export const bulacan = { south: 14.5, north: 15.2, west: 120.3, east: 121.2 };
+
+export function inBulacan(lat: number, lng: number) {
+  return lat >= bulacan.south && lat <= bulacan.north && lng >= bulacan.west && lng <= bulacan.east;
+}
+
+// Accepts "RPT-1048", "rpt 1048", or "1048".
+export function normalizeReportId(input: string): string | null {
+  const match = /^(?:rpt)?[\s-]*(\d+)$/i.exec(input.trim());
+  return match ? "RPT-" + match[1] : null;
+}
+
 export const severities = ["High", "Medium", "Low"] as const;
 
 export type Severity = (typeof severities)[number];

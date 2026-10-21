@@ -84,6 +84,7 @@ function RootNavigator() {
           <Stack.Screen name="crew" options={{ headerShown: false }} />
         </Stack.Protected>
         <Stack.Screen name="track" options={{ title: "Track a report" }} />
+        <Stack.Screen name="reports/[id]" options={{ title: "Report", headerBackTitle: "Back" }} />
         <Stack.Screen name="brand" options={{ title: "Brand check" }} />
       </Stack>
       <StatusBar style="auto" />
