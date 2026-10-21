@@ -1,6 +1,6 @@
 /* Page chrome shared by every ResQRoad page: light/dark theme, the workspace
    sidebar, popover menus, the Ctrl+K command palette, the notifications
-   panel, and the demo-data reset. Pages plug content into the palette and
+   panel. Pages plug content into the palette and
    notifications through window.RoadWatchShell. */
 (function () {
   "use strict";
@@ -541,37 +541,6 @@
     }
     refreshNotifications();
   }
-
-  /* ---------- Demo data reset ---------- */
-
-  document.addEventListener("click", function (event) {
-    const button = event.target.closest("[data-reset-demo]");
-    if (!button || !ui() || !window.RoadWatchStore) {
-      return;
-    }
-    ui()
-      .confirm({
-        kicker: "Demo data",
-        title: "Reset all demo data?",
-        message:
-          "Every report, account, and change saved in this browser goes back to the original sample data. This can't be undone.",
-        confirmLabel: "Reset data",
-        danger: true,
-        icon: "reset",
-        opener: button,
-      })
-      .then(function (confirmed) {
-        if (!confirmed) {
-          return;
-        }
-        try {
-          window.RoadWatchStore.resetDemoData();
-          window.location.reload();
-        } catch (error) {
-          ui().showMessage(error.message, "error");
-        }
-      });
-  });
 
   document.querySelectorAll("[data-current-year]").forEach(function (element) {
     element.textContent = String(new Date().getFullYear());

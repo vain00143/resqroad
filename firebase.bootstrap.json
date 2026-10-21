@@ -1,0 +1,6 @@
+{
+  "firestore": {
+    "rules": "tools/bootstrap.rules",
+    "indexes": "firestore.indexes.json"
+  }
+}

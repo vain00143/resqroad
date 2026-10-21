@@ -1,6 +1,6 @@
 /* Public report tracker: look a report up by ID and show its public progress.
    Reporter details and internal staff notes are never shown here. */
-(function () {
+(async function () {
   "use strict";
 
   const store = window.RoadWatchStore;
@@ -212,6 +212,7 @@
   });
 
   renderRecent();
+  await store.ready();
   const initial = new URLSearchParams(window.location.search).get("id");
   if (initial) {
     lookup(initial, false);

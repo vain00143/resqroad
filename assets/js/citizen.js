@@ -1,14 +1,14 @@
 /* Citizen portal: report road damage (with a map pin and photos) and follow
    the reports you've filed. Status changes made by staff in other tabs show
    up live, with a notification. */
-(function () {
+(async function () {
   "use strict";
 
   const store = window.RoadWatchStore;
   const ui = window.RoadWatchUI;
   const icon = ui.icon;
   const esc = ui.escapeHtml;
-  const currentUser = window.RoadWatchAuth.requireRole("citizen", "login.html");
+  const currentUser = await window.RoadWatchAuth.requireRole("citizen", "login.html");
   if (!currentUser) {
     return;
   }
@@ -39,7 +39,7 @@
       return item.id === currentUser.userId;
     });
     if (!citizen || citizen.active === false) {
-      window.RoadWatchAuth.signOut("login.html?deactivated=1");
+      window.RoadWatchAuth.signOut("login.html?signedout=1");
       throw new Error("Your account is no longer active.");
     }
     return state;
@@ -608,8 +608,12 @@
     });
   });
 
-  form.addEventListener("submit", function (event) {
+  form.addEventListener("submit", async function (event) {
     event.preventDefault();
+    const submitButton = form.querySelector('button[type="submit"]');
+    if (submitButton.classList.contains("is-loading")) {
+      return;
+    }
     errorBox.hidden = true;
     const problems = validate();
     if (problems.length) {
@@ -625,9 +629,9 @@
       return;
     }
 
-    const submitButton = form.querySelector('button[type="submit"]');
+    submitButton.classList.add("is-loading");
     try {
-      const report = store.addReport({
+      const report = await store.addReport({
         reporterId: citizen.id,
         title: form.elements.namedItem("title").value,
         road: form.elements.namedItem("road").value,
@@ -640,7 +644,7 @@
       });
       submitButton.classList.remove("is-loading");
       if (report.photosTrimmed) {
-        ui.showMessage("Browser storage is full, so only the photo file names were saved.", "info");
+        ui.showMessage("Your report was saved, but the photos couldn't be uploaded.", "info");
       }
       resetForm();
       render();
@@ -648,6 +652,7 @@
       showSuccess(report);
     } catch (error) {
       console.error("Could not submit the report.", error);
+      submitButton.classList.remove("is-loading");
       errorBox.innerHTML =
         icon("alert-circle") +
         "<span>" +

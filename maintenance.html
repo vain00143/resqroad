@@ -26,7 +26,7 @@
     <link rel="stylesheet" href="assets/css/app.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="" defer></script>
     <script src="assets/js/icons.js" defer></script>
-    <script src="assets/js/data-store.js" defer></script>
+    <script type="module" src="assets/js/data-store.js"></script>
     <script src="assets/js/ui.js" defer></script>
     <script src="assets/js/auth.js" defer></script>
     <script src="assets/js/menus.js" defer></script>
@@ -200,7 +200,7 @@
 
         <footer class="app-footer">
           <span>&copy; <span data-current-year></span> ResQRoad · Road Maintenance Office</span>
-          <span><svg data-icon="shield-check" class="icon-sm"></svg>Prototype — data is stored in this browser only</span>
+          <span><svg data-icon="shield-check" class="icon-sm"></svg>Connected to the ResQRoad cloud database</span>
         </footer>
       </div>
     </div>

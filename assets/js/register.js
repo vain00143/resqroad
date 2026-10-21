@@ -1,6 +1,7 @@
-/* Resident registration. New accounts are signed in right away and taken to
-   the citizen portal (straight to the report form when they came to report). */
-(function () {
+/* Resident registration. Creates a Firebase account plus a resident profile,
+   signs the person in, and opens the citizen portal (straight to the report
+   form when they came to report). */
+(async function () {
   "use strict";
 
   const store = window.RoadWatchStore;
@@ -13,12 +14,8 @@
   const confirmInput = form.elements.namedItem("confirm");
   const strength = document.querySelector("#password-strength");
   const wantsToReport = new URLSearchParams(window.location.search).get("next") === "report";
+  let registering = false;
 
-  const currentUser = auth.readUser();
-  if (currentUser) {
-    window.location.replace(auth.workspaceFor(currentUser));
-    return;
-  }
   if (wantsToReport) {
     document.querySelector("#login-link").href = "login.html?next=report";
   }
@@ -63,8 +60,11 @@
     button.setAttribute("aria-pressed", String(isHidden));
   });
 
-  form.addEventListener("submit", function (event) {
+  form.addEventListener("submit", async function (event) {
     event.preventDefault();
+    if (registering) {
+      return;
+    }
     errorMessage.hidden = true;
     form.querySelectorAll("[aria-invalid]").forEach(function (field) {
       field.removeAttribute("aria-invalid");
@@ -85,19 +85,34 @@
       return;
     }
 
+    registering = true;
+    submitButton.classList.add("is-loading");
     try {
-      const citizen = store.registerCitizen({
+      const citizen = await store.registerCitizen({
         name: name.value,
         email: email.value,
         password: passwordInput.value,
       });
-      auth.signInCitizen(citizen);
-      submitButton.classList.add("is-loading");
       ui.flash("Welcome to ResQRoad, " + citizen.name.split(" ")[0] + ". Your account is ready.", "success");
       window.location.assign(wantsToReport ? "citizen.html#report" : "citizen.html");
     } catch (error) {
-      const field = /email/i.test(error.message) ? email : /password|characters/i.test(error.message) ? passwordInput : /name/i.test(error.message) ? name : null;
+      registering = false;
+      submitButton.classList.remove("is-loading");
+      const field = /email/i.test(error.message)
+        ? email
+        : /password|characters/i.test(error.message)
+          ? passwordInput
+          : /name/i.test(error.message)
+            ? name
+            : null;
       showError(error.message, field);
     }
   });
+
+  // Already signed in: go to that account's workspace instead.
+  await store.ready();
+  const currentUser = auth.readUser();
+  if (currentUser && !registering) {
+    window.location.replace(auth.workspaceFor(currentUser));
+  }
 })();

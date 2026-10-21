@@ -1,12 +1,12 @@
 // Minimal static file server for running ResQRoad locally without Python.
 // Usage: node serve.js [port]   (default port 8000)
-"use strict";
 
-const http = require("http");
-const fs = require("fs");
-const path = require("path");
+import http from "node:http";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-const root = __dirname;
+const root = path.dirname(fileURLToPath(import.meta.url));
 const port = Number(process.argv[2] || process.env.PORT || 8000);
 const types = {
   ".html": "text/html; charset=utf-8",

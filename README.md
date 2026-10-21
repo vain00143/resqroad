@@ -4,25 +4,24 @@ ResQRoad is a road damage reporting and maintenance management system for local
 government. Residents report road problems, and the LGU's Road Maintenance
 Office verifies, assigns, tracks, and resolves them from a central workspace.
 
-This is a front-end prototype built with plain HTML, CSS, and JavaScript. There
-is no backend, database, or build step: data lives in the browser, and the
-sign-in is a mock (see [Sign-in](#sign-in)).
+**Live site:** <https://resqroad-bulsu.web.app>
+
+The website is plain HTML, CSS, and JavaScript (no build step) backed by
+**Firebase**: Authentication for real accounts, Cloud Firestore as the shared
+database for the website and the mobile app, and Hosting for the live site. It
+runs entirely on Firebase's free (Spark) plan.
 
 ## Run locally
 
-Open the folder through a local web server so browser storage and the map work
-reliably. Either of these works from this folder:
+From this folder, start a local web server (the pages use JavaScript modules,
+so opening the HTML files directly won't work):
 
 ```powershell
 node serve.js
 ```
 
-```powershell
-python -m http.server 8000
-```
-
-Then open <http://localhost:8000/>. (`serve.js` is a tiny dependency-free
-static server for computers without Python.)
+Then open <http://localhost:8000/>. The local copy uses the same live database
+as the deployed site. (`python -m http.server 8000` also works.)
 
 ## Pages
 
@@ -35,32 +34,32 @@ static server for computers without Python.)
 | `track.html` | Everyone | Look up any report by ID (e.g. `track.html?id=RPT-1048`) and see its public progress. |
 | `admin.html` | Administrator | Dashboard, Analytics & Reports, Review Reports, Assignment, Map, and User management. |
 | `maintenance.html` | Maintenance crews | Overview, assigned jobs (start repairs, submit notes with before/after photos), and job locations. |
-| `admin-login.html`, `maintenance-login.html` | — | Old sign-in addresses; they redirect to `login.html` so existing links keep working. |
+| `admin-login.html`, `maintenance-login.html` | — | Old sign-in addresses; they redirect to `login.html`. |
 
-## Sign-in
+## Accounts
 
-Everyone signs in on `login.html`; there is no role picker. `RoadWatchAuth.signIn`
-in `assets/js/auth.js` looks up the email and opens the matching workspace.
-Visiting `login.html` while signed in goes straight to that workspace, and
-logging out returns to the sign-in page (residents return to the home page).
+Everyone signs in on `login.html`; there is no role picker. Firebase
+Authentication checks the email and password, and the account's profile in
+Firestore decides which workspace opens. Sessions persist until you log out.
 
-The sign-in page does not display the test accounts, so keep them handy:
+Demo accounts (also shown to the instructor for testing):
 
-- Administrator: `admin@resqroad.ph` / `admin123`
-- Maintenance: any maintenance email (for example `juan.reyes@resqroad.ph`,
-  `ana.cruz@resqroad.ph`, `leo.santos@resqroad.ph`) / `crew123`
-- Residents: any sample citizen (for example `maria.santos@example.com`) /
-  `citizen123`, or register a new account. `pedro.garcia@example.com` is a
-  deactivated sample account, so it can't sign in.
+| Role | Email | Password |
+| --- | --- | --- |
+| Administrator | `admin@resqroad.ph` | `admin123` |
+| Maintenance crew | `juan.reyes@resqroad.ph`, `ana.cruz@resqroad.ph`, `leo.santos@resqroad.ph` | `crew123` |
+| Resident | `maria.santos@example.com` (and the other sample residents) | `citizen123` |
+| Deactivated resident | `pedro.garcia@example.com` | `citizen123` (sign-in is refused) |
 
-New maintenance accounts (User management) use the shared `crew123` password.
-Citizen accounts can't be created from the admin workspace; administrators can
-deactivate or reactivate them, and a deactivated resident can no longer sign in
-or submit reports. A maintenance account with open assignments must have its
-work reassigned or finished before it can be deleted.
-
-These credentials are fixed values or values stored in the browser, not real
-authentication. The session lives in the current tab's `sessionStorage`.
+- Residents create their own accounts on `register.html` (8+ characters with a
+  letter and a number).
+- The administrator adds maintenance accounts in **User management**; new crew
+  accounts sign in with `crew123`. A crew account with open jobs can't be
+  deleted until its work is reassigned or finished. Deleting a crew account
+  removes its profile, so it can no longer sign in to any workspace (its
+  Firebase sign-in record stays, so that email can't be reused).
+- The administrator can deactivate or reactivate residents. A deactivated
+  resident is signed out immediately and can't sign in or submit reports.
 
 ## The workflow
 
@@ -68,8 +67,7 @@ authentication. The session lives in the current tab's `sessionStorage`.
 with `Rejected` and `Duplicate` as closing outcomes.
 
 1. A resident files a report from `citizen.html`. Reports within about 100 m of
-   another **open** report are blocked as likely duplicates (a pothole that
-   comes back after a repair can be reported again).
+   another **open** report are blocked as likely duplicates.
 2. The administrator reviews it under **Review Reports → Needs review**, then
    marks it under review, verifies, rejects (with an optional reason shown to
    the resident), or marks it a duplicate.
@@ -79,85 +77,113 @@ with `Rejected` and `Duplicate` as closing outcomes.
 5. The administrator checks it under **Review Reports → Repairs to verify**, then
    resolves it or requests more work (the note is shown on the crew's job).
 
-Every decision is recorded in the report's activity history. Administrators can
-also add internal notes, which are never shown publicly.
+Every decision is recorded in the report's history. Administrators can also add
+internal notes, which only administrators can read. All screens update live
+when anyone changes the data.
 
-## What's in each workspace
+## Database (Cloud Firestore)
 
-**Administrator** — a dashboard with KPIs, a submitted-vs-resolved trend, a
-"needs attention" queue, recent reports, and live activity; the review queues
-(card or table view, search, severity/status filters, sorting); assignment with
-crew workload; a live map with severity filters and a report list; analytics
-(resolution rate, time to verify and resolve, monthly chart, severity, status,
-top locations, crew performance) with CSV export and print; and user
-management. Press <kbd>Ctrl</kbd>+<kbd>K</kbd> to search reports, people, and
-pages. The bell lists new citizen reports and crew updates. "Reset demo data" in
-the account menu restores the original sample data.
+Region: `asia-southeast1` (Singapore). Security rules: `firestore.rules`.
 
-**Maintenance** — an overview with an "Up next" job, job tabs (Active, Awaiting
-review, Completed, All), directions links, drag-and-drop photo upload with
-previews, and a map of job locations. Unsaved repair notes and photos survive
-data refreshes.
+| Collection | Document ID | Fields | Who can read / write |
+| --- | --- | --- | --- |
+| `users` | Firebase user ID | `name`, `email`, `role` (`admin` \| `maintenance` \| `citizen`), `active`, `team` (crews), `createdAt`, `deleted` | Read: the owner and admins. Residents create their own resident profile; admins manage the rest. |
+| `crews` | Firebase user ID | `name`, `team` | Public read (crew names on reports); admins write. |
+| `reports` | `RPT-1048`, … | `id`, `title`, `road`, `location`, `coordinates {lat, lng}`, `severity`, `description`, `reporterId` → `users`, `reportedAt`, `evidencePhotos [{name, photoId}]`, `status`, `assignedTo` → `users`, `assignedName`, `repair {notes, beforePhotos, afterPhotos, submittedAt}`, `history [{status, description, actor, at, note}]`, `updatedAt` | Public read (no names or emails are stored here). Residents create; crews may only move their own job from Assigned → In Progress → Repair Submitted; admins update anything. |
+| `notes` | auto ID | `reportId` → `reports`, `note`, `actor`, `at` | Admins only. |
+| `photos` | auto ID | `reportId` → `reports`, `kind` (`evidence` \| `before` \| `after`), `name`, `src` (resized JPEG data URL), `uploadedBy` → `users`, `createdAt` | Public read; signed-in users upload their own. |
+| `counters` | `reports` | `next` (last report number used) | Signed-in read; incremented in a transaction when a report is filed. |
 
-**Residents** — a guided report form with a map pin picker (open reports are
-shown as orange dots), "use my location", photo upload, a confirmation with the
-report ID, and a "My reports" list with each report's progress. Status changes
-made by staff in another tab appear immediately with a notification.
+Photos are resized in the browser and stored in Firestore (each under 1 MB)
+instead of Cloud Storage, because Storage now requires a paid plan.
+
+## Architecture
+
+```
+Browser (HTML/CSS/JS)                        Firebase (resqroad-bulsu)
+──────────────────────                       ─────────────────────────
+Pages (admin, maintenance, citizen, …)       Hosting   → serves the website
+  └─ RoadWatchStore (assets/js/data-store.js)
+       ├─ Firebase Auth SDK  ───────────────► Authentication (email/password)
+       └─ Firestore SDK      ◄── live ──────► Cloud Firestore + security rules
+```
+
+`RoadWatchStore` keeps a live copy of the data using Firestore listeners, so
+pages read it instantly and re-render whenever anything changes. Changes appear
+on screen immediately and are then saved; if the security rules reject a
+change, the real data is restored and an error is shown.
+
+## Deploying and managing data
+
+Requires Node.js and the Firebase CLI (`npm install -g firebase-tools`, then
+`firebase login` with the Google account that owns the project).
+
+```powershell
+npm install                 # once, for the seed tool
+npm run deploy              # website + security rules
+npm run deploy:hosting      # website only
+npm run deploy:rules        # security rules only
+npm run seed -- --reset     # reload the 21 sample reports (keeps accounts)
+```
+
+### Setting up a new Firebase project
+
+1. Create a project, register a web app, and paste its config into
+   `assets/js/firebase-config.js`; set the project ID in `.firebaserc`.
+2. Create the Firestore database and turn on **Email/Password** under
+   Authentication → Sign-in method.
+3. The first admin profile can't be created under the real rules, so seed once
+   with temporary rules, then restore the real ones right away:
+
+```powershell
+npm run deploy:bootstrap-rules
+npm run seed
+npm run deploy:rules
+```
 
 ## Brand and design
 
 The design follows `ResQRoad Brandsheet.pdf`:
 
-- **Colors** — the Road Orange scale (`#7B3621` → `#EFC88B`), Pastel Rust,
-  Black, Blush Mist, and Asphalt Gray are defined as tokens at the top of
-  `assets/css/core.css`. Buttons use `#B34F2F` so white text meets WCAG AA.
-  Severity (high/medium/low) and each workflow status keep their own hues so
-  they stay easy to tell apart.
-- **Type** — headlines use **Nofex**; body copy and UI use **Poppins** (Google
-  Fonts). Nofex isn't on a public font CDN, so the site uses it when it's
-  installed and otherwise falls back to **Archivo Expanded**, which has the same
-  wide, heavy build. To ship Nofex with the site, add the licensed web font to
-  `assets/fonts/` and add it to the `@font-face` rule at the top of `core.css`.
-- **Logo** — `assets/images/resqroad-mark.png` (the Q mark, also the favicon),
-  `resqroad-logotype.png` (light backgrounds), and `resqroad-logotype-white.png`
+- **Colors**: the Road Orange scale (`#7B3621` → `#EFC88B`), Pastel Rust,
+  Black, Blush Mist, and Asphalt Gray are tokens at the top of
+  `assets/css/core.css`. Severity and each workflow status keep their own hues.
+- **Type**: headlines use **Nofex** when it's installed, otherwise **Archivo
+  Expanded**, which has the same wide, heavy build; body copy and UI use
+  **Poppins**.
+- **Logo**: `assets/images/resqroad-mark.png` (the Q mark and favicon),
+  `resqroad-logotype.png` (light backgrounds), `resqroad-logotype-white.png`
   (dark backgrounds).
-- **Themes** — light and dark, following the system setting until someone picks
-  one with the sun/moon button.
+- **Themes**: light and dark, following the system setting until someone picks
+  one with the sun/moon button. Every page works at phone width.
 
 ## Code layout
 
 ```
-assets/css/core.css      Design tokens, base styles, and shared components
-assets/css/app.css       Workspace shell (sidebar, top bar) and workspace views
-assets/css/site.css      Landing page, sign-in, citizen portal, and tracker
-assets/js/icons.js       Inline SVG icon set
-assets/js/data-store.js  RoadWatchStore: data, workflow rules, and migrations
-assets/js/auth.js        RoadWatchAuth: mock sign-in and role checks
-assets/js/ui.js          RoadWatchUI: toasts, dialogs, lightbox, maps, formatting
-assets/js/menus.js       Accessible custom select menus
-assets/js/shell.js       Theme, sidebar, popovers, Ctrl+K palette, notifications
-assets/js/charts.js      SVG charts (trend, columns, donut, bars, sparklines)
-assets/js/*.js           One script per page (admin, maintenance, citizen, …)
-serve.js                 Optional local static server (Node.js, no dependencies)
+assets/css/core.css           Design tokens, base styles, shared components
+assets/css/app.css            Workspace shell (sidebar, top bar) and views
+assets/css/site.css           Landing page, sign-in, citizen portal, tracker
+assets/js/firebase-config.js  Firebase project settings
+assets/js/data-store.js       RoadWatchStore: Firestore data, workflow rules
+assets/js/auth.js             RoadWatchAuth: sign-in and role checks
+assets/js/ui.js               Toasts, dialogs, lightbox, maps, formatting
+assets/js/menus.js            Accessible custom select menus
+assets/js/shell.js            Theme, sidebar, popovers, Ctrl+K palette, notifications
+assets/js/charts.js           SVG charts (trend, columns, donut, bars, sparklines)
+assets/js/*.js                One script per page (admin, maintenance, citizen, …)
+firestore.rules               Database security rules
+tools/seed.js, seed-data.js   Demo accounts and sample reports
+serve.js                      Local static server (Node.js, no dependencies)
 ```
 
-## Maps
+## Acknowledgements
 
-Maps use [Leaflet](https://leafletjs.com/) with OpenStreetMap tiles (loaded from
-the internet, with attribution). If the map library or tiles can't load, every
-map falls back to the original schematic map of Bulacan, so pins and popups
-still work offline.
-
-## Stored data
-
-Reports, accounts, and changes are saved in browser `localStorage` under the
-same key as before (`roadwatch-demo-v1`), shared by every page on the same
-browser and origin, so data saved by the earlier version carries over and is
-upgraded automatically. Open tabs update each other live. Changes stay in that
-browser; nothing is sent to a server. Reset everything with **Reset demo data**
-in the administrator's account menu, or by clearing the site's browser storage.
-
-Photos chosen by residents and crews are resized in the browser and saved with
-the report, so administrators can view them. If browser storage runs out, the
-report is still saved with the photo file names only. Sample reports use sample
-road photos.
+- [Firebase](https://firebase.google.com/) (Authentication, Cloud Firestore,
+  Hosting) by Google.
+- [Leaflet](https://leafletjs.com/) for maps, with map data © [OpenStreetMap](https://www.openstreetmap.org/copyright)
+  contributors. If the map can't load, a built-in schematic map is shown.
+- Fonts: [Poppins](https://fonts.google.com/specimen/Poppins) and
+  [Archivo](https://fonts.google.com/specimen/Archivo) via Google Fonts; Nofex
+  from the ResQRoad brand sheet.
+- Icons are drawn in the style of [Lucide](https://lucide.dev/) (ISC license).
+- Sample road photos on demo reports are linked from public news websites.

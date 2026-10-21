@@ -1,7 +1,7 @@
 /* Maintenance crew workspace: overview, assigned jobs (start a repair, submit
    notes with before-and-after photos), and a map of job locations. Repair
    drafts survive re-renders, so typing is never lost when data refreshes. */
-(function () {
+(async function () {
   "use strict";
 
   const store = window.RoadWatchStore;
@@ -9,7 +9,7 @@
   const shell = window.RoadWatchShell;
   const icon = ui.icon;
   const esc = ui.escapeHtml;
-  const currentUser = window.RoadWatchAuth.requireRole("maintenance", "login.html");
+  const currentUser = await window.RoadWatchAuth.requireRole("maintenance", "login.html");
   if (!currentUser) {
     return;
   }
@@ -821,19 +821,31 @@
       if (!confirmed) {
         return;
       }
-      runSafely(function () {
-        const result = store.submitRepair(reportId, currentUser.userId, {
+      const submitButton = form.querySelector('button[type="submit"]');
+      submitButton.classList.add("is-loading");
+      let request;
+      try {
+        request = store.submitRepair(reportId, currentUser.userId, {
           notes: draft.notes,
           beforePhotos: draft.before,
           afterPhotos: draft.after,
         });
-        drafts.delete(reportId);
-        ui.showMessage(reportId + " sent to the administrator for verification.", "success");
-        if (result.photosTrimmed) {
-          ui.showMessage("Browser storage is full, so only the photo file names were saved.", "info");
-        }
-        render();
-      });
+      } catch (error) {
+        submitButton.classList.remove("is-loading");
+        ui.showMessage(error.message, "error");
+        return;
+      }
+      request
+        .then(function () {
+          drafts.delete(reportId);
+          ui.showMessage(reportId + " sent to the administrator for verification.", "success");
+          runSafely(render);
+        })
+        .catch(function (error) {
+          // The draft is kept, so the crew can simply try again.
+          submitButton.classList.remove("is-loading");
+          ui.showMessage(error.message, "error");
+        });
     });
   });
 

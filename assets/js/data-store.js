@@ -1,1099 +1,880 @@
-/* ResQRoad data store. Everything lives in this browser's localStorage under
-   one key, shared by the public site and every workspace on the same origin.
-   The API keeps the original RoadWatchStore names so saved data and older
-   pages keep working; migrations below upgrade data saved by earlier builds. */
-(function () {
-  "use strict";
+/* ResQRoad data store, backed by Firebase (Authentication + Cloud Firestore).
 
-  const storageKey = "roadwatch-demo-v1";
-  const dayMs = 24 * 60 * 60 * 1000;
-  const openStatuses = ["submitted", "under_review", "verified", "assigned", "in_progress", "repair_submitted"];
-  const closedStatuses = ["resolved", "rejected", "duplicate"];
-  const crewOpenStatuses = ["assigned", "in_progress", "repair_submitted"];
-  const statuses = {
-    submitted: "Submitted",
-    under_review: "Under Review",
-    verified: "Verified",
-    assigned: "Assigned",
-    in_progress: "In Progress",
-    repair_submitted: "Repair Submitted",
-    resolved: "Resolved",
-    rejected: "Rejected",
-    duplicate: "Duplicate",
-  };
-  const adminEmail = "admin@resqroad.ph";
-  const defaultCitizenPassword = "citizen123";
+   Pages keep using the same RoadWatchStore API as before. Firestore listeners
+   keep an in-memory copy of the data up to date in real time, so reads stay
+   synchronous: call `await RoadWatchStore.ready()` once, then getState()
+   always returns the latest data. Changes are applied to the local copy
+   immediately and then saved; if the server rejects a change, the listener
+   restores the real data and the person sees an error message.
 
-  // Days ago each sample report was filed, and when each step of its seeded
-  // history happened, so the journey dates line up with the report date.
-  const sampleTimelines = {
-    "RPT-1048": { reported: 0.15, events: { submitted: 0.15 } },
-    "RPT-1047": { reported: 2, events: { submitted: 2, under_review: 0.5 } },
-    "RPT-1046": { reported: 4, events: { submitted: 4, verified: 2.5 } },
-    "RPT-1045": { reported: 7, events: { submitted: 7, verified: 6, assigned: 5 } },
-    "RPT-1044": { reported: 12, events: { submitted: 12, verified: 10, assigned: 9, in_progress: 3 } },
-    "RPT-1043": {
-      reported: 16,
-      events: { submitted: 16, verified: 14, assigned: 13, in_progress: 9, repair_submitted: 0.6 },
-    },
-    "RPT-1042": {
-      reported: 32,
-      events: { submitted: 32, verified: 31, assigned: 30, in_progress: 27, repair_submitted: 25, resolved: 24 },
-    },
-    "RPT-1041": { reported: 46, events: { submitted: 46, duplicate: 45 } },
-    "RPT-1051": { reported: 0.3, events: { submitted: 0.3 } },
-    "RPT-1052": { reported: 0.5, events: { submitted: 0.5 } },
-    "RPT-1053": { reported: 0.8, events: { submitted: 0.8 } },
-  };
+   Collections (see firestore.rules and README.md for the full schema):
+     users/{uid}      private profile: name, email, role, active, team
+     crews/{uid}      public crew directory: name, team
+     reports/{RPT-n}  report, status, assignment, repair, and history
+     notes/{id}       internal staff notes on reports (admins only)
+     photos/{id}      resized photos as data URLs
+     counters/reports next report number */
 
-  const personnel = [
-    { id: "juan-reyes", name: "Juan Reyes", email: "juan.reyes@resqroad.ph", team: "North road crew" },
-    { id: "ana-cruz", name: "Ana Cruz", email: "ana.cruz@resqroad.ph", team: "Central road crew" },
-    { id: "leo-santos", name: "Leo Santos", email: "leo.santos@resqroad.ph", team: "South road crew" },
-  ];
+import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js";
+import {
+  getAuth,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut as firebaseSignOut,
+  updateProfile,
+} from "https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js";
+import {
+  getFirestore,
+  collection,
+  doc,
+  onSnapshot,
+  getDoc,
+  setDoc,
+  updateDoc,
+  deleteDoc,
+  runTransaction,
+  writeBatch,
+} from "https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js";
+import { firebaseConfig } from "./firebase-config.js";
 
-  const citizens = [
-    { id: "citizen-maria-santos", name: "Maria Santos", email: "maria.santos@example.com", active: true, joinedDaysAgo: 260 },
-    { id: "citizen-jose-dela-cruz", name: "Jose Dela Cruz", email: "jose.delacruz@example.com", active: true, joinedDaysAgo: 240 },
-    { id: "citizen-ana-reyes", name: "Ana Reyes", email: "ana.reyes@example.com", active: true, joinedDaysAgo: 220 },
-    { id: "citizen-pedro-garcia", name: "Pedro Garcia", email: "pedro.garcia@example.com", active: false, joinedDaysAgo: 200 },
-  ];
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
 
-  // Citizens behind the remaining sample reports, added by a migration.
-  const additionalCitizens = [
-    { id: "citizen-rosa-mendoza", name: "Rosa Mendoza", email: "rosa.mendoza@example.com", active: true, joinedDaysAgo: 180 },
-    { id: "citizen-luis-flores", name: "Luis Flores", email: "luis.flores@example.com", active: true, joinedDaysAgo: 150 },
-    { id: "citizen-carla-bautista", name: "Carla Bautista", email: "carla.bautista@example.com", active: true, joinedDaysAgo: 90 },
-    { id: "citizen-elena-navarro", name: "Elena Navarro", email: "elena.navarro@example.com", active: true, joinedDaysAgo: 60 },
-  ];
+const openStatuses = ["submitted", "under_review", "verified", "assigned", "in_progress", "repair_submitted"];
+const closedStatuses = ["resolved", "rejected", "duplicate"];
+const crewOpenStatuses = ["assigned", "in_progress", "repair_submitted"];
+const statuses = {
+  submitted: "Submitted",
+  under_review: "Under Review",
+  verified: "Verified",
+  assigned: "Assigned",
+  in_progress: "In Progress",
+  repair_submitted: "Repair Submitted",
+  resolved: "Resolved",
+  rejected: "Rejected",
+  duplicate: "Duplicate",
+};
+const defaultCrewPassword = "crew123";
 
-  // Sample reporters are stored with short names; these link them to accounts.
-  const sampleReporters = {
-    "M. Santos": "maria.santos@example.com",
-    "J. Dela Cruz": "jose.delacruz@example.com",
-    "A. Reyes": "ana.reyes@example.com",
-    "R. Mendoza": "rosa.mendoza@example.com",
-    "P. Garcia": "pedro.garcia@example.com",
-    "L. Flores": "luis.flores@example.com",
-    "C. Bautista": "carla.bautista@example.com",
-    "E. Navarro": "elena.navarro@example.com",
-  };
+/* ---------- Live cache ---------- */
 
-  function daysAgo(days) {
-    return new Date(Date.now() - days * dayMs).toISOString();
+const cache = {
+  profile: null, // { uid, name, email, role, active, team }
+  reports: new Map(),
+  crews: new Map(),
+  users: new Map(), // admins only
+  notes: [], // admins only
+  photos: new Map(),
+};
+const changeListeners = new Set();
+let derived = null;
+let unsubscribers = [];
+let authGeneration = 0;
+let resolveReady;
+const readyPromise = new Promise(function (resolve) {
+  resolveReady = resolve;
+});
+let emitScheduled = false;
+
+function markDirty() {
+  derived = null;
+}
+
+function emit() {
+  markDirty();
+  if (emitScheduled) {
+    return;
   }
-
-  function event(status, description, days, actor) {
-    return {
-      status: status,
-      description: description,
-      actor: actor || "ResQRoad",
-      at: daysAgo(days),
-    };
-  }
-
-  function timelineDay(reportId, status, fallback) {
-    const timeline = sampleTimelines[reportId];
-    return timeline && Object.prototype.hasOwnProperty.call(timeline.events, status)
-      ? timeline.events[status]
-      : fallback;
-  }
-
-  function reportedDay(reportId) {
-    return sampleTimelines[reportId] ? sampleTimelines[reportId].reported : 0;
-  }
-
-  function createSampleReports() {
-    return [
-      {
-        id: "RPT-1048",
-        title: "Deep pothole near the public market",
-        road: "MacArthur Highway",
-        location: "Guinhawa, Malolos City",
-        coordinates: { lat: 14.8474, lng: 120.8122 },
-        severity: "High",
-        description:
-          "A deep pothole in the right lane is causing drivers to swerve. Reported near the public market entrance.",
-        reporter: "M. Santos",
-        reportedAt: daysAgo(reportedDay("RPT-1048")),
-        evidencePhotos: ["market-road-damage.jpg"],
-        status: "submitted",
-        assignedTo: null,
-        repair: null,
-        history: [event("submitted", "Report received from a citizen.", timelineDay("RPT-1048", "submitted", 0))],
-      },
-      {
-        id: "RPT-1047",
-        title: "Pothole beside the school crossing",
-        road: "Longos Road",
-        location: "Longos, Malolos City",
-        coordinates: { lat: 14.8681, lng: 120.7964 },
-        severity: "Medium",
-        description: "There is a pothole near the pedestrian crossing. It gets harder to see after rain.",
-        reporter: "J. Dela Cruz",
-        reportedAt: daysAgo(reportedDay("RPT-1047")),
-        evidencePhotos: ["longos-crossing.jpg"],
-        status: "under_review",
-        assignedTo: null,
-        repair: null,
-        history: [
-          event("submitted", "Report received from a citizen.", timelineDay("RPT-1047", "submitted", 1)),
-          event("under_review", "Administrator started reviewing this report.", timelineDay("RPT-1047", "under_review", 0)),
-        ],
-      },
-      {
-        id: "RPT-1046",
-        title: "Broken road surface near the bridge",
-        road: "Calumpit Bridge Road",
-        location: "Calumpit, Bulacan",
-        coordinates: { lat: 14.9189, lng: 120.7652 },
-        severity: "High",
-        description: "A damaged section of the lane is wide enough to affect motorcycles and cars.",
-        reporter: "A. Reyes",
-        reportedAt: daysAgo(reportedDay("RPT-1046")),
-        evidencePhotos: ["bridge-road.jpg"],
-        status: "verified",
-        assignedTo: null,
-        repair: null,
-        history: [
-          event("submitted", "Report received from a citizen.", timelineDay("RPT-1046", "submitted", 2)),
-          event("verified", "Administrator confirmed the reported road damage.", timelineDay("RPT-1046", "verified", 1)),
-        ],
-      },
-      {
-        id: "RPT-1045",
-        title: "Road damage at the intersection",
-        road: "Sta. Isabel Road",
-        location: "Sta. Isabel, Malolos City",
-        coordinates: { lat: 14.842, lng: 120.8088 },
-        severity: "High",
-        description: "The damaged patch is near an intersection and is difficult to avoid during busy hours.",
-        reporter: "R. Mendoza",
-        reportedAt: daysAgo(reportedDay("RPT-1045")),
-        evidencePhotos: ["sta-isabel-intersection.jpg"],
-        status: "assigned",
-        assignedTo: "juan-reyes",
-        repair: null,
-        history: [
-          event("submitted", "Report received from a citizen.", timelineDay("RPT-1045", "submitted", 3)),
-          event("verified", "Administrator confirmed the report.", timelineDay("RPT-1045", "verified", 2)),
-          event("assigned", "Assigned to Juan Reyes.", timelineDay("RPT-1045", "assigned", 1)),
-        ],
-      },
-      {
-        id: "RPT-1044",
-        title: "Small pothole expanding after rain",
-        road: "Dakila Road",
-        location: "Dakila, Malolos City",
-        coordinates: { lat: 14.8592, lng: 120.8282 },
-        severity: "Low",
-        description: "A small pothole has started to spread near the shoulder of the road.",
-        reporter: "P. Garcia",
-        reportedAt: daysAgo(reportedDay("RPT-1044")),
-        evidencePhotos: ["dakila-road.jpg"],
-        status: "in_progress",
-        assignedTo: "ana-cruz",
-        repair: null,
-        history: [
-          event("submitted", "Report received from a citizen.", timelineDay("RPT-1044", "submitted", 4)),
-          event("verified", "Administrator confirmed the report.", timelineDay("RPT-1044", "verified", 3)),
-          event("assigned", "Assigned to Ana Cruz.", timelineDay("RPT-1044", "assigned", 2)),
-          event("in_progress", "Repair inspection has started.", timelineDay("RPT-1044", "in_progress", 1)),
-        ],
-      },
-      {
-        id: "RPT-1043",
-        title: "Pothole repaired near the barangay hall",
-        road: "Tikay Road",
-        location: "Tikay, Malolos City",
-        coordinates: { lat: 14.8728, lng: 120.8141 },
-        severity: "Medium",
-        description: "Road damage near the barangay hall was reported for inspection and repair.",
-        reporter: "L. Flores",
-        reportedAt: daysAgo(reportedDay("RPT-1043")),
-        evidencePhotos: ["tikay-before.jpg"],
-        status: "repair_submitted",
-        assignedTo: "juan-reyes",
-        repair: {
-          notes: "Filled the damaged section and cleared loose material from the lane.",
-          beforePhotos: ["repair-before.jpg"],
-          afterPhotos: ["repair-after.jpg"],
-          submittedAt: daysAgo(timelineDay("RPT-1043", "repair_submitted", 0)),
-        },
-        history: [
-          event("submitted", "Report received from a citizen.", timelineDay("RPT-1043", "submitted", 6)),
-          event("verified", "Administrator confirmed the report.", timelineDay("RPT-1043", "verified", 5)),
-          event("assigned", "Assigned to Juan Reyes.", timelineDay("RPT-1043", "assigned", 4)),
-          event("in_progress", "Repair inspection has started.", timelineDay("RPT-1043", "in_progress", 2)),
-          event("repair_submitted", "Repair submitted for admin verification.", timelineDay("RPT-1043", "repair_submitted", 0)),
-        ],
-      },
-      {
-        id: "RPT-1042",
-        title: "Resolved road damage near the town plaza",
-        road: "Plaridel Bypass Road",
-        location: "Plaridel, Bulacan",
-        coordinates: { lat: 14.8864, lng: 120.8574 },
-        severity: "Medium",
-        description: "A damaged patch on the roadside was reported and repaired.",
-        reporter: "C. Bautista",
-        reportedAt: daysAgo(reportedDay("RPT-1042")),
-        evidencePhotos: ["plaridel-before.jpg"],
-        status: "resolved",
-        assignedTo: "leo-santos",
-        repair: {
-          notes: "Repaired and leveled the road surface.",
-          beforePhotos: ["plaridel-before.jpg"],
-          afterPhotos: ["plaridel-after.jpg"],
-          submittedAt: daysAgo(timelineDay("RPT-1042", "repair_submitted", 3)),
-        },
-        history: [
-          event("submitted", "Report received from a citizen.", timelineDay("RPT-1042", "submitted", 9)),
-          event("verified", "Administrator confirmed the report.", timelineDay("RPT-1042", "verified", 8)),
-          event("assigned", "Assigned to Leo Santos.", timelineDay("RPT-1042", "assigned", 7)),
-          event("in_progress", "Repair work started.", timelineDay("RPT-1042", "in_progress", 5)),
-          event("repair_submitted", "Repair submitted for admin verification.", timelineDay("RPT-1042", "repair_submitted", 3)),
-          event("resolved", "Administrator verified the repair and closed the report.", timelineDay("RPT-1042", "resolved", 2)),
-        ],
-      },
-      {
-        id: "RPT-1041",
-        title: "Repeat report near the municipal hall",
-        road: "Capitol View Park Road",
-        location: "Guinhawa, Malolos City",
-        coordinates: { lat: 14.8466, lng: 120.811 },
-        severity: "Low",
-        description: "This report refers to an existing pothole report nearby.",
-        reporter: "E. Navarro",
-        reportedAt: daysAgo(reportedDay("RPT-1041")),
-        evidencePhotos: ["capitol-road.jpg"],
-        status: "duplicate",
-        assignedTo: null,
-        repair: null,
-        history: [
-          event("submitted", "Report received from a citizen.", timelineDay("RPT-1041", "submitted", 10)),
-          event("duplicate", "Marked as a duplicate of another nearby report.", timelineDay("RPT-1041", "duplicate", 9)),
-        ],
-      },
-    ];
-  }
-
-  function createAdditionalSubmittedReports() {
-    return [
-      {
-        id: "RPT-1051",
-        title: "Pothole outside the health center",
-        road: "Mabini Street",
-        location: "Santiago, Malolos City",
-        coordinates: { lat: 14.8506, lng: 120.8171 },
-        severity: "Medium",
-        description: "A pothole near the health center entrance may cause vehicles to swerve.",
-        reporter: "J. Dela Cruz",
-        reportedAt: daysAgo(reportedDay("RPT-1051")),
-        evidencePhotos: ["longos-crossing.jpg"],
-        status: "submitted",
-        assignedTo: null,
-        repair: null,
-        history: [event("submitted", "Report received from a citizen.", timelineDay("RPT-1051", "submitted", 0))],
-      },
-      {
-        id: "RPT-1052",
-        title: "Cracked pavement near the terminal",
-        road: "Mojon Road",
-        location: "Mojon, Malolos City",
-        coordinates: { lat: 14.8531, lng: 120.8058 },
-        severity: "Low",
-        description: "A cracked section of pavement is starting to break apart near the terminal.",
-        reporter: "A. Reyes",
-        reportedAt: daysAgo(reportedDay("RPT-1052")),
-        evidencePhotos: ["bridge-road.jpg"],
-        status: "submitted",
-        assignedTo: null,
-        repair: null,
-        history: [event("submitted", "Report received from a citizen.", timelineDay("RPT-1052", "submitted", 0))],
-      },
-      {
-        id: "RPT-1053",
-        title: "Deep road damage near the public school",
-        road: "Paseo del Congreso",
-        location: "Bulihan, Malolos City",
-        coordinates: { lat: 14.8588, lng: 120.8186 },
-        severity: "High",
-        description: "A deep damaged patch is close to the public school and affects passing vehicles.",
-        reporter: "P. Garcia",
-        reportedAt: daysAgo(reportedDay("RPT-1053")),
-        evidencePhotos: ["sta-isabel-intersection.jpg"],
-        status: "submitted",
-        assignedTo: null,
-        repair: null,
-        history: [event("submitted", "Report received from a citizen.", timelineDay("RPT-1053", "submitted", 0))],
-      },
-    ];
-  }
-
-  // Closed reports from earlier months, so trends and resolution times have
-  // history to work with.
-  function createHistoricalReports() {
-    const seeds = [
-      ["RPT-1031", "Washed-out shoulder after heavy rain", "Malolos–Paombong Road", "Paombong, Bulacan", 14.8311, 120.7894, "Medium", "The road shoulder washed out after the typhoon, leaving a drop-off along the lane edge.", "M. Santos", 228, "leo-santos", 6, "Rebuilt the shoulder with compacted base course and resurfaced the edge."],
-      ["RPT-1032", "Pothole cluster near the bus stop", "MacArthur Highway", "Tikay, Malolos City", 14.8705, 120.8189, "High", "Several potholes in the outer lane beside the bus stop force jeepneys into the middle lane.", "R. Mendoza", 214, "juan-reyes", 3, "Cold-patched four potholes and sealed the surrounding cracks."],
-      ["RPT-1033", "Sunken manhole cover", "Pulilan–Baliuag Road", "Pulilan, Bulacan", 14.9021, 120.8492, "Medium", "A manhole cover has sunk below the road surface and jolts passing vehicles.", "J. Dela Cruz", 196, "ana-cruz", 5, "Raised the manhole frame to grade and patched the surrounding asphalt."],
-      ["RPT-1034", "Uneven patch at the crossing", "Guiguinto Road", "Tabe, Guiguinto", 14.8337, 120.8791, "Low", "The pavement at the pedestrian crossing feels uneven.", "L. Flores", 171, null, 0, ""],
-      ["RPT-1035", "Deep rut in the left lane", "Plaridel Bypass Road", "Lalangan, Plaridel", 14.8952, 120.8653, "High", "A long rut in the left lane holds water and is hard to see at night.", "A. Reyes", 158, "leo-santos", 4, "Milled the damaged lane section and laid new asphalt."],
-      ["RPT-1036", "Crumbling pavement edge", "Calumpit–Pulilan Road", "Calumpit, Bulacan", 14.9105, 120.7801, "Low", "The pavement edge is crumbling into the drainage canal.", "C. Bautista", 133, "juan-reyes", 8, "Reinforced the pavement edge and cleared the canal inlet."],
-      ["RPT-1037", "Pothole beside the church entrance", "Paseo del Congreso", "Barasoain, Malolos City", 14.8578, 120.8139, "Medium", "A pothole beside the church entrance is in the path of tricycles dropping off passengers.", "E. Navarro", 104, "ana-cruz", 3, "Filled and compacted the pothole with hot-mix asphalt."],
-      ["RPT-1038", "Large pothole on the service road", "NLEX Service Road", "Sta. Rita, Guiguinto", 14.8456, 120.8902, "High", "A large pothole on the service road has already caused a flat tire.", "M. Santos", 77, "juan-reyes", 2, "Emergency patch completed the same day; full repair done after curing."],
-      ["RPT-1039", "Cracked asphalt near the market", "Mabini Street", "Santo Rosario, Malolos City", 14.8441, 120.8126, "Low", "Alligator cracking is spreading across the lane near the market.", "R. Mendoza", 58, "ana-cruz", 5, "Sealed the cracks and applied a surface treatment."],
-      ["RPT-1040", "Damaged lane at the bridge approach", "Calumpit Bridge Road", "Calumpit, Bulacan", 14.9163, 120.7678, "Medium", "The bridge approach slab has separated from the road, leaving a bump.", "J. Dela Cruz", 41, "leo-santos", 4, "Leveled the approach slab joint and patched the transition."],
-    ];
-
-    return seeds.map(function (seed) {
-      const [id, title, road, location, lat, lng, severity, description, reporter, age, crewId, fixDays, notes] = seed;
-      const crew = personnel.find(function (person) {
-        return person.id === crewId;
-      });
-      const report = {
-        id: id,
-        title: title,
-        road: road,
-        location: location,
-        coordinates: { lat: lat, lng: lng },
-        severity: severity,
-        description: description,
-        reporter: reporter,
-        reportedAt: daysAgo(age),
-        evidencePhotos: [id.toLowerCase() + ".jpg"],
-        status: crew ? "resolved" : "rejected",
-        assignedTo: crew ? crew.id : null,
-        repair: null,
-        history: [event("submitted", "Report received from a citizen.", age)],
-      };
-      if (!crew) {
-        report.history.push(
-          Object.assign(event("rejected", "Administrator rejected this report.", age - 1, "Admin User"), {
-            note: "Inspection found no road damage at the reported location.",
-          }),
-        );
-        return report;
-      }
-      report.assignedName = crew.name;
-      report.repair = {
-        notes: notes,
-        beforePhotos: [id.toLowerCase() + "-before.jpg"],
-        afterPhotos: [id.toLowerCase() + "-after.jpg"],
-        submittedAt: daysAgo(age - 3 - fixDays),
-      };
-      report.history.push(
-        event("verified", "Administrator confirmed the reported road damage.", age - 1, "Admin User"),
-        event("assigned", "Assigned to " + crew.name + ".", age - 2, "Admin User"),
-        event("in_progress", "Repair work started.", age - 3, crew.name),
-        event("repair_submitted", "Repair submitted for admin verification.", age - 3 - fixDays, crew.name),
-        event("resolved", "Administrator verified the repair and closed the report.", age - 4 - fixDays, "Admin User"),
-      );
-      return report;
-    });
-  }
-
-  function seedCitizen(citizen) {
-    return {
-      id: citizen.id,
-      name: citizen.name,
-      email: citizen.email,
-      active: citizen.active,
-      password: defaultCitizenPassword,
-      createdAt: daysAgo(citizen.joinedDaysAgo || 30),
-    };
-  }
-
-  function linkSampleReporters(reports) {
-    reports.forEach(function (report) {
-      if (!report.reporterEmail && sampleReporters[report.reporter]) {
-        report.reporterEmail = sampleReporters[report.reporter];
+  emitScheduled = true;
+  queueMicrotask(function () {
+    emitScheduled = false;
+    changeListeners.forEach(function (listener) {
+      try {
+        listener();
+      } catch (error) {
+        console.error("A ResQRoad change listener failed.", error);
       }
     });
-  }
+  });
+}
 
-  function createInitialState() {
-    const reports = createSampleReports()
-      .concat(createAdditionalSubmittedReports())
-      .concat(createHistoricalReports());
-    linkSampleReporters(reports);
-    return {
-      reports: reports,
-      personnel: personnel.map(function (person) {
-        return Object.assign({}, person);
+function stopListeners() {
+  unsubscribers.forEach(function (unsubscribe) {
+    unsubscribe();
+  });
+  unsubscribers = [];
+}
+
+// Subscribes to a collection or document; resolves after the first snapshot
+// (or the first error, so a denied listener never blocks the page).
+function listen(target, apply) {
+  return new Promise(function (resolve) {
+    let settled = false;
+    const unsubscribe = onSnapshot(
+      target,
+      function (snapshot) {
+        apply(snapshot);
+        emit();
+        if (!settled) {
+          settled = true;
+          resolve();
+        }
+      },
+      function (error) {
+        console.error("ResQRoad live data stopped.", error);
+        if (!settled) {
+          settled = true;
+          resolve();
+        }
+      },
+    );
+    unsubscribers.push(unsubscribe);
+  });
+}
+
+function mapCollection(map, snapshot) {
+  map.clear();
+  snapshot.forEach(function (item) {
+    map.set(item.id, Object.assign({ id: item.id }, item.data()));
+  });
+}
+
+async function startListeners() {
+  const waits = [
+    listen(collection(db, "reports"), function (snapshot) {
+      mapCollection(cache.reports, snapshot);
+    }),
+    listen(collection(db, "crews"), function (snapshot) {
+      mapCollection(cache.crews, snapshot);
+    }),
+  ];
+  const profile = cache.profile;
+  if (profile && profile.active) {
+    waits.push(
+      listen(collection(db, "photos"), function (snapshot) {
+        mapCollection(cache.photos, snapshot);
       }),
-      citizens: citizens.concat(additionalCitizens).map(seedCitizen),
-      personnelSequence: 0,
-      citizenSequence: 0,
-      sampleReportDatesVersion: 3,
-      sampleReportStatusVersion: 1,
-      sampleReviewReportsVersion: 2,
-      sampleHistoryVersion: 1,
-      sampleReporterVersion: 1,
-    };
-  }
-
-  function isQuotaError(error) {
-    return (
-      error &&
-      (error.name === "QuotaExceededError" ||
-        error.name === "NS_ERROR_DOM_QUOTA_REACHED" ||
-        error.code === 22 ||
-        error.code === 1014)
     );
-  }
-
-  function saveState(state) {
-    try {
-      localStorage.setItem(storageKey, JSON.stringify(state));
-    } catch (error) {
-      console.error("Could not save ResQRoad data.", error);
-      const saveError = new Error(
-        isQuotaError(error)
-          ? "This browser's storage is full. Remove some photos or reset the demo data, then try again."
-          : "Could not save changes in this browser. Check browser storage settings and try again.",
-      );
-      saveError.code = isQuotaError(error) ? "quota" : "storage";
-      throw saveError;
-    }
-  }
-
-  // Applies the upgrades that bring data saved by earlier builds up to date.
-  function migrate(state) {
-    let needsSave = false;
-
-    if (!Array.isArray(state.citizens)) {
-      state.citizens = citizens.map(seedCitizen);
-      needsSave = true;
-    }
-    if (!Number.isInteger(state.personnelSequence) || state.personnelSequence < 0) {
-      state.personnelSequence = state.personnel.reduce(function (highest, person) {
-        const match = /^road-worker-(\d+)$/.exec(person.id);
-        return match ? Math.max(highest, Number(match[1])) : highest;
-      }, 0);
-      needsSave = true;
-    }
-    if (!Number.isInteger(state.citizenSequence) || state.citizenSequence < 0) {
-      state.citizenSequence = state.citizens.reduce(function (highest, citizen) {
-        const match = /^citizen-(\d+)$/.exec(citizen.id);
-        return match ? Math.max(highest, Number(match[1])) : highest;
-      }, 0);
-      needsSave = true;
-    }
-    if (state.sampleReportStatusVersion !== 1) {
-      const testReport = state.reports.find(function (report) {
-        return report.id === "RPT-1048";
-      });
-      if (testReport) {
-        testReport.status = "submitted";
-        testReport.assignedTo = null;
-        testReport.assignedName = null;
-        testReport.repair = null;
-        testReport.history = [event("submitted", "Report received from a citizen.", 0)];
-      }
-      state.sampleReportStatusVersion = 1;
-      needsSave = true;
-    }
-    if (state.sampleReviewReportsVersion !== 2) {
-      const initialReviewReport = state.reports.find(function (report) {
-        return report.id === "RPT-1048";
-      });
-      if (initialReviewReport) {
-        initialReviewReport.status = "submitted";
-        initialReviewReport.assignedTo = null;
-        initialReviewReport.assignedName = null;
-        initialReviewReport.repair = null;
-        initialReviewReport.history = [event("submitted", "Report received from a citizen.", 0)];
-      }
-      const existingIds = new Set(
-        state.reports.map(function (report) {
-          return report.id;
+    if (profile.role === "admin") {
+      waits.push(
+        listen(collection(db, "users"), function (snapshot) {
+          mapCollection(cache.users, snapshot);
         }),
-      );
-      createAdditionalSubmittedReports().forEach(function (report) {
-        if (!existingIds.has(report.id)) {
-          state.reports.push(report);
-        }
-      });
-      state.sampleReviewReportsVersion = 2;
-      needsSave = true;
-    }
-    // v3: sample report dates and their seeded history now agree.
-    if (state.sampleReportDatesVersion !== 3) {
-      state.reports.forEach(function (report) {
-        const timeline = sampleTimelines[report.id];
-        if (!timeline) {
-          return;
-        }
-        report.reportedAt = daysAgo(timeline.reported);
-        (report.history || []).forEach(function (item) {
-          if (item.actor === "ResQRoad" && Object.prototype.hasOwnProperty.call(timeline.events, item.status)) {
-            item.at = daysAgo(timeline.events[item.status]);
-          }
-        });
-        if (report.repair && report.history) {
-          const submitted = report.history.find(function (item) {
-            return item.status === "repair_submitted" && item.actor === "ResQRoad";
+        listen(collection(db, "notes"), function (snapshot) {
+          cache.notes = [];
+          snapshot.forEach(function (item) {
+            cache.notes.push(Object.assign({ id: item.id }, item.data()));
           });
-          if (submitted) {
-            report.repair.submittedAt = submitted.at;
-          }
-        }
-      });
-      state.sampleReportDatesVersion = 3;
-      needsSave = true;
-    }
-    if (state.sampleHistoryVersion !== 1) {
-      const existingIds = new Set(
-        state.reports.map(function (report) {
-          return report.id;
         }),
       );
-      createHistoricalReports().forEach(function (report) {
-        if (!existingIds.has(report.id)) {
-          state.reports.push(report);
-        }
-      });
-      state.sampleHistoryVersion = 1;
-      needsSave = true;
     }
-    if (state.sampleReporterVersion !== 1) {
-      const knownEmails = new Set(
-        state.citizens.map(function (citizen) {
-          return citizen.email.toLowerCase();
-        }),
-      );
-      additionalCitizens.forEach(function (citizen) {
-        if (!knownEmails.has(citizen.email)) {
-          state.citizens.push(seedCitizen(citizen));
-        }
-      });
-      state.citizens.forEach(function (citizen) {
-        const seed = citizens.concat(additionalCitizens).find(function (item) {
-          return item.id === citizen.id;
-        });
-        if (!citizen.password) {
-          citizen.password = defaultCitizenPassword;
-        }
-        if (!citizen.createdAt) {
-          citizen.createdAt = daysAgo(seed ? seed.joinedDaysAgo : 30);
-        }
-      });
-      linkSampleReporters(state.reports);
-      state.sampleReporterVersion = 1;
-      needsSave = true;
-    }
-
-    state.personnel.forEach(function (person) {
-      const matchingSeed = personnel.find(function (seed) {
-        return seed.id === person.id;
-      });
-      if (!person.email && matchingSeed) {
-        person.email = matchingSeed.email;
-        needsSave = true;
+    // Watch your own profile so a deactivated account is signed out at once.
+    listen(doc(db, "users", profile.uid), function (snapshot) {
+      const data = snapshot.exists() ? snapshot.data() : null;
+      if (!data || data.deleted || data.active === false) {
+        cache.profile = null;
+        firebaseSignOut(auth).catch(function () {});
+        return;
       }
-      if (person.email && /@roadwatch\.demo$/i.test(person.email)) {
-        person.email = person.email.replace(/@roadwatch\.demo$/i, "@resqroad.ph");
-        needsSave = true;
-      }
+      cache.profile = Object.assign({ uid: profile.uid }, data);
     });
-
-    return needsSave;
   }
+  // Don't hang forever without a connection.
+  await Promise.race([
+    Promise.all(waits),
+    new Promise(function (resolve) {
+      setTimeout(resolve, 10000);
+    }),
+  ]);
+}
 
-  function getState() {
-    let savedState;
-
+onAuthStateChanged(auth, async function (user) {
+  const generation = ++authGeneration;
+  stopListeners();
+  cache.profile = null;
+  cache.users.clear();
+  cache.notes = [];
+  if (user) {
     try {
-      savedState = localStorage.getItem(storageKey);
-    } catch (error) {
-      console.error("Could not access ResQRoad data.", error);
-      throw new Error(
-        "Browser storage is unavailable. Open the site through a local web server and allow browser storage.",
-      );
-    }
-
-    if (savedState === null) {
-      const initialState = createInitialState();
-      saveState(initialState);
-      return initialState;
-    }
-
-    let state;
-    try {
-      state = JSON.parse(savedState);
-      if (!state || !Array.isArray(state.reports) || !Array.isArray(state.personnel)) {
-        throw new Error("Saved data has an unexpected format.");
+      const snapshot = await getDoc(doc(db, "users", user.uid));
+      const data = snapshot.exists() ? snapshot.data() : null;
+      if (data && !data.deleted && data.active !== false) {
+        cache.profile = Object.assign({ uid: user.uid }, data);
       }
     } catch (error) {
-      console.error("Could not read ResQRoad data.", error);
-      throw new Error(
-        "Saved data could not be read. Reset the demo data or clear this site's browser storage to restore the default reports.",
-      );
+      console.error("Could not load the ResQRoad profile.", error);
     }
-
-    if (migrate(state)) {
-      saveState(state);
-    }
-    return state;
   }
-
-  function addHistory(report, status, description, actor, note) {
-    const entry = {
-      status: status,
-      description: description,
-      actor: actor,
-      at: new Date().toISOString(),
-    };
-    if (note) {
-      entry.note = note;
-    }
-    report.history.push(entry);
-    return entry;
+  if (generation !== authGeneration) {
+    return;
   }
+  await startListeners();
+  if (generation !== authGeneration) {
+    return;
+  }
+  resolveReady();
+  emit();
+});
 
-  function findReport(state, reportId) {
-    return state.reports.find(function (item) {
-      return item.id === reportId;
+function ready() {
+  return readyPromise;
+}
+
+/* ---------- Derived state for pages ---------- */
+
+function resolvePhotos(list) {
+  return (list || []).map(function (photo) {
+    if (photo && typeof photo === "object" && photo.photoId) {
+      const stored = cache.photos.get(photo.photoId);
+      return stored && stored.src ? { name: photo.name, src: stored.src } : photo.name;
+    }
+    return photo;
+  });
+}
+
+function citizenName(reporterId) {
+  if (!reporterId) {
+    return "Resident";
+  }
+  const user = cache.users.get(reporterId);
+  if (user) {
+    return user.name;
+  }
+  if (cache.profile && cache.profile.uid === reporterId) {
+    return cache.profile.name;
+  }
+  return "Resident";
+}
+
+function buildState() {
+  const notesByReport = new Map();
+  cache.notes.forEach(function (note) {
+    if (!notesByReport.has(note.reportId)) {
+      notesByReport.set(note.reportId, []);
+    }
+    notesByReport.get(note.reportId).push({
+      status: "note",
+      description: "Added an internal note.",
+      actor: note.actor,
+      at: note.at,
+      note: note.note,
     });
-  }
+  });
 
-  function updateReport(reportId, actor, update) {
-    const state = getState();
-    const report = findReport(state, reportId);
-
-    if (!report) {
-      throw new Error("This report is no longer available.");
-    }
-
-    update(report, state);
-    saveState(state);
-    return report;
-  }
-
-  function getReport(reportId) {
-    const normalized = String(reportId || "").trim().toUpperCase();
-    return findReport(getState(), normalized) || null;
-  }
-
-  function setStatus(reportId, status, description, actor, note) {
-    if (!Object.prototype.hasOwnProperty.call(statuses, status)) {
-      throw new Error("Choose a valid report status.");
-    }
-
-    return updateReport(reportId, actor, function (report) {
-      report.status = status;
-      addHistory(report, status, description, actor, note ? String(note).trim() : "");
+  const reports = Array.from(cache.reports.values())
+    .map(function (raw) {
+      const history = (raw.history || []).concat(notesByReport.get(raw.id) || []);
+      history.sort(function (first, second) {
+        return Date.parse(first.at) - Date.parse(second.at);
+      });
+      return Object.assign({}, raw, {
+        reporter: citizenName(raw.reporterId),
+        evidencePhotos: resolvePhotos(raw.evidencePhotos),
+        repair: raw.repair
+          ? Object.assign({}, raw.repair, {
+              beforePhotos: resolvePhotos(raw.repair.beforePhotos),
+              afterPhotos: resolvePhotos(raw.repair.afterPhotos),
+            })
+          : null,
+        history: history,
+      });
+    })
+    .sort(function (first, second) {
+      return Date.parse(second.reportedAt) - Date.parse(first.reportedAt);
     });
-  }
 
-  function addNote(reportId, text, actor) {
-    const note = String(text || "").trim();
-    if (!note) {
-      throw new Error("Write a note before saving it.");
-    }
-    if (note.length > 1000) {
-      throw new Error("Keep notes under 1,000 characters.");
-    }
-    return updateReport(reportId, actor, function (report) {
-      addHistory(report, "note", "Added an internal note.", actor, note);
+  const personnel = Array.from(cache.crews.values())
+    .map(function (crew) {
+      const user = cache.users.get(crew.id);
+      return {
+        id: crew.id,
+        name: crew.name,
+        team: crew.team,
+        email: user ? user.email : crew.id === (cache.profile && cache.profile.uid) ? cache.profile.email : "",
+        createdAt: user ? user.createdAt : null,
+      };
+    })
+    .sort(function (first, second) {
+      return first.team.localeCompare(second.team);
     });
-  }
 
-  function normalizePhotos(photos) {
-    return (photos || [])
-      .map(function (photo) {
-        if (typeof photo === "string") {
-          return photo;
-        }
-        if (photo && typeof photo.name === "string") {
-          return photo.src ? { name: photo.name, src: String(photo.src) } : photo.name;
-        }
-        return null;
+  let citizens;
+  if (cache.profile && cache.profile.role === "admin") {
+    citizens = Array.from(cache.users.values())
+      .filter(function (user) {
+        return user.role === "citizen";
       })
-      .filter(Boolean);
-  }
-
-  function stripPhotoData(photos) {
-    return (photos || []).map(function (photo) {
-      return typeof photo === "string" ? photo : photo.name;
-    });
-  }
-
-  // Saves the state; if the browser is out of space, keeps the photo file
-  // names but drops the image data for `report` and tries once more.
-  function saveWithPhotoFallback(state, report, photoKeys) {
-    try {
-      saveState(state);
-      return false;
-    } catch (error) {
-      if (error.code !== "quota") {
-        throw error;
-      }
-      photoKeys.forEach(function (key) {
-        const holder = key.indexOf(".") > 0 ? report[key.split(".")[0]] : report;
-        const field = key.indexOf(".") > 0 ? key.split(".")[1] : key;
-        if (holder && holder[field]) {
-          holder[field] = stripPhotoData(holder[field]);
-        }
+      .map(function (user) {
+        return { id: user.id, name: user.name, email: user.email, active: user.active !== false, createdAt: user.createdAt };
+      })
+      .sort(function (first, second) {
+        return first.name.localeCompare(second.name);
       });
-      saveState(state);
+  } else if (cache.profile && cache.profile.role === "citizen") {
+    citizens = [
+      {
+        id: cache.profile.uid,
+        name: cache.profile.name,
+        email: cache.profile.email,
+        active: cache.profile.active !== false,
+        createdAt: cache.profile.createdAt,
+      },
+    ];
+  } else {
+    citizens = [];
+  }
+
+  return { reports: reports, personnel: personnel, citizens: citizens };
+}
+
+function getState() {
+  if (!derived) {
+    derived = buildState();
+  }
+  return derived;
+}
+
+function getReport(reportId) {
+  const normalized = String(reportId || "").trim().toUpperCase();
+  return (
+    getState().reports.find(function (report) {
+      return report.id === normalized;
+    }) || null
+  );
+}
+
+/* ---------- Helpers for changes ---------- */
+
+const authMessages = {
+  "auth/invalid-credential": "Incorrect email or password.",
+  "auth/invalid-login-credentials": "Incorrect email or password.",
+  "auth/wrong-password": "Incorrect email or password.",
+  "auth/user-not-found": "Incorrect email or password.",
+  "auth/invalid-email": "Enter a valid email address.",
+  "auth/user-disabled": "This account has been disabled.",
+  "auth/too-many-requests": "Too many attempts. Wait a moment and try again.",
+  "auth/network-request-failed": "Can't reach the server. Check your internet connection.",
+  "auth/email-already-in-use": "An account already uses this email.",
+  "auth/weak-password": "Use at least 8 characters with a letter and a number.",
+  "auth/operation-not-allowed": "Email sign-in isn't enabled for this project yet.",
+};
+
+function friendlyError(error) {
+  if (error && authMessages[error.code]) {
+    return new Error(authMessages[error.code]);
+  }
+  if (error && error.code === "permission-denied") {
+    return new Error("You don't have permission to do that. Sign in again and retry.");
+  }
+  if (error && error.code === "unavailable") {
+    return new Error("Can't reach the database. Check your internet connection.");
+  }
+  return error instanceof Error ? error : new Error("Something went wrong. Try again.");
+}
+
+// Saves in the background; the live listener restores the real data if the
+// save is rejected, and the person is told what happened.
+function persist(promise) {
+  return promise.then(
+    function () {
       return true;
+    },
+    function (error) {
+      console.error("Could not save the ResQRoad change.", error);
+      const message = friendlyError(error).message;
+      if (window.RoadWatchUI) {
+        window.RoadWatchUI.showMessage(message, "error");
+      }
+      return false;
+    },
+  );
+}
+
+function now() {
+  return new Date().toISOString();
+}
+
+function actorName(fallback) {
+  return (cache.profile && cache.profile.name) || fallback || "ResQRoad";
+}
+
+function requireRole(roles) {
+  if (!cache.profile) {
+    throw new Error("Your session has ended. Sign in again to continue.");
+  }
+  if (!roles.includes(cache.profile.role)) {
+    throw new Error("Your account doesn't have permission to do that.");
+  }
+}
+
+function rawReport(reportId) {
+  const report = cache.reports.get(reportId);
+  if (!report) {
+    throw new Error("This report is no longer available.");
+  }
+  return report;
+}
+
+function historyEntry(status, description, actor, note) {
+  const entry = { status: status, description: description, actor: actor, at: now() };
+  if (note) {
+    entry.note = note;
+  }
+  return entry;
+}
+
+// Applies `fields` to the cached report right away, then saves them.
+function saveReport(report, fields) {
+  report.updatedAt = now();
+  emit();
+  const data = { updatedAt: report.updatedAt };
+  fields.forEach(function (field) {
+    data[field] = report[field] === undefined ? null : report[field];
+  });
+  return persist(updateDoc(doc(db, "reports", report.id), data));
+}
+
+function isEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value);
+}
+
+function photoRefs(photos, reportId, kind) {
+  const uploads = [];
+  const refs = (photos || []).map(function (photo) {
+    if (photo && typeof photo === "object" && photo.src) {
+      const ref = doc(collection(db, "photos"));
+      const record = {
+        reportId: reportId,
+        kind: kind,
+        name: photo.name,
+        src: photo.src,
+        uploadedBy: cache.profile.uid,
+        createdAt: now(),
+      };
+      cache.photos.set(ref.id, Object.assign({ id: ref.id }, record));
+      uploads.push([ref, record]);
+      return { name: photo.name, photoId: ref.id };
     }
+    return typeof photo === "string" ? photo : photo.name;
+  });
+  return { refs: refs, uploads: uploads };
+}
+
+async function uploadPhotos(uploads) {
+  // Each photo is its own document (under 1 MB); batches keep requests small.
+  for (let index = 0; index < uploads.length; index += 4) {
+    const batch = writeBatch(db);
+    uploads.slice(index, index + 4).forEach(function (item) {
+      batch.set(item[0], item[1]);
+    });
+    await batch.commit();
+  }
+}
+
+/* ---------- Report workflow ---------- */
+
+function setStatus(reportId, status, description, actor, note) {
+  if (!Object.prototype.hasOwnProperty.call(statuses, status)) {
+    throw new Error("Choose a valid report status.");
+  }
+  requireRole(["admin"]);
+  const report = rawReport(reportId);
+  report.status = status;
+  report.history = (report.history || []).concat([
+    historyEntry(status, description, actorName(actor), note ? String(note).trim() : ""),
+  ]);
+  saveReport(report, ["status", "history"]);
+  return report;
+}
+
+function addNote(reportId, text, actor) {
+  const note = String(text || "").trim();
+  if (!note) {
+    throw new Error("Write a note before saving it.");
+  }
+  if (note.length > 1000) {
+    throw new Error("Keep notes under 1,000 characters.");
+  }
+  requireRole(["admin"]);
+  rawReport(reportId);
+  const ref = doc(collection(db, "notes"));
+  const record = { reportId: reportId, note: note, actor: actorName(actor), at: now() };
+  cache.notes.push(Object.assign({ id: ref.id }, record));
+  emit();
+  persist(setDoc(ref, record));
+  return record;
+}
+
+function assignReport(reportId, personnelId) {
+  requireRole(["admin"]);
+  const report = rawReport(reportId);
+  if (report.status !== "verified" && report.status !== "assigned") {
+    throw new Error("Verify this report before assigning maintenance personnel.");
+  }
+  const crew = cache.crews.get(personnelId);
+  if (!crew) {
+    throw new Error("Choose an available maintenance person.");
+  }
+  report.assignedTo = personnelId;
+  report.assignedName = crew.name;
+  report.status = "assigned";
+  report.history = (report.history || []).concat([
+    historyEntry("assigned", "Assigned to " + crew.name + ".", "Administrator"),
+  ]);
+  saveReport(report, ["assignedTo", "assignedName", "status", "history"]);
+  return report;
+}
+
+function startRepair(reportId, personnelId) {
+  requireRole(["maintenance"]);
+  const report = rawReport(reportId);
+  if (report.assignedTo !== personnelId || report.status !== "assigned") {
+    throw new Error("This job is no longer assigned to you.");
+  }
+  report.status = "in_progress";
+  report.history = (report.history || []).concat([historyEntry("in_progress", "Repair work started.", actorName())]);
+  saveReport(report, ["status", "history"]);
+  return report;
+}
+
+async function submitRepair(reportId, personnelId, repair) {
+  requireRole(["maintenance"]);
+  const report = rawReport(reportId);
+  if (report.assignedTo !== personnelId || report.status !== "in_progress") {
+    throw new Error("This repair is no longer assigned to you.");
+  }
+  const before = photoRefs(repair.beforePhotos, reportId, "before");
+  const after = photoRefs(repair.afterPhotos, reportId, "after");
+  try {
+    await uploadPhotos(before.uploads.concat(after.uploads));
+  } catch (error) {
+    throw friendlyError(error);
+  }
+  report.status = "repair_submitted";
+  report.repair = {
+    notes: String(repair.notes || "").trim(),
+    beforePhotos: before.refs,
+    afterPhotos: after.refs,
+    submittedAt: now(),
+  };
+  report.history = (report.history || []).concat([
+    historyEntry("repair_submitted", "Repair submitted for admin verification.", actorName()),
+  ]);
+  const saved = await saveReport(report, ["status", "repair", "history"]);
+  if (!saved) {
+    throw new Error("The repair couldn't be submitted. Try again.");
+  }
+  return report;
+}
+
+async function addReport(input) {
+  requireRole(["citizen"]);
+  if (cache.profile.active === false) {
+    throw new Error("Your account has been deactivated. Contact the Road Maintenance Office to reactivate it.");
+  }
+  const title = String(input.title || "").trim();
+  const road = String(input.road || "").trim();
+  const location = String(input.location || "").trim();
+  const description = String(input.description || "").trim();
+  const latitude = Number(input.latitude);
+  const longitude = Number(input.longitude);
+  const severity = input.severity;
+  const photos = input.evidencePhotos || [];
+
+  if (!title || !road || !location || !description) {
+    throw new Error("Complete all required report fields before submitting.");
+  }
+  if (!["Low", "Medium", "High"].includes(severity)) {
+    throw new Error("Choose a valid report severity.");
+  }
+  if (
+    !Number.isFinite(latitude) ||
+    !Number.isFinite(longitude) ||
+    latitude < 14.5 ||
+    latitude > 15.2 ||
+    longitude < 120.3 ||
+    longitude > 121.2
+  ) {
+    throw new Error("Enter valid GPS coordinates for Bulacan.");
+  }
+  if (photos.length > 5) {
+    throw new Error("Choose no more than five evidence photos.");
   }
 
-  function isEmail(value) {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value);
-  }
-
-  function emailInUse(state, email) {
+  // A pothole can come back after a repair, so only open reports count.
+  const duplicate = Array.from(cache.reports.values()).find(function (report) {
     return (
-      email === adminEmail ||
-      state.personnel.some(function (person) {
-        return person.email && person.email.toLowerCase() === email;
-      }) ||
-      state.citizens.some(function (citizen) {
-        return citizen.email.toLowerCase() === email;
-      })
+      openStatuses.includes(report.status) &&
+      Math.abs(report.coordinates.lat - latitude) < 0.001 &&
+      Math.abs(report.coordinates.lng - longitude) < 0.001
     );
+  });
+  if (duplicate) {
+    const error = new Error(
+      "A report already exists very close to this location (" + duplicate.id + "). Check the map before adding another report.",
+    );
+    error.duplicateId = duplicate.id;
+    throw error;
   }
 
-  function addReport(input) {
-    const title = String(input.title || "").trim();
-    const road = String(input.road || "").trim();
-    const location = String(input.location || "").trim();
-    const description = String(input.description || "").trim();
-    const latitude = Number(input.latitude);
-    const longitude = Number(input.longitude);
-    const severity = input.severity;
-    const evidencePhotos = normalizePhotos(input.evidencePhotos);
+  const counterRef = doc(db, "counters", "reports");
+  const base = {
+    title: title,
+    road: road,
+    location: location,
+    coordinates: { lat: Math.round(latitude * 1e6) / 1e6, lng: Math.round(longitude * 1e6) / 1e6 },
+    severity: severity,
+    description: description,
+    reporterId: cache.profile.uid,
+    reportedAt: now(),
+    evidencePhotos: [],
+    status: "submitted",
+    assignedTo: null,
+    assignedName: null,
+    repair: null,
+    history: [historyEntry("submitted", "Report received from a citizen.", cache.profile.name)],
+  };
 
-    const state = getState();
-    let citizen = null;
-    if (input.reporterId) {
-      citizen = state.citizens.find(function (item) {
-        return item.id === input.reporterId;
-      });
-      if (!citizen) {
-        throw new Error("Your citizen account is no longer available. Sign in again.");
-      }
-      if (citizen.active === false) {
-        throw new Error("Your account has been deactivated. Contact the Road Maintenance Office to reactivate it.");
-      }
-    }
-    const reporter = citizen ? citizen.name : String(input.reporter || "").trim();
-
-    if (!reporter || !title || !road || !location || !description) {
-      throw new Error("Complete all required report fields before submitting.");
-    }
-    if (!["Low", "Medium", "High"].includes(severity)) {
-      throw new Error("Choose a valid report severity.");
-    }
-    if (
-      !Number.isFinite(latitude) ||
-      !Number.isFinite(longitude) ||
-      latitude < 14.5 ||
-      latitude > 15.2 ||
-      longitude < 120.3 ||
-      longitude > 121.2
-    ) {
-      throw new Error("Enter valid GPS coordinates for Bulacan.");
-    }
-    if (evidencePhotos.length > 5) {
-      throw new Error("Choose no more than five evidence photos.");
-    }
-
-    // A pothole can come back after a repair, so only open reports count.
-    const duplicate = state.reports.find(function (report) {
-      return (
-        openStatuses.includes(report.status) &&
-        Math.abs(report.coordinates.lat - latitude) < 0.001 &&
-        Math.abs(report.coordinates.lng - longitude) < 0.001
-      );
+  let reportId;
+  try {
+    reportId = await runTransaction(db, async function (transaction) {
+      const counter = await transaction.get(counterRef);
+      const next = (counter.exists() ? counter.data().next : 1000) + 1;
+      const id = "RPT-" + next;
+      transaction.update(counterRef, { next: next });
+      transaction.set(doc(db, "reports", id), Object.assign({ id: id }, base));
+      return id;
     });
-    if (duplicate) {
-      const error = new Error(
-        "A report already exists very close to this location (" +
-          duplicate.id +
-          "). Check the map before adding another report.",
-      );
-      error.duplicateId = duplicate.id;
-      throw error;
-    }
-
-    const nextNumber =
-      state.reports.reduce(function (highest, report) {
-        const match = /^RPT-(\d+)$/.exec(report.id);
-        return match ? Math.max(highest, Number(match[1])) : highest;
-      }, 1000) + 1;
-    const report = {
-      id: "RPT-" + nextNumber,
-      title: title,
-      road: road,
-      location: location,
-      coordinates: { lat: Math.round(latitude * 1e6) / 1e6, lng: Math.round(longitude * 1e6) / 1e6 },
-      severity: severity,
-      description: description,
-      reporter: reporter,
-      reporterId: citizen ? citizen.id : null,
-      reporterEmail: citizen ? citizen.email : null,
-      reportedAt: new Date().toISOString(),
-      evidencePhotos: evidencePhotos,
-      status: "submitted",
-      assignedTo: null,
-      repair: null,
-      history: [],
-    };
-    addHistory(report, "submitted", "Report received from a citizen.", reporter);
-    state.reports.unshift(report);
-    report.photosTrimmed = saveWithPhotoFallback(state, report, ["evidencePhotos"]);
-    if (!report.photosTrimmed) {
-      delete report.photosTrimmed;
-    }
-    return report;
+  } catch (error) {
+    throw friendlyError(error);
   }
 
-  function addPersonnel(input) {
-    const name = String(input.name || "").trim();
-    const email = String(input.email || "").trim().toLowerCase();
-    const team = String(input.team || "").trim();
-    if (!name || !email || !team) {
-      throw new Error("Enter a name, email, and maintenance team.");
+  const evidence = photoRefs(photos, reportId, "evidence");
+  let photosSaved = true;
+  try {
+    await uploadPhotos(evidence.uploads);
+    if (evidence.refs.length) {
+      await updateDoc(doc(db, "reports", reportId), { evidencePhotos: evidence.refs });
     }
-    if (!isEmail(email)) {
-      throw new Error("Enter a valid email address.");
-    }
-
-    const state = getState();
-    if (emailInUse(state, email)) {
-      throw new Error("An account already uses this email.");
-    }
-
-    state.personnelSequence += 1;
-    const person = {
-      id: "road-worker-" + state.personnelSequence,
-      name: name,
-      email: email,
-      team: team,
-      createdAt: new Date().toISOString(),
-    };
-    state.personnel.push(person);
-    saveState(state);
-    return person;
+  } catch (error) {
+    console.error("Could not upload the report photos.", error);
+    photosSaved = false;
   }
 
-  function deletePersonnel(personnelId) {
-    const state = getState();
-    const person = state.personnel.find(function (item) {
-      return item.id === personnelId;
-    });
-    if (!person) {
-      throw new Error("This maintenance account is no longer available.");
-    }
-
-    const hasOpenAssignments = state.reports.some(function (report) {
-      return report.assignedTo === personnelId && crewOpenStatuses.includes(report.status);
-    });
-    if (hasOpenAssignments) {
-      throw new Error("Reassign or finish this person's open jobs before deleting the account.");
-    }
-
-    state.reports.forEach(function (report) {
-      if (report.assignedTo === personnelId) {
-        report.assignedName = person.name;
-      }
-    });
-    state.personnel = state.personnel.filter(function (item) {
-      return item.id !== personnelId;
-    });
-    saveState(state);
-    return person;
+  const report = Object.assign({ id: reportId }, base, { evidencePhotos: evidence.refs });
+  cache.reports.set(reportId, report);
+  emit();
+  const result = getReport(reportId) || report;
+  if (!photosSaved) {
+    result.photosTrimmed = true;
   }
+  return result;
+}
 
-  function registerCitizen(input) {
-    const name = String(input.name || "").trim().replace(/\s+/g, " ");
-    const email = String(input.email || "").trim().toLowerCase();
-    const password = String(input.password || "");
+/* ---------- Accounts ---------- */
 
-    if (name.length < 2) {
-      throw new Error("Enter your full name.");
-    }
-    if (name.length > 80) {
-      throw new Error("Keep your name under 80 characters.");
-    }
-    if (!isEmail(email)) {
-      throw new Error("Enter a valid email address.");
-    }
-    if (password.length < 8 || !/[A-Za-z]/.test(password) || !/\d/.test(password)) {
-      throw new Error("Use at least 8 characters with a letter and a number.");
-    }
-
-    const state = getState();
-    if (emailInUse(state, email)) {
+async function registerCitizen(input) {
+  const name = String(input.name || "").trim().replace(/\s+/g, " ");
+  const email = String(input.email || "").trim().toLowerCase();
+  const password = String(input.password || "");
+  if (name.length < 2) {
+    throw new Error("Enter your full name.");
+  }
+  if (name.length > 80) {
+    throw new Error("Keep your name under 80 characters.");
+  }
+  if (!isEmail(email)) {
+    throw new Error("Enter a valid email address.");
+  }
+  if (password.length < 8 || !/[A-Za-z]/.test(password) || !/\d/.test(password)) {
+    throw new Error("Use at least 8 characters with a letter and a number.");
+  }
+  let credential;
+  try {
+    credential = await createUserWithEmailAndPassword(auth, email, password);
+    await updateProfile(credential.user, { displayName: name });
+  } catch (error) {
+    if (error.code === "auth/email-already-in-use") {
       throw new Error("An account already uses this email. Sign in instead.");
     }
+    throw friendlyError(error);
+  }
+  const profile = { name: name, email: email, role: "citizen", active: true, createdAt: now() };
+  try {
+    await setDoc(doc(db, "users", credential.user.uid), profile);
+  } catch (error) {
+    throw friendlyError(error);
+  }
+  return Object.assign({ id: credential.user.uid }, profile);
+}
 
-    state.citizenSequence += 1;
-    const citizen = {
-      id: "citizen-" + state.citizenSequence,
-      name: name,
-      email: email,
-      active: true,
-      password: password,
-      createdAt: new Date().toISOString(),
-    };
-    state.citizens.push(citizen);
-    saveState(state);
-    return citizen;
+async function addPersonnel(input) {
+  requireRole(["admin"]);
+  const name = String(input.name || "").trim();
+  const email = String(input.email || "").trim().toLowerCase();
+  const team = String(input.team || "").trim();
+  if (!name || !email || !team) {
+    throw new Error("Enter a name, email, and maintenance team.");
+  }
+  if (!isEmail(email)) {
+    throw new Error("Enter a valid email address.");
   }
 
-  function setCitizenActive(citizenId, active) {
-    const state = getState();
-    const citizen = state.citizens.find(function (item) {
-      return item.id === citizenId;
-    });
-    if (!citizen) {
-      throw new Error("This citizen account is no longer available.");
+  // A second Firebase app creates the account without signing the admin out.
+  const provisioning = initializeApp(firebaseConfig, "provisioning-" + Date.now());
+  const provisioningAuth = getAuth(provisioning);
+  let uid;
+  try {
+    const credential = await createUserWithEmailAndPassword(provisioningAuth, email, defaultCrewPassword);
+    await updateProfile(credential.user, { displayName: name });
+    uid = credential.user.uid;
+  } catch (error) {
+    throw friendlyError(error);
+  } finally {
+    await firebaseSignOut(provisioningAuth).catch(function () {});
+    await deleteApp(provisioning).catch(function () {});
+  }
+
+  const createdAt = now();
+  const batch = writeBatch(db);
+  batch.set(doc(db, "users", uid), { name: name, email: email, team: team, role: "maintenance", active: true, createdAt: createdAt });
+  batch.set(doc(db, "crews", uid), { name: name, team: team });
+  try {
+    await batch.commit();
+  } catch (error) {
+    throw friendlyError(error);
+  }
+  return { id: uid, name: name, email: email, team: team, createdAt: createdAt };
+}
+
+async function deletePersonnel(personnelId) {
+  requireRole(["admin"]);
+  const crew = cache.crews.get(personnelId);
+  if (!crew) {
+    throw new Error("This maintenance account is no longer available.");
+  }
+  const hasOpenAssignments = Array.from(cache.reports.values()).some(function (report) {
+    return report.assignedTo === personnelId && crewOpenStatuses.includes(report.status);
+  });
+  if (hasOpenAssignments) {
+    throw new Error("Reassign or finish this person's open jobs before deleting the account.");
+  }
+  // The sign-in account stays in Firebase Authentication, but without an
+  // active profile it can no longer open any workspace.
+  const batch = writeBatch(db);
+  batch.update(doc(db, "users", personnelId), { active: false, deleted: true, deletedAt: now() });
+  batch.delete(doc(db, "crews", personnelId));
+  cache.reports.forEach(function (report) {
+    if (report.assignedTo === personnelId) {
+      report.assignedName = crew.name;
+      batch.update(doc(db, "reports", report.id), { assignedName: crew.name });
     }
-
-    citizen.active = Boolean(active);
-    saveState(state);
-    return citizen;
+  });
+  try {
+    await batch.commit();
+  } catch (error) {
+    throw friendlyError(error);
   }
+  return Object.assign({ id: personnelId }, crew);
+}
 
-  function assignReport(reportId, personnelId) {
-    return updateReport(reportId, "Administrator", function (report, state) {
-      if (report.status !== "verified" && report.status !== "assigned") {
-        throw new Error("Verify this report before assigning maintenance personnel.");
-      }
-
-      const assignedPerson = state.personnel.find(function (person) {
-        return person.id === personnelId;
-      });
-
-      if (!assignedPerson) {
-        throw new Error("Choose an available maintenance person.");
-      }
-
-      report.assignedTo = assignedPerson.id;
-      report.assignedName = assignedPerson.name;
-      report.status = "assigned";
-      addHistory(report, "assigned", "Assigned to " + assignedPerson.name + ".", "Administrator");
-    });
+function setCitizenActive(citizenId, active) {
+  requireRole(["admin"]);
+  const user = cache.users.get(citizenId);
+  if (!user || user.role !== "citizen") {
+    throw new Error("This citizen account is no longer available.");
   }
+  user.active = Boolean(active);
+  emit();
+  persist(updateDoc(doc(db, "users", citizenId), { active: user.active }));
+  return { id: citizenId, name: user.name, email: user.email, active: user.active };
+}
 
-  function startRepair(reportId, personnelId) {
-    return updateReport(reportId, personnelId, function (report, state) {
-      if (report.assignedTo !== personnelId || report.status !== "assigned") {
-        throw new Error("This job is no longer assigned to you.");
-      }
+/* ---------- Queries ---------- */
 
-      const person = state.personnel.find(function (item) {
-        return item.id === personnelId;
-      });
-      report.status = "in_progress";
-      addHistory(report, "in_progress", "Repair work started.", person ? person.name : "Maintenance personnel");
-    });
+function reporterName(report) {
+  return citizenName(report.reporterId);
+}
+
+function reportsByCitizen(citizen, state) {
+  return (state || getState()).reports.filter(function (report) {
+    return report.reporterId === citizen.id;
+  });
+}
+
+function onExternalChange(callback) {
+  changeListeners.add(callback);
+}
+
+/* ---------- Sign-in ---------- */
+
+async function signIn(email, password) {
+  const normalized = String(email || "").trim().toLowerCase();
+  if (!normalized || !password) {
+    throw new Error("Enter your email and password.");
   }
-
-  function submitRepair(reportId, personnelId, repair) {
-    const state = getState();
-    const report = findReport(state, reportId);
-    if (!report) {
-      throw new Error("This report is no longer available.");
-    }
-    if (report.assignedTo !== personnelId || report.status !== "in_progress") {
-      throw new Error("This repair is no longer assigned to you.");
-    }
-
-    const person = state.personnel.find(function (item) {
-      return item.id === personnelId;
-    });
-    report.status = "repair_submitted";
-    report.repair = {
-      notes: String(repair.notes || "").trim(),
-      beforePhotos: normalizePhotos(repair.beforePhotos),
-      afterPhotos: normalizePhotos(repair.afterPhotos),
-      submittedAt: new Date().toISOString(),
-    };
-    addHistory(
-      report,
-      "repair_submitted",
-      "Repair submitted for admin verification.",
-      person ? person.name : "Maintenance personnel",
-    );
-    report.photosTrimmed = saveWithPhotoFallback(state, report, ["repair.beforePhotos", "repair.afterPhotos"]);
-    if (!report.photosTrimmed) {
-      delete report.photosTrimmed;
-    }
-    return report;
+  let credential;
+  try {
+    credential = await signInWithEmailAndPassword(auth, normalized, password);
+  } catch (error) {
+    throw friendlyError(error);
   }
-
-  // Full name for a report's citizen, from the linked account when there is one.
-  function reporterName(report, state) {
-    const currentState = state || getState();
-    if (report.reporterEmail) {
-      const citizen = currentState.citizens.find(function (item) {
-        return item.email.toLowerCase() === String(report.reporterEmail).toLowerCase();
-      });
-      if (citizen) {
-        return citizen.name;
-      }
-    }
-    return report.reporter;
+  const snapshot = await getDoc(doc(db, "users", credential.user.uid)).catch(function () {
+    return null;
+  });
+  const data = snapshot && snapshot.exists() ? snapshot.data() : null;
+  if (!data || data.deleted) {
+    await firebaseSignOut(auth);
+    throw new Error("This account is no longer active. Contact the Road Maintenance Office.");
   }
-
-  function reportsByCitizen(citizen, state) {
-    const currentState = state || getState();
-    const email = citizen.email.toLowerCase();
-    return currentState.reports.filter(function (report) {
-      return (
-        report.reporterId === citizen.id ||
-        (report.reporterEmail && String(report.reporterEmail).toLowerCase() === email)
-      );
-    });
+  if (data.active === false) {
+    await firebaseSignOut(auth);
+    throw new Error("This account has been deactivated. Contact the Road Maintenance Office to reactivate it.");
   }
+  return toUser(Object.assign({ uid: credential.user.uid }, data));
+}
 
-  function resetDemoData() {
-    try {
-      localStorage.removeItem(storageKey);
-    } catch (error) {
-      console.error("Could not reset ResQRoad data.", error);
-      throw new Error("Could not reset the demo data in this browser.");
-    }
-  }
+function toUser(profile) {
+  return profile
+    ? { role: profile.role, userId: profile.uid, name: profile.name, team: profile.team || "", email: profile.email }
+    : null;
+}
 
-  // Calls `callback` when another tab changes the shared data.
-  function onExternalChange(callback) {
-    window.addEventListener("storage", function (event) {
-      if (event.key === storageKey || event.key === null) {
-        callback();
-      }
-    });
-  }
+function currentUser() {
+  return toUser(cache.profile);
+}
 
-  window.RoadWatchStore = {
-    storageKey: storageKey,
-    getState: getState,
-    getReport: getReport,
-    statuses: statuses,
-    openStatuses: openStatuses,
-    closedStatuses: closedStatuses,
-    crewOpenStatuses: crewOpenStatuses,
-    setStatus: setStatus,
-    addNote: addNote,
-    addReport: addReport,
-    addPersonnel: addPersonnel,
-    deletePersonnel: deletePersonnel,
-    registerCitizen: registerCitizen,
-    setCitizenActive: setCitizenActive,
-    assignReport: assignReport,
-    startRepair: startRepair,
-    submitRepair: submitRepair,
-    reporterName: reporterName,
-    reportsByCitizen: reportsByCitizen,
-    resetDemoData: resetDemoData,
-    onExternalChange: onExternalChange,
-  };
-})();
+function signOut() {
+  return firebaseSignOut(auth);
+}
+
+window.RoadWatchStore = {
+  ready: ready,
+  getState: getState,
+  getReport: getReport,
+  statuses: statuses,
+  openStatuses: openStatuses,
+  closedStatuses: closedStatuses,
+  crewOpenStatuses: crewOpenStatuses,
+  setStatus: setStatus,
+  addNote: addNote,
+  addReport: addReport,
+  addPersonnel: addPersonnel,
+  deletePersonnel: deletePersonnel,
+  registerCitizen: registerCitizen,
+  setCitizenActive: setCitizenActive,
+  assignReport: assignReport,
+  startRepair: startRepair,
+  submitRepair: submitRepair,
+  reporterName: reporterName,
+  reportsByCitizen: reportsByCitizen,
+  onExternalChange: onExternalChange,
+};
+
+window.RoadWatchBackend = {
+  signIn: signIn,
+  signOut: signOut,
+  currentUser: currentUser,
+};

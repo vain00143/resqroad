@@ -1,7 +1,7 @@
 /* Landing page: live numbers, the hero product preview, the public report
    map, and the "recently fixed" list, all built from the shared data. Only
    public details are shown — never reporter names or internal notes. */
-(function () {
+(async function () {
   "use strict";
 
   const store = window.RoadWatchStore;
@@ -22,6 +22,7 @@
 
   let state;
   try {
+    await store.ready();
     state = store.getState();
   } catch (error) {
     console.error("Could not load ResQRoad data.", error);

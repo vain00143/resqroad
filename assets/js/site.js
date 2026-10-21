@@ -5,7 +5,6 @@
 
   const auth = window.RoadWatchAuth;
   const header = document.querySelector(".site-header");
-  const user = auth ? auth.readUser() : null;
 
   if (header) {
     const transparent = header.hasAttribute("data-transparent");
@@ -50,26 +49,33 @@
     sync();
   }
 
-  // Signed-in visitors see a link back to their workspace instead of "Sign in".
-  document.querySelectorAll("[data-signed-in]").forEach(function (element) {
-    element.hidden = !user;
-  });
-  document.querySelectorAll("[data-signed-out]").forEach(function (element) {
-    element.hidden = Boolean(user);
-  });
-  document.querySelectorAll("[data-workspace-link]").forEach(function (link) {
-    if (!user) {
-      return;
-    }
-    link.href = auth.workspaceFor(user);
-    const label = link.querySelector("[data-workspace-label]");
-    if (label) {
-      label.textContent = user.role === "citizen" ? "My reports" : "Open workspace";
-    }
-  });
-  // "Report a problem" goes straight to the form for citizens; everyone else
-  // signs in (or registers) first.
-  document.querySelectorAll("[data-report-link]").forEach(function (link) {
-    link.href = user && user.role === "citizen" ? "citizen.html#report" : "login.html?next=report";
-  });
+  function applyUser() {
+    const user = auth ? auth.readUser() : null;
+    // Signed-in visitors see a link back to their workspace instead of "Sign in".
+    document.querySelectorAll("[data-signed-in]").forEach(function (element) {
+      element.hidden = !user;
+    });
+    document.querySelectorAll("[data-signed-out]").forEach(function (element) {
+      element.hidden = Boolean(user);
+    });
+    document.querySelectorAll("[data-workspace-link]").forEach(function (link) {
+      if (!user) {
+        return;
+      }
+      link.href = auth.workspaceFor(user);
+      const label = link.querySelector("[data-workspace-label]");
+      if (label) {
+        label.textContent = user.role === "citizen" ? "My reports" : "Open workspace";
+      }
+    });
+    // "Report a problem" goes straight to the form for citizens; everyone else
+    // signs in (or registers) first.
+    document.querySelectorAll("[data-report-link]").forEach(function (link) {
+      link.href = user && user.role === "citizen" ? "citizen.html#report" : "login.html?next=report";
+    });
+  }
+
+  if (window.RoadWatchStore) {
+    window.RoadWatchStore.ready().then(applyUser);
+  }
 })();

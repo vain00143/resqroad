@@ -1,7 +1,7 @@
 /* Administrator workspace: dashboard, report review, assignment, map,
    analytics, and user management. Everything renders from RoadWatchStore and
-   re-renders after each change (including changes made in other tabs). */
-(function () {
+   re-renders after each change, including live changes from the database. */
+(async function () {
   "use strict";
 
   const store = window.RoadWatchStore;
@@ -10,7 +10,7 @@
   const charts = window.RoadWatchCharts;
   const icon = ui.icon;
   const esc = ui.escapeHtml;
-  const currentUser = window.RoadWatchAuth.requireRole("admin", "login.html");
+  const currentUser = await window.RoadWatchAuth.requireRole("admin", "login.html");
   if (!currentUser) {
     return;
   }
@@ -1416,6 +1416,18 @@
     if (!report) {
       throw new Error("This report is no longer available.");
     }
+    // Live updates re-render the drawer; keep what the admin was typing.
+    const sameReport = els.drawerBody.dataset.reportId === reportId;
+    const noteField = els.drawerBody.querySelector('textarea[name="note"]');
+    const assignField = els.drawerBody.querySelector("[data-assign-select]");
+    const draft = sameReport
+      ? {
+          note: noteField ? noteField.value : "",
+          crew: assignField ? assignField.value : "",
+          scroll: els.drawerBody.scrollTop,
+          focusNote: document.activeElement === noteField,
+        }
+      : null;
     if (detailMap) {
       detailMap.destroy();
       detailMap = null;
@@ -1548,6 +1560,22 @@
       zoom: 15,
       emptyMessage: "Location coordinates are unavailable.",
     });
+
+    els.drawerBody.dataset.reportId = reportId;
+    if (draft) {
+      const newNote = els.drawerBody.querySelector('textarea[name="note"]');
+      const newAssign = els.drawerBody.querySelector("[data-assign-select]");
+      if (newNote && draft.note) {
+        newNote.value = draft.note;
+        if (draft.focusNote) {
+          newNote.focus({ preventScroll: true });
+        }
+      }
+      if (newAssign && draft.crew) {
+        newAssign.value = draft.crew;
+      }
+      els.drawerBody.scrollTop = draft.scroll;
+    }
 
     const decisions = reviewActions(report);
     els.drawerActions.innerHTML = decisions.length
@@ -1984,14 +2012,18 @@
         if (!confirmed) {
           return;
         }
-        runSafely(function () {
-          store.deletePersonnel(person.id);
-          if (crewFilter === person.id) {
-            crewFilter = null;
-          }
-          ui.showMessage(person.name + "'s maintenance account was deleted.", "success");
-          render();
-        });
+        store
+          .deletePersonnel(person.id)
+          .then(function () {
+            if (crewFilter === person.id) {
+              crewFilter = null;
+            }
+            ui.showMessage(person.name + "'s maintenance account was deleted.", "success");
+            render();
+          })
+          .catch(function (error) {
+            ui.showMessage(error.message, "error");
+          });
       });
     });
   });
@@ -2047,17 +2079,29 @@
     if (!els.personnelForm.reportValidity()) {
       return;
     }
-    runSafely(function () {
-      const values = new FormData(els.personnelForm);
-      const person = store.addPersonnel({
+    const submitButton = els.personnelForm.querySelector('button[type="submit"]');
+    if (submitButton.classList.contains("is-loading")) {
+      return;
+    }
+    const values = new FormData(els.personnelForm);
+    submitButton.classList.add("is-loading");
+    store
+      .addPersonnel({
         name: values.get("name"),
         email: values.get("email"),
         team: values.get("team"),
+      })
+      .then(function (person) {
+        els.personnelForm.reset();
+        ui.showMessage(person.name + "'s maintenance account was added. They sign in with crew123.", "success");
+        render();
+      })
+      .catch(function (error) {
+        ui.showMessage(error.message, "error");
+      })
+      .finally(function () {
+        submitButton.classList.remove("is-loading");
       });
-      els.personnelForm.reset();
-      ui.showMessage(person.name + "'s maintenance account was added.", "success");
-      render();
-    });
   });
 
   // Drawer
@@ -2088,7 +2132,9 @@
     }
     event.preventDefault();
     runSafely(function () {
-      store.addNote(openReportId, form.elements.namedItem("note").value, currentUser.name);
+      const field = form.elements.namedItem("note");
+      store.addNote(openReportId, field.value, currentUser.name);
+      field.value = "";
       ui.showMessage("Note added to " + openReportId + ".", "success");
       render();
     });
@@ -2247,7 +2293,7 @@
     });
   }, "admin");
 
-  // Another tab (a crew member or citizen) changed the data: refresh.
+  // Live database updates (from crews, residents, or other admins): refresh.
   store.onExternalChange(function () {
     runSafely(render);
   });
