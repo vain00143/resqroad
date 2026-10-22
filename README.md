@@ -430,6 +430,7 @@ tests/firebase-import.test.js npm test: Firebase import and password carry-over
 tests/photo-database.test.js  npm test: photos kept in MySQL (PHOTO_STORAGE=database)
 render.yaml                   Render Blueprint for the hosted copy (with Aiven MySQL)
 docs/API.md                   API for the mobile app
+docs/ResQRoad-User-Guide.pptx User guide (PowerPoint) for residents, crews, administrators, and the app
 firebase/                     The previous Firebase configuration (reference); redirect/ sends the old site to the hosted copy
 assets/css/core.css           Design tokens, base styles, shared components
 assets/css/app.css            Workspace shell (sidebar, top bar) and views
