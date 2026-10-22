@@ -9,12 +9,15 @@ import { addPhotos, maxPhotos, type LocalPhoto } from "@/lib/photos";
 import { radius, useTheme } from "@/theme";
 
 // Camera and gallery buttons with removable thumbnails (up to five photos).
+// `target` names the form the photos are for (see addPhotos).
 export function PhotoPicker({
   photos,
+  target,
   onChange,
   onError,
 }: {
   photos: LocalPhoto[];
+  target: string;
   onChange: (photos: LocalPhoto[]) => void;
   onError: (message: string) => void;
 }) {
@@ -25,7 +28,7 @@ export function PhotoPicker({
   async function add(source: "camera" | "library") {
     setBusy(source);
     try {
-      const added = await addPhotos(source, room);
+      const added = await addPhotos(source, room, target);
       if (added.length) {
         onChange([...photos, ...added].slice(0, maxPhotos));
       }

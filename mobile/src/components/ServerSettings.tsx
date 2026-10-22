@@ -37,8 +37,8 @@ export function ServerSettings({ unreachable = false }: { unreachable?: boolean 
     setTesting(true);
     setResult(null);
     try {
-      // A sleeping hosted server can take up to a minute to answer.
-      await api("/health", { baseUrl: url, token: null, timeoutMs: isHostedServer(url) ? 60000 : 8000 });
+      // A sleeping hosted server can take about a minute to answer.
+      await api("/health", { baseUrl: url, token: null, timeoutMs: isHostedServer(url) ? 90000 : 8000 });
       await setServerUrl(url);
       setAddress(url);
       setResult({ ok: true, message: "Connected to " + url + "." });

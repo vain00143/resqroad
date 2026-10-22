@@ -3,10 +3,10 @@
 // per account; cleared once the report goes through.
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Image, Platform } from "react-native";
+import { Platform } from "react-native";
 
 import type { MapPoint } from "@/components/map/mapHtml";
-import type { LocalPhoto } from "@/lib/photos";
+import { keepExistingPhotos, type LocalPhoto } from "@/lib/photos";
 import type { Severity } from "@/lib/reports";
 
 export type ReportDraft = {
@@ -35,17 +35,6 @@ export function isEmptyDraft(draft: ReportDraft) {
   );
 }
 
-// Resized photos live in the app's cache folder, which Android may empty.
-function photoExists(uri: string) {
-  return new Promise<boolean>((resolve) => {
-    Image.getSize(
-      uri,
-      () => resolve(true),
-      () => resolve(false),
-    );
-  });
-}
-
 export async function loadReportDraft(userId: string): Promise<ReportDraft | null> {
   try {
     const saved = await AsyncStorage.getItem(storageKey(userId));
@@ -53,8 +42,7 @@ export async function loadReportDraft(userId: string): Promise<ReportDraft | nul
       return null;
     }
     const draft = JSON.parse(saved) as ReportDraft;
-    const kept = await Promise.all(draft.photos.map((photo) => photoExists(photo.uri)));
-    return { ...draft, photos: draft.photos.filter((_, index) => kept[index]) };
+    return { ...draft, photos: await keepExistingPhotos(draft.photos) };
   } catch {
     return null;
   }

@@ -11,7 +11,8 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://resqroad.onrender.com"
+        "EXPO_PUBLIC_API_URL": "https://resqroad.onrender.com",
+        "ORG_GRADLE_PROJECT_reactNativeArchitectures": "armeabi-v7a,arm64-v8a,x86_64"
       }
     }
   }

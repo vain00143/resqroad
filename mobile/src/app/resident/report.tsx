@@ -23,7 +23,7 @@ import {
   wakingMessage,
   withRetries,
 } from "@/lib/api";
-import { appendPhoto, type LocalPhoto } from "@/lib/photos";
+import { appendPhoto, maxPhotos, takePendingPhotos, type LocalPhoto } from "@/lib/photos";
 import { inBulacan, isOpen, type Report, type Severity } from "@/lib/reports";
 import { clearReportDraft, loadReportDraft, saveReportDraft } from "@/lib/reportDraft";
 import { useSession } from "@/lib/session";
@@ -83,7 +83,10 @@ export default function ReportProblem() {
       return;
     }
     let active = true;
-    loadReportDraft(userId).then((draft) => {
+    (async () => {
+      const draft = await loadReportDraft(userId);
+      // A camera photo that arrived after Android restarted the app.
+      const recovered = await takePendingPhotos("report", maxPhotos - (draft?.photos.length ?? 0));
       if (!active) {
         return;
       }
@@ -100,8 +103,12 @@ export default function ReportProblem() {
           setPanKey((key) => key + 1);
         }
       }
+      if (recovered.length) {
+        setPhotos((current) => [...current, ...recovered].slice(0, maxPhotos));
+        setRestored(true);
+      }
       setDraftReady(true);
-    });
+    })();
     return () => {
       active = false;
     };
@@ -360,7 +367,7 @@ export default function ReportProblem() {
         </FormSection>
 
         <FormSection step={3} title="Add photos (optional)" text="Clear photos help the team verify the damage faster. Add up to five.">
-          <PhotoPicker photos={photos} onChange={setPhotos} onError={setError} />
+          <PhotoPicker photos={photos} target="report" onChange={setPhotos} onError={setError} />
         </FormSection>
 
         <View style={[styles.submit, { backgroundColor: colors.surface, borderColor: colors.border }]}>

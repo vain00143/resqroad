@@ -8,6 +8,7 @@ import { FormScreen } from "@/components/FormScreen";
 import { Notice } from "@/components/Notice";
 import { ServerSettings } from "@/components/ServerSettings";
 import { TextField } from "@/components/TextField";
+import { WakingNotice } from "@/components/WakingNotice";
 import { errorMessage, NetworkError } from "@/lib/api";
 import { useSession } from "@/lib/session";
 
@@ -66,6 +67,7 @@ export default function Register() {
         </AppText>
       </View>
 
+      <WakingNotice active={busy} />
       {error ? <Notice tone="error" message={error} /> : null}
 
       <TextField

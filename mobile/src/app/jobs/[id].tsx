@@ -1,5 +1,5 @@
 import { Stack, useLocalSearchParams } from "expo-router";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -39,17 +39,24 @@ import {
 } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import { directionsUrl, lastEvent, moreWorkNote } from "@/lib/jobs";
-import { appendPhoto, type LocalPhoto } from "@/lib/photos";
+import { appendPhoto, maxPhotos, takePendingPhotos } from "@/lib/photos";
+import { clearRepairDraft, loadRepairDraft, saveRepairDraft, type RepairDraft } from "@/lib/repairDraft";
 import { normalizeReportId, type Report } from "@/lib/reports";
 import { useSession } from "@/lib/session";
 import { severityColors, useTheme } from "@/theme";
 
-type Draft = { notes: string; before: LocalPhoto[]; after: LocalPhoto[] };
+type Draft = RepairDraft;
 
 // Unsent repair notes and photos stay put while the crew looks at other
-// screens, as on the website.
+// screens, as on the website, and are also saved on the phone
+// (lib/repairDraft) in case the app closes.
 const drafts = new Map<string, Draft>();
 const emptyDraft: Draft = { notes: "", before: [], after: [] };
+
+// Which photo field opened the camera (see addPhotos).
+function cameraTarget(reportId: string, field: "before" | "after") {
+  return "repair:" + reportId + ":" + field;
+}
 
 // One key per job's repair update, sent with every attempt to submit it, so a
 // retry after a lost answer isn't refused as "no longer assigned"; a new key
@@ -96,6 +103,53 @@ export default function JobDetail() {
       return next;
     });
   }
+
+  // The update saved on this phone is restored when the job opens, with any
+  // camera photo that arrived after Android restarted the app; then it's
+  // saved again as the crew fills it in.
+  const userId = user?.id ?? null;
+  const [draftReady, setDraftReady] = useState(false);
+
+  useEffect(() => {
+    if (!userId) {
+      return;
+    }
+    let active = true;
+    (async () => {
+      const saved = drafts.has(reportId) ? null : await loadRepairDraft(userId, reportId);
+      const base = drafts.get(reportId) ?? saved ?? emptyDraft;
+      const before = await takePendingPhotos(cameraTarget(reportId, "before"), maxPhotos - base.before.length);
+      const after = await takePendingPhotos(cameraTarget(reportId, "after"), maxPhotos - base.after.length);
+      if (!active) {
+        return;
+      }
+      if (saved || before.length || after.length) {
+        setDraftState((current) => {
+          // Changes made while this loaded win over the saved copy.
+          const start = drafts.has(reportId) ? current : (saved ?? current);
+          const next = {
+            ...start,
+            before: [...start.before, ...before].slice(0, maxPhotos),
+            after: [...start.after, ...after].slice(0, maxPhotos),
+          };
+          drafts.set(reportId, next);
+          return next;
+        });
+      }
+      setDraftReady(true);
+    })();
+    return () => {
+      active = false;
+    };
+  }, [userId, reportId]);
+
+  useEffect(() => {
+    if (!userId || !draftReady) {
+      return;
+    }
+    const timer = setTimeout(() => void saveRepairDraft(userId, reportId, draft), 400);
+    return () => clearTimeout(timer);
+  }, [userId, reportId, draftReady, draft]);
 
   const lat = report?.coordinates.lat;
   const lng = report?.coordinates.lng;
@@ -173,6 +227,9 @@ export default function JobDetail() {
       repairKeys.delete(reportId);
       drafts.delete(reportId);
       setDraftState(emptyDraft);
+      if (userId) {
+        void clearRepairDraft(userId, reportId);
+      }
       show({ tone: "success", text: reportId + " sent to the administrator for verification.", version: keep(updated) });
     } catch (error) {
       setFormError(errorMessage(error));
@@ -275,6 +332,7 @@ export default function JobDetail() {
               </AppText>
               <PhotoPicker
                 photos={draft.before}
+                target={cameraTarget(reportId, "before")}
                 onChange={(before) => setDraft({ before })}
                 onError={setFormError}
               />
@@ -285,6 +343,7 @@ export default function JobDetail() {
               </AppText>
               <PhotoPicker
                 photos={draft.after}
+                target={cameraTarget(reportId, "after")}
                 onChange={(after) => setDraft({ after })}
                 onError={setFormError}
               />

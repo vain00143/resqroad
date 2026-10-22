@@ -87,10 +87,10 @@ export function isHostedServer(baseUrl: string) {
   return /^https:\/\//i.test(baseUrl);
 }
 
-// The free hosted server sleeps when nobody uses it and takes up to a minute
-// to wake, so requests to it wait longer.
+// The free hosted server sleeps when nobody uses it and takes about a minute
+// to wake (sometimes more), so requests to it wait longer.
 export function defaultTimeout(baseUrl: string) {
-  return isHostedServer(baseUrl) ? 60000 : 15000;
+  return isHostedServer(baseUrl) ? 90000 : 15000;
 }
 
 // Photo uploads may have to wait for the hosted server to wake up first.
@@ -98,9 +98,10 @@ export function uploadTimeout(baseUrl: string) {
   return isHostedServer(baseUrl) ? 90000 : 30000;
 }
 
-// Photo `src` values are paths on the server.
+// Photo `src` values are paths on the server, or full addresses if photos are
+// kept elsewhere (such as object storage).
 export function serverAsset(path: string) {
-  return config.baseUrl + path;
+  return /^https?:\/\//i.test(path) ? path : config.baseUrl + path;
 }
 
 function requestHeaders(token: string | null) {
