@@ -101,4 +101,44 @@
       }
     });
   });
+
+  // "Change password" in the account menu, for every signed-in person.
+  document.addEventListener("click", function (event) {
+    const button = event.target.closest("[data-change-password]");
+    const ui = window.RoadWatchUI;
+    if (!button || !ui || !ui.form) {
+      return;
+    }
+    event.preventDefault();
+    ui.form({
+      kicker: "Account",
+      title: "Change your password",
+      message: "You'll stay signed in here. Your other devices will be signed out.",
+      icon: "lock",
+      confirmLabel: "Change password",
+      opener: button,
+      fields: [
+        { name: "current", label: "Current password", type: "password", autocomplete: "current-password" },
+        {
+          name: "next",
+          label: "New password",
+          type: "password",
+          autocomplete: "new-password",
+          hint: "At least 8 characters with a letter and a number.",
+        },
+        { name: "confirm", label: "Confirm new password", type: "password", autocomplete: "new-password" },
+      ],
+      submit: async function (values) {
+        if (values.next !== values.confirm) {
+          throw new Error("The new passwords don't match.");
+        }
+        await backend().changePassword(values.current, values.next);
+        return true;
+      },
+    }).then(function (changed) {
+      if (changed) {
+        ui.showMessage("Your password was changed. Other devices were signed out.", "success");
+      }
+    });
+  });
 })();

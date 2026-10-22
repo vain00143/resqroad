@@ -1611,6 +1611,10 @@ button.kpi:hover {
   white-space: nowrap;
 }
 
+.table .cell-actions .btn + .btn {
+  margin-left: 0.4rem;
+}
+
 .table .num {
   font-variant-numeric: tabular-nums;
 }

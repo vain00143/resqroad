@@ -1,3 +1,4 @@
+import { router } from "expo-router";
 import { useState, type ReactNode } from "react";
 import { RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -100,7 +101,7 @@ export function HomeScaffold({ subtitle, stats, listTitle, reports, emptyText, a
         )}
 
         <View style={[styles.account, { borderColor: colors.border }]}>
-          <View style={styles.accountText}>
+          <View>
             <AppText variant="label" tone="heading">
               {user?.name}
             </AppText>
@@ -108,6 +109,12 @@ export function HomeScaffold({ subtitle, stats, listTitle, reports, emptyText, a
               {user?.email}
             </AppText>
           </View>
+          <Button
+            label="Change password"
+            variant="secondary"
+            onPress={() => router.push("/password")}
+            icon={<Icon name="lock" size={16} color={colors.text} />}
+          />
           <Button
             label="Log out"
             variant="secondary"
@@ -146,11 +153,8 @@ const styles = StyleSheet.create({
   next: { flexDirection: "row", gap: 10, padding: 14, borderRadius: radius.md },
   nextText: { flex: 1 },
   account: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
+    gap: 10,
     paddingTop: 20,
     borderTopWidth: 1,
   },
-  accountText: { flex: 1 },
 });

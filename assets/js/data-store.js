@@ -703,6 +703,17 @@ function setCitizenActive(citizenId, active) {
   return { id: citizenId, name: user.name, email: user.email, active: updated.active };
 }
 
+// Sets a new temporary password for a crew member or resident; they are
+// signed out on every device.
+async function setUserPassword(userId, password) {
+  requireRole(["admin"]);
+  const value = String(password || "");
+  if (value.length < 8 || !/[A-Za-z]/.test(value) || !/\d/.test(value)) {
+    throw new Error("Use a temporary password of at least 8 characters with a letter and a number.");
+  }
+  await api("users/" + encodeURIComponent(userId) + "/password", { method: "POST", json: { password: value } });
+}
+
 /* ---------- Queries ---------- */
 
 function reporterName(report) {
@@ -751,6 +762,21 @@ async function signOut() {
   }
 }
 
+// Changes the signed-in person's password. This device stays signed in;
+// the server signs out their other devices.
+async function changePassword(currentPassword, newPassword) {
+  if (!currentPassword) {
+    throw new Error("Enter your current password.");
+  }
+  if (newPassword.length < 8 || !/[A-Za-z]/.test(newPassword) || !/\d/.test(newPassword)) {
+    throw new Error("Use at least 8 characters with a letter and a number.");
+  }
+  if (newPassword === currentPassword) {
+    throw new Error("Choose a password that's different from your current one.");
+  }
+  await api("auth/password", { method: "POST", json: { currentPassword: currentPassword, newPassword: newPassword } });
+}
+
 window.RoadWatchStore = {
   ready: ready,
   getState: getState,
@@ -766,6 +792,7 @@ window.RoadWatchStore = {
   deletePersonnel: deletePersonnel,
   registerCitizen: registerCitizen,
   setCitizenActive: setCitizenActive,
+  setUserPassword: setUserPassword,
   assignReport: assignReport,
   startRepair: startRepair,
   submitRepair: submitRepair,
@@ -777,5 +804,6 @@ window.RoadWatchStore = {
 window.RoadWatchBackend = {
   signIn: signIn,
   signOut: signOut,
+  changePassword: changePassword,
   currentUser: currentUser,
 };

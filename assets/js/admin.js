@@ -1275,6 +1275,18 @@
     });
   }
 
+  function setPasswordButton(userId, name) {
+    return (
+      '<button class="btn btn-secondary btn-icon btn-sm" type="button" data-action="set-password" data-user-id="' +
+      esc(userId) +
+      '" title="Set a new password" aria-label="Set a new password for ' +
+      esc(name) +
+      '">' +
+      icon("lock", "icon-sm") +
+      "</button>"
+    );
+  }
+
   function renderUsers() {
     $("#personnel-rows").innerHTML = state.personnel
       .map(function (person) {
@@ -1295,7 +1307,9 @@
           stats.open +
           '</span></td><td class="num">' +
           stats.resolved +
-          '</td><td class="cell-actions"><button class="btn btn-danger-outline btn-sm" type="button" data-action="delete-person" data-user-id="' +
+          '</td><td class="cell-actions">' +
+          setPasswordButton(person.id, person.name) +
+          '<button class="btn btn-danger-outline btn-sm" type="button" data-action="delete-person" data-user-id="' +
           esc(person.id) +
           '">' +
           icon("trash", "icon-sm") +
@@ -1341,7 +1355,9 @@
           (active ? "" : " is-inactive") +
           '"><span class="pill-dot"></span>' +
           (active ? "Active" : "Inactive") +
-          '</span></td><td class="cell-actions"><button class="btn ' +
+          '</span></td><td class="cell-actions">' +
+          setPasswordButton(citizen.id, citizen.name) +
+          '<button class="btn ' +
           (active ? "btn-danger-outline" : "btn-secondary") +
           ' btn-sm" type="button" data-action="toggle-citizen" data-user-id="' +
           esc(citizen.id) +
@@ -1948,6 +1964,55 @@
   $("#citizen-search").addEventListener("input", ui.debounce(function () {
     runSafely(renderUsers);
   }, 120));
+
+  // A new temporary password for a crew member or resident who forgot theirs.
+  function setPassword(button) {
+    const userId = button.dataset.userId;
+    const person =
+      findPerson(userId) ||
+      state.citizens.find(function (citizen) {
+        return citizen.id === userId;
+      });
+    if (!person) {
+      throw new Error("This account is no longer available.");
+    }
+    ui.form({
+      kicker: person.team ? "Maintenance account" : "Citizen account",
+      title: "Set a new password",
+      message:
+        person.name +
+        " will be signed out on every device. Share the new password with them privately; they can change it after signing in.",
+      icon: "lock",
+      confirmLabel: "Set password",
+      opener: button,
+      fields: [
+        {
+          name: "password",
+          label: "New temporary password",
+          hint: "At least 8 characters with a letter and a number.",
+        },
+      ],
+      submit: async function (values) {
+        await store.setUserPassword(userId, values.password);
+        return true;
+      },
+    }).then(function (changed) {
+      if (changed) {
+        ui.showMessage(person.name + "'s password was changed. Share it with them privately.", "success");
+      }
+    });
+  }
+
+  $$("#personnel-rows, #citizen-rows").forEach(function (rows) {
+    rows.addEventListener("click", function (event) {
+      const button = event.target.closest('[data-action="set-password"]');
+      if (button) {
+        runSafely(function () {
+          setPassword(button);
+        });
+      }
+    });
+  });
 
   $("#personnel-rows").addEventListener("click", function (event) {
     const button = event.target.closest('[data-action="delete-person"]');

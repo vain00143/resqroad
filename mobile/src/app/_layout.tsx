@@ -95,6 +95,9 @@ function RootNavigator() {
           <Stack.Screen name="crew" options={{ headerShown: false }} />
           <Stack.Screen name="jobs/[id]" options={{ title: "Job", headerBackTitle: "Back" }} />
         </Stack.Protected>
+        <Stack.Protected guard={status === "signedIn"}>
+          <Stack.Screen name="password" options={{ title: "Change password", headerBackTitle: "Back" }} />
+        </Stack.Protected>
         <Stack.Screen name="track" options={{ title: "Track a report" }} />
         <Stack.Screen name="reports/[id]" options={{ title: "Report", headerBackTitle: "Back" }} />
         <Stack.Screen name="brand" options={{ title: "Brand check" }} />

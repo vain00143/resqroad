@@ -714,6 +714,150 @@
     return openDialog(options, true);
   }
 
+  /* ---------- Form dialog ---------- */
+
+  // A dialog with several fields that stays open until `submit` succeeds.
+  // options: title, message, kicker, icon, confirmLabel, cancelLabel, opener,
+  // fields [{ name, label, type, autocomplete, hint }], and submit(values),
+  // which returns a promise; throwing shows its message in the dialog.
+  // Resolves with what submit returned, or null when cancelled.
+  function formDialog(options) {
+    if (activeDialog) {
+      activeDialog.settle(false);
+    }
+
+    return new Promise(function (resolve) {
+      const backdrop = document.createElement("div");
+      backdrop.className = "dialog-backdrop";
+      const titleId = "dialog-title-" + Date.now();
+      const messageId = titleId + "-message";
+      backdrop.innerHTML =
+        '<section class="dialog" role="dialog" aria-modal="true" aria-labelledby="' +
+        titleId +
+        '"' +
+        (options.message ? ' aria-describedby="' + messageId + '"' : "") +
+        '><form novalidate><div class="dialog-icon">' +
+        icon(options.icon || "info", "icon-lg") +
+        "</div>" +
+        (options.kicker ? '<p class="dialog-kicker">' + escapeHtml(options.kicker) + "</p>" : "") +
+        '<h2 class="dialog-title" id="' +
+        titleId +
+        '">' +
+        escapeHtml(options.title) +
+        "</h2>" +
+        (options.message ? '<p class="dialog-message" id="' + messageId + '">' + escapeHtml(options.message) + "</p>" : "") +
+        options.fields
+          .map(function (spec) {
+            return (
+              '<label class="field dialog-field"><span class="field-label">' +
+              escapeHtml(spec.label) +
+              '</span><input type="' +
+              escapeHtml(spec.type || "text") +
+              '" name="' +
+              escapeHtml(spec.name) +
+              '" autocomplete="' +
+              escapeHtml(spec.autocomplete || "off") +
+              '" spellcheck="false" maxlength="128" />' +
+              (spec.hint ? '<span class="field-hint">' + escapeHtml(spec.hint) + "</span>" : "") +
+              "</label>"
+            );
+          })
+          .join("") +
+        '<p class="field-error dialog-field" role="alert" data-form-error hidden></p>' +
+        '<div class="dialog-actions"><button class="btn btn-secondary" type="button" data-dialog-cancel>' +
+        escapeHtml(options.cancelLabel || "Cancel") +
+        '</button><button class="btn btn-primary" type="submit" data-dialog-accept>' +
+        escapeHtml(options.confirmLabel || "Save") +
+        "</button></div></form></section>";
+
+      const form = backdrop.querySelector("form");
+      const error = backdrop.querySelector("[data-form-error]");
+      const accept = backdrop.querySelector("[data-dialog-accept]");
+      document.body.appendChild(backdrop);
+      const opener = options.opener || document.activeElement;
+      const restoreInert = setBackgroundInert([backdrop]);
+      let busy = false;
+
+      function focusables() {
+        return Array.from(backdrop.querySelectorAll("button, input")).filter(function (element) {
+          return !element.disabled;
+        });
+      }
+
+      function close(result) {
+        if (activeDialog !== controller) {
+          return;
+        }
+        activeDialog = null;
+        document.removeEventListener("keydown", onKeydown, true);
+        restoreInert();
+        backdrop.classList.add("is-closing");
+        afterAnimation(backdrop, function () {
+          backdrop.remove();
+        });
+        if (opener && opener.isConnected && typeof opener.focus === "function") {
+          opener.focus({ preventScroll: true });
+        }
+        resolve(result);
+      }
+
+      function onKeydown(event) {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          if (!busy) {
+            close(null);
+          }
+        } else if (event.key === "Tab") {
+          const list = focusables();
+          const index = list.indexOf(document.activeElement);
+          const next = event.shiftKey ? (index <= 0 ? list.length : index) - 1 : (index + 1) % list.length;
+          event.preventDefault();
+          list[next].focus();
+        }
+      }
+
+      form.addEventListener("submit", async function (event) {
+        event.preventDefault();
+        if (busy) {
+          return;
+        }
+        const values = {};
+        options.fields.forEach(function (spec) {
+          values[spec.name] = form.elements[spec.name].value;
+        });
+        busy = true;
+        error.hidden = true;
+        accept.classList.add("is-loading");
+        accept.setAttribute("aria-busy", "true");
+        try {
+          close(await options.submit(values));
+        } catch (failure) {
+          error.textContent = failure.message || "Something went wrong. Try again.";
+          error.hidden = false;
+          busy = false;
+          accept.classList.remove("is-loading");
+          accept.removeAttribute("aria-busy");
+        }
+      });
+
+      backdrop.addEventListener("click", function (event) {
+        if (!busy && (event.target === backdrop || event.target.closest("[data-dialog-cancel]"))) {
+          close(null);
+        }
+      });
+
+      const controller = {
+        settle: function () {
+          close(null);
+        },
+      };
+      activeDialog = controller;
+      document.addEventListener("keydown", onKeydown, true);
+      form.elements[options.fields[0].name].focus({ preventScroll: true });
+    });
+  }
+
   /* ---------- Lightbox ---------- */
 
   let lightbox = null;
@@ -1574,6 +1718,7 @@
     showMessage: showMessage,
     confirm: confirmAction,
     prompt: promptAction,
+    form: formDialog,
     openLightbox: openLightbox,
     bindPhotoPreview: bindPhotoPreview,
     downloadCsv: downloadCsv,
