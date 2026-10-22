@@ -12,3 +12,9 @@ These files are kept for reference:
 
 The website no longer uses Firebase. Don't run `firebase deploy` from here:
 Firebase Hosting can't run the new server, so a deployed copy wouldn't work.
+
+- `redirect/`: what Firebase Hosting serves now. Every address on
+  `resqroad-bulsu.web.app` and `resqroad-bulsu.firebaseapp.com` redirects to
+  the hosted copy at `https://resqroad.onrender.com` (same page path). Deploy
+  it from that folder with `firebase deploy --only hosting --project
+  resqroad-bulsu`.

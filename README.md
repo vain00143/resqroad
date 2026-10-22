@@ -240,9 +240,14 @@ An administrator can give anyone left over a new temporary password
 
 ## Deploying
 
+The hosted copy is at **https://resqroad.onrender.com**. Its database is
+separate from the one on this computer: accounts, reports, and photos made on
+the live site stay there.
+
 Firebase Hosting only serves static files, so it can't run this version. The
 hosted copy runs for free on **Render** (the Node.js server: website, API, and
-live updates) with **Aiven** (MySQL), kept awake by **UptimeRobot**:
+live updates, in Singapore) with **Aiven** (MySQL, in Bangalore), kept awake by
+**UptimeRobot**:
 
 1. **Aiven:** create a free MySQL service. From its overview, note the host,
    port, user (`avnadmin`), and password, and download the CA certificate.
@@ -256,9 +261,16 @@ live updates) with **Aiven** (MySQL), kept awake by **UptimeRobot**:
    `mysqldump --no-create-info` export of another copy, run with the Aiven
    values in the environment.
 4. **UptimeRobot:** an HTTP(S) monitor every 5 minutes on
-   `https://<your service>.onrender.com/api/health/db`. Free Render services
-   sleep after 15 minutes without visitors, and Aiven powers off free databases
-   that stay idle; this check keeps both awake.
+   `https://resqroad.onrender.com/api/health/db`. Free Render services sleep
+   after 15 minutes without visitors, and Aiven powers off free databases that
+   stay idle; this check keeps both awake. If the server is asleep anyway, the
+   first visit takes up to a minute while it wakes.
+
+The old Firebase addresses (`resqroad-bulsu.web.app` and
+`resqroad-bulsu.firebaseapp.com`) redirect every page to the hosted copy. The
+redirect's configuration is in `firebase/redirect/`; to change it, edit
+`firebase.json` there and run `firebase deploy --only hosting --project
+resqroad-bulsu` from that folder.
 
 Any other host works too: set the `.env` values there, run `npm run db:setup`
 and `npm run create-admin`, start it with `npm start`, and put it behind HTTPS
@@ -282,9 +294,12 @@ npx expo start
 Scan the QR code with **Expo Go** on an Android phone on the same Wi-Fi, or
 press `w` to open it in a browser.
 
-**Server address.** The app talks to the server started with `npm start`.
-Copy `mobile/.env.example` to `mobile/.env` and set `EXPO_PUBLIC_API_URL` to
-the address the server prints for other devices (for example
+**Server address.** The APK connects to the hosted copy,
+`https://resqroad.onrender.com`, so it works on any network, Wi-Fi or mobile
+data. While developing, `npx expo start` uses the server started with
+`npm start` on this computer, so test data stays off the live site: copy
+`mobile/.env.example` to `mobile/.env` and set `EXPO_PUBLIC_API_URL` to the
+address the server prints for other devices (for example
 `http://192.168.1.15:8000`). That address changes when the laptop joins
 another network, so it can also be changed in the app under **Server
 settings** on the sign-in screen ("Save and test connection" checks it). The
@@ -293,7 +308,9 @@ Firewall. For the browser preview, use `http://localhost:8000` and add
 `http://localhost:8081` to `CORS_ORIGINS` in the server's `.env`.
 
 **If the app says it can't reach the server**, the message names the address
-it tried, and Server settings opens by itself. Check, in order:
+it tried, and Server settings opens by itself. With the hosted address, check
+the phone's internet connection; requests wait up to a minute in case the free
+server is waking up. With a laptop's address, check, in order:
 
 1. The server is running (`npm start` in the project folder; leave it open).
 2. The address is the one `npm start` prints for **the network the phone is
@@ -365,12 +382,13 @@ app). The build takes about 10–20 minutes and ends with a link and QR code.
 Open it on the phone, download the APK, allow **Install unknown apps** for
 the browser when Android asks, and install it.
 
-The `preview` profile in `mobile/eas.json` builds an APK with the server
-address `http://192.168.1.15:8000` built in (change `EXPO_PUBLIC_API_URL`
-there before building if your laptop's address differs). The address can
+The `preview` profile in `mobile/eas.json` builds an APK with the hosted
+address `https://resqroad.onrender.com` built in (`EXPO_PUBLIC_API_URL`).
+When a new build's address differs from the one an installed app was using,
+the app switches to it and asks people to sign in again. The address can
 always be changed in the app under **Server settings**. Plain `http://` is
-allowed in this build (`usesCleartextTraffic`), because the server runs on
-the local network without HTTPS.
+still allowed in this build (`usesCleartextTraffic`), so it can also be
+pointed at a laptop on the local network for testing.
 
 ## Brand and design
 
@@ -412,7 +430,7 @@ tests/firebase-import.test.js npm test: Firebase import and password carry-over
 tests/photo-database.test.js  npm test: photos kept in MySQL (PHOTO_STORAGE=database)
 render.yaml                   Render Blueprint for the hosted copy (with Aiven MySQL)
 docs/API.md                   API for the mobile app
-firebase/                     The previous Firebase configuration (reference)
+firebase/                     The previous Firebase configuration (reference); redirect/ sends the old site to the hosted copy
 assets/css/core.css           Design tokens, base styles, shared components
 assets/css/app.css            Workspace shell (sidebar, top bar) and views
 assets/css/site.css           Landing page, sign-in, citizen portal, tracker

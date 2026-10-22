@@ -46,6 +46,18 @@ export function normalizeServerUrl(input: string): string {
   return value.replace(/\/+$/, "").replace(/\/api$/i, "");
 }
 
+// An HTTPS address is the hosted copy (on the internet); plain http is a laptop
+// on the local network.
+export function isHostedServer(baseUrl: string) {
+  return /^https:\/\//i.test(baseUrl);
+}
+
+// The free hosted server sleeps when nobody uses it and takes up to a minute
+// to wake, so requests to it wait longer.
+export function defaultTimeout(baseUrl: string) {
+  return isHostedServer(baseUrl) ? 60000 : 15000;
+}
+
 // Photo `src` values are paths on the server.
 export function serverAsset(path: string) {
   return config.baseUrl + path;
@@ -84,7 +96,7 @@ export async function api<T>(path: string, options: RequestOptions = {}): Promis
   }
 
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), options.timeoutMs ?? 15000);
+  const timer = setTimeout(() => controller.abort(), options.timeoutMs ?? defaultTimeout(baseUrl));
   let response: Response;
   try {
     response = await fetch(baseUrl + "/api" + path, {
@@ -97,7 +109,9 @@ export async function api<T>(path: string, options: RequestOptions = {}): Promis
     throw new NetworkError(
       "Can't reach the ResQRoad server at " +
         baseUrl +
-        ". Make sure the server is running and this phone is on the same Wi-Fi, or change the address under Server settings.",
+        (isHostedServer(baseUrl)
+          ? ". Check this phone's internet connection and try again."
+          : ". Make sure the server is running and this phone is on the same Wi-Fi, or change the address under Server settings."),
     );
   } finally {
     clearTimeout(timer);
