@@ -431,6 +431,37 @@ test("9. rejected and duplicate reports close with the reason shown to the resid
   assert.equal(verifyClosed.status, 409);
 });
 
+test("a retried upload with the same Idempotency-Key files the report only once", async function () {
+  const drain = { title: "Collapsed drain cover", latitude: 14.78, longitude: 120.85 };
+  const photo = [["photos", jpeg, "drain.jpg", "image/jpeg"]];
+  const key = { "Idempotency-Key": "retry-test-0001" };
+  const first = await resident.request("POST", "/api/reports", reportForm(drain, photo), key);
+  assert.equal(first.status, 201, JSON.stringify(first.body));
+  // The app never got the answer and sends the same form again.
+  const retry = await resident.request("POST", "/api/reports", reportForm(drain, photo), key);
+  assert.equal(retry.status, 200, JSON.stringify(retry.body));
+  assert.equal(retry.body.report.id, first.body.report.id);
+  assert.equal(retry.body.report.evidencePhotos.length, 1, "the retry's photos aren't added again");
+
+  // A new form at the same spot, or another resident's form with the same
+  // key, is still a likely duplicate.
+  const newForm = await resident.request("POST", "/api/reports", reportForm(drain), { "Idempotency-Key": "retry-test-0002" });
+  assert.equal(newForm.status, 409);
+  assert.equal((await neighbour.request("POST", "/api/reports", reportForm(drain), key)).status, 409);
+  const badKey = await resident.request("POST", "/api/reports", reportForm({ latitude: 14.77 }), { "Idempotency-Key": "a b" });
+  assert.equal(badKey.status, 400);
+
+  // Two copies of the same upload arriving at once file one report.
+  const sign = { title: "Fallen road sign", latitude: 14.76, longitude: 120.83 };
+  const twinKey = { "Idempotency-Key": "retry-test-0003" };
+  const twins = await Promise.all([
+    resident.request("POST", "/api/reports", reportForm(sign), twinKey),
+    resident.request("POST", "/api/reports", reportForm(sign), twinKey),
+  ]);
+  assert.deepEqual(twins.map((twin) => twin.status).sort(), [200, 201], JSON.stringify(twins.map((twin) => twin.body)));
+  assert.equal(twins[0].body.report.id, twins[1].body.report.id);
+});
+
 /* ---------- Accounts and sign-in ---------- */
 
 test("sign-in checks the password and the account's role decides access", async function () {

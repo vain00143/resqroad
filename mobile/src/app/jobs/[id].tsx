@@ -27,7 +27,7 @@ import { ReportTimeline } from "@/components/ReportTimeline";
 import { SeverityBadge } from "@/components/SeverityBadge";
 import { StatusPill } from "@/components/StatusPill";
 import { TextField } from "@/components/TextField";
-import { api, errorMessage } from "@/lib/api";
+import { api, errorMessage, upload, wakeServer } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import { directionsUrl, lastEvent, moreWorkNote } from "@/lib/jobs";
 import { appendPhoto, type LocalPhoto } from "@/lib/photos";
@@ -90,11 +90,14 @@ export default function JobDetail() {
 
   // Returns how many history entries the job has after the action.
   async function act(path: "start" | "repair", form?: FormData) {
-    const { report: updated } = await api<{ report: Report }>("/reports/" + reportId + "/" + path, {
-      method: "POST",
-      form,
-      timeoutMs: form ? 90000 : 15000,
-    });
+    const url = "/reports/" + reportId + "/" + path;
+    if (form) {
+      // Lets a sleeping hosted server start before the photos go up.
+      await wakeServer();
+    }
+    const { report: updated } = form
+      ? await upload<{ report: Report }>(url, form)
+      : await api<{ report: Report }>(url, { method: "POST", timeoutMs: 15000 });
     upsertReport(updated);
     return updated.history.length;
   }

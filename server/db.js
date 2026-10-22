@@ -69,8 +69,36 @@ export async function setupDatabase() {
     await connection.query("USE `" + name + "`");
     const schema = fs.readFileSync(path.join(rootDir, "database", "schema.sql"), "utf8");
     await connection.query(schema);
+    await addMissingColumns(connection);
   } finally {
     await connection.end();
+  }
+}
+
+// Columns added to database/schema.sql after the first release.
+// CREATE TABLE IF NOT EXISTS leaves existing tables alone, so databases set up
+// earlier get them here (and on every server start, in case db:setup wasn't
+// run after updating).
+const addedColumns = [
+  {
+    table: "reports",
+    column: "client_key",
+    alter:
+      "ALTER TABLE reports ADD COLUMN client_key VARCHAR(64) NULL " +
+      "COMMENT 'Idempotency-Key from the app: a retried upload returns this report' AFTER reporter_id, " +
+      "ADD UNIQUE KEY reports_client_key (reporter_id, client_key)",
+  },
+];
+
+export async function addMissingColumns(connection) {
+  for (const item of addedColumns) {
+    const [rows] = await connection.query(
+      "SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?",
+      [item.table, item.column],
+    );
+    if (!rows.length) {
+      await connection.query(item.alter);
+    }
   }
 }
 
