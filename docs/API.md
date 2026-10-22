@@ -82,8 +82,10 @@ A **report** (what everyone may see):
 ```
 
 - Photo `src` is a path on the server: prefix it with the server address.
-  Sample reports may list a plain file name (a string) instead of a photo
-  object; show a placeholder for those.
+  The same `/uploads/...` addresses work whether the server keeps photos on
+  disk or in MySQL (`PHOTO_STORAGE=database`). Sample reports may list a
+  plain file name (a string) instead of a photo object; show a placeholder
+  for those.
 - `repair`, once submitted: `{ "notes", "beforePhotos", "afterPhotos", "submittedAt" }`.
 - A history entry may have a `note`: the reason for a rejection, or what the
   crew still needs to fix.
@@ -98,6 +100,7 @@ Statuses: `submitted`, `under_review`, `verified`, `assigned`, `in_progress`,
 | Method and path | Who | What it does |
 | --- | --- | --- |
 | `GET /api/health` | Anyone | `{ "ok": true }` when the server is up. |
+| `GET /api/health/db` | Anyone | `{ "ok": true, "database": true }` when the server can also reach MySQL. An uptime monitor calls this to keep a free host and database awake. |
 | `GET /api/state` | Anyone | Everything a screen needs: `{ user, reports, crews }`, plus `users` for administrators. `user` is `null` when signed out. |
 | `POST /api/auth/login` | Anyone | `{ email, password }` → `{ user }` (+ `token` for the app). |
 | `POST /api/auth/register` | Anyone | `{ name, email, password }` → creates a resident account and signs in. |

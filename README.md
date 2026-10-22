@@ -82,10 +82,12 @@ Sign-ins last 30 days (renewed while in use) or until you log out.
   with a letter and a number). The administrator can deactivate or reactivate
   them; a deactivated resident is signed out on every device at once and can't
   sign in or submit reports.
-- Anyone signed in can change their password through the API
-  (`POST /api/auth/password`), which signs out their other devices; an
-  administrator can set a new temporary password for a crew member or resident
-  who forgot theirs (`POST /api/users/:id/password`).
+- Anyone signed in can change their password: **Change password** in the
+  account menu on the website, or on the Home tab in the app. Their other
+  devices are signed out. An administrator can give a crew member or resident
+  who forgot theirs a new temporary password with the lock button in **User
+  management**; that person is signed out everywhere and can change it after
+  signing in. (API: `POST /api/auth/password` and `POST /api/users/:id/password`.)
 
 Too many wrong passwords for the same email from the same address (8 in 15
 minutes) pause sign-in attempts for a while.
@@ -342,6 +344,9 @@ residents can register in the app. Administrators are pointed to the website.
   confirmation before sending. When an administrator asks for more work, the
   note appears at the top and the previous repair stays visible. Unsent notes
   and photos are kept while the crew looks at other screens.
+- **Account**: the bottom of Home has **Change password** (the current
+  password, then the new one twice; other devices are signed out) and
+  **Log out**.
 - **Status alerts**: when one of a resident's reports changes status, or a
   crew member gets a new job, loses one to reassignment, has a repair sent
   back, or has a repair verified, the app shows a banner (while it's open) or
@@ -451,6 +456,17 @@ mobile/                       The Android app (Expo): screens in mobile/src/app/
 - [Express](https://expressjs.com/), [mysql2](https://sidorares.github.io/node-mysql2/),
   [ws](https://github.com/websockets/ws), [Multer](https://github.com/expressjs/multer),
   and [bcrypt.js](https://github.com/dcodeIO/bcrypt.js) for the server.
+- The mobile app is built with [Expo](https://expo.dev/) and
+  [React Native](https://reactnative.dev/): [Expo Router](https://docs.expo.dev/router/introduction/),
+  Expo's Secure Store, Image Picker, Image Manipulator, Location,
+  Notifications, and Splash Screen modules,
+  [react-native-svg](https://github.com/software-mansion/react-native-svg),
+  [react-native-webview](https://github.com/react-native-webview/react-native-webview),
+  [react-native-screens](https://github.com/software-mansion/react-native-screens),
+  and [react-native-safe-area-context](https://github.com/AppAndFlow/react-native-safe-area-context).
+  The APK is built with [EAS Build](https://docs.expo.dev/build/introduction/).
+- Hosting: [Render](https://render.com/) runs the server, [Aiven](https://aiven.io/)
+  hosts MySQL, and [UptimeRobot](https://uptimerobot.com/) keeps both awake.
 - [Leaflet](https://leafletjs.com/) for maps, with map data © [OpenStreetMap](https://www.openstreetmap.org/copyright)
   contributors. If the map can't load, a built-in schematic map is shown.
 - Fonts: [Poppins](https://fonts.google.com/specimen/Poppins) and
