@@ -22,7 +22,7 @@
 
 import { firebasePasswordPrefix, hashPassword } from "../server/auth.js";
 import { explainDatabaseError, pool, query, setupDatabase, transaction } from "../server/db.js";
-import { checkPhotos, removePhotoFiles, savePhotos } from "../server/photos.js";
+import { checkPhotos, removePhotoFiles, savePhotos, storePhotoData } from "../server/photos.js";
 import { firebaseConfig } from "../firebase/firebase-config.js";
 import { ask, askHidden } from "./prompt.js";
 
@@ -149,7 +149,14 @@ async function photoRows(list, kind, photosById, saved) {
       const [checked] = checkPhotos([{ buffer: buffer, originalname: name, size: buffer.length }]);
       const [file] = await savePhotos([checked], kind);
       saved.push(file);
-      rows.push({ kind: kind, name: checked.name, filePath: file.filePath, mime: checked.mime, size: checked.size });
+      rows.push({
+        kind: kind,
+        name: checked.name,
+        filePath: file.filePath,
+        mime: checked.mime,
+        size: checked.size,
+        buffer: checked.buffer,
+      });
     } else {
       rows.push({ kind: kind, name: name, filePath: null, mime: null, size: null });
     }
@@ -250,10 +257,11 @@ async function main() {
           .concat(repair ? await photoRows(repair.beforePhotos, "before", photosById, saved) : [])
           .concat(repair ? await photoRows(repair.afterPhotos, "after", photosById, saved) : []);
         for (const [index, row] of rows.entries()) {
-          await connection.query(
+          const [inserted] = await connection.query(
             "INSERT INTO photos (report_id, kind, name, file_path, mime_type, size_bytes, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             [number, row.kind, row.name, row.filePath, row.mime, row.size, index, toDate(report.reportedAt)],
           );
+          await storePhotoData(connection, inserted.insertId, row);
         }
       }
     });

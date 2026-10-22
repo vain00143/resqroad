@@ -113,3 +113,15 @@ CREATE TABLE IF NOT EXISTS photos (
   CONSTRAINT photos_report_fk FOREIGN KEY (report_id) REFERENCES reports (id) ON DELETE CASCADE,
   CONSTRAINT photos_uploader_fk FOREIGN KEY (uploaded_by) REFERENCES users (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Photo files kept in the database (PHOTO_STORAGE=database), for hosts with
+-- no permanent disk. Served from /uploads/<file_path>, like files on disk.
+CREATE TABLE IF NOT EXISTS photo_data (
+  photo_id   INT UNSIGNED NOT NULL,
+  file_path  VARCHAR(255) NOT NULL,
+  mime_type  VARCHAR(40)  NOT NULL,
+  data       MEDIUMBLOB   NOT NULL,
+  PRIMARY KEY (photo_id),
+  UNIQUE KEY photo_data_path (file_path),
+  CONSTRAINT photo_data_photo_fk FOREIGN KEY (photo_id) REFERENCES photos (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

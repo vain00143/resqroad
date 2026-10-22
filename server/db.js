@@ -14,6 +14,7 @@ const settings = {
   // Dates come back as JavaScript Dates in UTC, and are stored in UTC.
   timezone: "Z",
   decimalNumbers: true,
+  ssl: config.db.ssl,
 };
 
 export const pool = mysql.createPool(

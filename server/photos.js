@@ -1,5 +1,6 @@
-// Photo uploads. Images are checked, saved under storage/photos/YYYY/MM/, and
-// served publicly from /uploads/... (reports and their photos are public).
+// Photo uploads. Images are checked, saved under storage/photos/YYYY/MM/ (or,
+// with PHOTO_STORAGE=database, in the photo_data table), and served publicly
+// from /uploads/... (reports and their photos are public).
 
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
@@ -7,9 +8,11 @@ import path from "node:path";
 import multer from "multer";
 import { config } from "./config.js";
 import { HttpError } from "./auth.js";
+import { one } from "./db.js";
 
 export const photosDir = path.join(config.storageDir, "photos");
 export const photoUrlPrefix = "/uploads/";
+const inDatabase = config.photoStorage === "database";
 
 // Accepts multipart/form-data with up to five files per field.
 export function photoUpload(fields) {
@@ -65,15 +68,25 @@ export function checkPhotos(files) {
 }
 
 // Writes checked photos to storage; returns their paths (relative to
-// storage/photos) for the database.
+// storage/photos, and the address under /uploads/) for the database. With
+// PHOTO_STORAGE=database nothing is written yet: storePhotoData saves the
+// bytes together with each photo's row.
 export async function savePhotos(photos, prefix) {
   const now = new Date();
   const folder = String(now.getUTCFullYear()) + "/" + String(now.getUTCMonth() + 1).padStart(2, "0");
+  const newPath = function (photo) {
+    return folder + "/" + prefix + "-" + crypto.randomBytes(8).toString("hex") + photo.ext;
+  };
+  if (inDatabase) {
+    return photos.map(function (photo) {
+      return Object.assign({}, photo, { filePath: newPath(photo) });
+    });
+  }
   await fs.mkdir(path.join(photosDir, folder), { recursive: true });
   const saved = [];
   try {
     for (const photo of photos) {
-      const relative = folder + "/" + prefix + "-" + crypto.randomBytes(8).toString("hex") + photo.ext;
+      const relative = newPath(photo);
       await fs.writeFile(path.join(photosDir, relative), photo.buffer, { flag: "wx" });
       saved.push(Object.assign({}, photo, { filePath: relative }));
     }
@@ -84,7 +97,34 @@ export async function savePhotos(photos, prefix) {
   return saved;
 }
 
+// Saves a photo's bytes in MySQL (PHOTO_STORAGE=database), in the same
+// transaction as its photos row. Does nothing when photos are files on disk.
+export async function storePhotoData(connection, photoId, photo) {
+  if (!inDatabase || !photo.filePath) {
+    return;
+  }
+  await connection.query("INSERT INTO photo_data (photo_id, file_path, mime_type, data) VALUES (?, ?, ?, ?)", [
+    photoId,
+    photo.filePath,
+    photo.mime,
+    photo.buffer,
+  ]);
+}
+
+// A photo kept in MySQL, by its path under /uploads/, or null.
+export async function photoFromDatabase(filePath) {
+  if (!inDatabase) {
+    return null;
+  }
+  return one("SELECT mime_type, data FROM photo_data WHERE file_path = ?", [filePath]);
+}
+
 export async function removePhotoFiles(photos) {
+  // Photos in MySQL are removed with their rows (or never saved when a
+  // transaction fails).
+  if (inDatabase) {
+    return;
+  }
   await Promise.all(
     photos.map(function (photo) {
       const relative = photo.filePath || photo.file_path;
