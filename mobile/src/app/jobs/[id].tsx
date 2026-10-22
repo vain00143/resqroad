@@ -31,7 +31,7 @@ import { api, errorMessage } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import { directionsUrl, lastEvent, moreWorkNote } from "@/lib/jobs";
 import { appendPhoto, type LocalPhoto } from "@/lib/photos";
-import { normalizeReportId, type Report, type ReportStatus } from "@/lib/reports";
+import { normalizeReportId, type Report } from "@/lib/reports";
 import { useSession } from "@/lib/session";
 import { severityColors, useTheme } from "@/theme";
 
@@ -42,9 +42,9 @@ type Draft = { notes: string; before: LocalPhoto[]; after: LocalPhoto[] };
 const drafts = new Map<string, Draft>();
 const emptyDraft: Draft = { notes: "", before: [], after: [] };
 
-// A result message belongs to the status it describes, so it hides once the
-// job moves on (for example when an administrator sends a repair back).
-type Message = { tone: "success" | "error"; text: string; status: ReportStatus };
+// A result message belongs to the moment it describes (the job's history
+// length then), so it hides as soon as anything else happens to the job.
+type Message = { tone: "success" | "error"; text: string; version: number };
 
 export default function JobDetail() {
   const { colors } = useTheme();
@@ -88,6 +88,7 @@ export default function JobDetail() {
     scroll.current?.scrollTo({ y: 0, animated: true });
   }
 
+  // Returns how many history entries the job has after the action.
   async function act(path: "start" | "repair", form?: FormData) {
     const { report: updated } = await api<{ report: Report }>("/reports/" + reportId + "/" + path, {
       method: "POST",
@@ -95,15 +96,16 @@ export default function JobDetail() {
       timeoutMs: form ? 90000 : 15000,
     });
     upsertReport(updated);
+    return updated.history.length;
   }
 
   async function start() {
     setStarting(true);
     try {
-      await act("start");
-      show({ tone: "success", text: "Repair started on " + reportId + ".", status: "in_progress" });
+      const version = await act("start");
+      show({ tone: "success", text: "Repair started on " + reportId + ".", version });
     } catch (error) {
-      show({ tone: "error", text: errorMessage(error), status: "assigned" });
+      show({ tone: "error", text: errorMessage(error), version: report?.history.length ?? 0 });
     } finally {
       setStarting(false);
     }
@@ -130,10 +132,10 @@ export default function JobDetail() {
       for (const photo of draft.after) {
         await appendPhoto(form, "after", photo);
       }
-      await act("repair", form);
+      const version = await act("repair", form);
       drafts.delete(reportId);
       setDraftState(emptyDraft);
-      show({ tone: "success", text: reportId + " sent to the administrator for verification.", status: "repair_submitted" });
+      show({ tone: "success", text: reportId + " sent to the administrator for verification.", version });
     } catch (error) {
       setFormError(errorMessage(error));
     } finally {
@@ -173,7 +175,7 @@ export default function JobDetail() {
         keyboardShouldPersistTaps="handled"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={pullToRefresh} tintColor={colors.accent} />}
       >
-        {message && message.status === report.status ? <Notice tone={message.tone} message={message.text} /> : null}
+        {message && message.version === report.history.length ? <Notice tone={message.tone} message={message.text} /> : null}
         {sentBack ? <Notice tone="warning" title="More work requested by the administrator" message={sentBack} /> : null}
         {!mine ? <Notice tone="error" message="This job is no longer assigned to you." /> : null}
 

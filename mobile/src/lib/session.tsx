@@ -9,6 +9,7 @@ import { api, configureApi, NetworkError, normalizeServerUrl } from "@/lib/api";
 import { connectLive, type LiveConnection, type LiveStatus } from "@/lib/live";
 import type { Crew, Report, User } from "@/lib/reports";
 import { readItem, removeItem, storageKeys, writeItem } from "@/lib/storage";
+import { announce, describeChange } from "@/lib/updates";
 
 type Status = "loading" | "signedOut" | "signedIn";
 
@@ -52,6 +53,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [notice, setNotice] = useState<string | null>(null);
   const inFlight = useRef<Promise<void> | null>(null);
   const live = useRef<LiveConnection | null>(null);
+  // The latest values, for comparing what a live update changed.
+  const latest = useRef({ user, reports });
+  latest.current = { user, reports };
 
   // Forgets the session on this phone.
   const endLocally = useCallback(async (message: string | null) => {
@@ -146,7 +150,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     const connection = connectLive(serverUrl, token, {
       // After a reconnect, catch up on anything missed.
       onHello: () => void refresh().catch(() => {}),
-      onReport: upsertReport,
+      onReport: (report) => {
+        const { user: viewer, reports: current } = latest.current;
+        const update = viewer ? describeChange(current.find((item) => item.id === report.id), report, viewer) : null;
+        upsertReport(report);
+        if (update) {
+          announce(update);
+        }
+      },
       onCrews: setCrews,
       onSignedOut: () => void endLocally("You were signed out of ResQRoad. Sign in again to continue."),
       onStatus: setConnection,

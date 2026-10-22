@@ -273,6 +273,13 @@ residents can register in the app. Administrators are pointed to the website.
   confirmation before sending. When an administrator asks for more work, the
   note appears at the top and the previous repair stays visible. Unsent notes
   and photos are kept while the crew looks at other screens.
+- **Status alerts**: when one of a resident's reports changes status, or a
+  crew member gets a new job, loses one to reassignment, has a repair sent
+  back, or has a repair verified, the app shows a banner (while it's open) or
+  a phone notification (while it's in the background and still running).
+  Tapping either opens the report or job. Changes people make themselves
+  don't alert them. These come from the live updates, so there's no push
+  server; nothing arrives once Android has closed the app.
 - **Maps** are the website's Leaflet + OpenStreetMap maps running in a WebView,
   so no map API key is needed (the phone needs internet for the map tiles).
   Open reports appear as grey dots on the reporting map.

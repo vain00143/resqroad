@@ -1,11 +1,13 @@
 import { useFonts } from "expo-font";
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from "expo-router";
+import { DarkTheme, DefaultTheme, router, Stack, ThemeProvider, type Href } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import * as SystemUI from "expo-system-ui";
 import { useEffect } from "react";
 
+import { UpdateBanner } from "@/components/UpdateBanner";
 import { SessionProvider, useSession } from "@/lib/session";
+import { onNotificationTap, setUpNotifications } from "@/lib/updates";
 import { fonts, useTheme } from "@/theme";
 import { fontFiles } from "@/theme/fonts";
 
@@ -37,6 +39,15 @@ function RootNavigator() {
       SplashScreen.hide();
     }
   }, [status]);
+
+  // Status notifications: ask once signed in, and open the report or job
+  // when one is tapped.
+  useEffect(() => {
+    if (status === "signedIn") {
+      setUpNotifications().catch(() => {});
+    }
+  }, [status]);
+  useEffect(() => onNotificationTap((path) => router.push(path as Href)), []);
 
   if (status === "loading") {
     return null;
@@ -88,6 +99,7 @@ function RootNavigator() {
         <Stack.Screen name="reports/[id]" options={{ title: "Report", headerBackTitle: "Back" }} />
         <Stack.Screen name="brand" options={{ title: "Brand check" }} />
       </Stack>
+      <UpdateBanner />
       <StatusBar style="auto" />
     </ThemeProvider>
   );
