@@ -247,12 +247,26 @@ press `w` to open it in a browser.
 **Server address.** The app talks to the server started with `npm start`.
 Copy `mobile/.env.example` to `mobile/.env` and set `EXPO_PUBLIC_API_URL` to
 the address the server prints for other devices (for example
-`http://192.168.1.13:8000`). That address changes when the laptop joins
+`http://192.168.1.15:8000`). That address changes when the laptop joins
 another network, so it can also be changed in the app under **Server
 settings** on the sign-in screen ("Save and test connection" checks it). The
 phone must be on the same Wi-Fi, and Node.js must be allowed through Windows
 Firewall. For the browser preview, use `http://localhost:8000` and add
 `http://localhost:8081` to `CORS_ORIGINS` in the server's `.env`.
+
+**If the app says it can't reach the server**, the message names the address
+it tried, and Server settings opens by itself. Check, in order:
+
+1. The server is running (`npm start` in the project folder; leave it open).
+2. The address is the one `npm start` prints for **the network the phone is
+   on** (usually the Wi-Fi line). An address from a disconnected Ethernet
+   adapter or a VirtualBox adapter (`192.168.56.x`) won't work from a phone.
+3. The phone is on the same Wi-Fi as the laptop, not mobile data. Opening
+   `http://<address>:8000` in the phone's browser should show the website.
+4. Windows Firewall allows Node.js for the network type the laptop's Wi-Fi
+   uses (Public or Private).
+
+In the Android emulator, `http://10.0.2.2:8000` also reaches the laptop.
 
 Residents and maintenance crews sign in with their website accounts, and new
 residents can register in the app. Administrators are pointed to the website.
@@ -314,7 +328,7 @@ Open it on the phone, download the APK, allow **Install unknown apps** for
 the browser when Android asks, and install it.
 
 The `preview` profile in `mobile/eas.json` builds an APK with the server
-address `http://192.168.1.13:8000` built in (change `EXPO_PUBLIC_API_URL`
+address `http://192.168.1.15:8000` built in (change `EXPO_PUBLIC_API_URL`
 there before building if your laptop's address differs). The address can
 always be changed in the app under **Server settings**. Plain `http://` is
 allowed in this build (`usesCleartextTraffic`), because the server runs on

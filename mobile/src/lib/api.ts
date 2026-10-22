@@ -33,8 +33,8 @@ export function getServerUrl() {
   return config.baseUrl;
 }
 
-// Accepts "192.168.1.13:8000", "http://192.168.1.13:8000/", or a URL ending
-// in /api, and returns "http://192.168.1.13:8000".
+// Accepts "192.168.1.15:8000", "http://192.168.1.15:8000/", or a URL ending
+// in /api, and returns "http://192.168.1.15:8000".
 export function normalizeServerUrl(input: string): string {
   let value = input.trim();
   if (!value) {
@@ -94,7 +94,11 @@ export async function api<T>(path: string, options: RequestOptions = {}): Promis
       signal: controller.signal,
     });
   } catch {
-    throw new NetworkError("Can't reach the ResQRoad server. Check the server address and your Wi-Fi.");
+    throw new NetworkError(
+      "Can't reach the ResQRoad server at " +
+        baseUrl +
+        ". Make sure the server is running and this phone is on the same Wi-Fi, or change the address under Server settings.",
+    );
   } finally {
     clearTimeout(timer);
   }

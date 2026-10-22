@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 
 import { AppText } from "@/components/AppText";
@@ -11,12 +11,19 @@ import { useSession } from "@/lib/session";
 import { radius, useTheme } from "@/theme";
 
 // The server runs on a laptop whose Wi-Fi address changes, so the address
-// can be changed and tested from the sign-in screens.
-export function ServerSettings() {
+// can be changed and tested from the sign-in screens. `unreachable` opens it
+// when signing in couldn't reach the server.
+export function ServerSettings({ unreachable = false }: { unreachable?: boolean }) {
   const { colors } = useTheme();
   const { serverUrl, setServerUrl } = useSession();
   const [open, setOpen] = useState(!serverUrl);
   const [address, setAddress] = useState(serverUrl);
+
+  useEffect(() => {
+    if (unreachable) {
+      setOpen(true);
+    }
+  }, [unreachable]);
   const [testing, setTesting] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; message: string } | null>(null);
 
@@ -69,7 +76,7 @@ export function ServerSettings() {
               setAddress(text);
               setResult(null);
             }}
-            placeholder="http://192.168.1.13:8000"
+            placeholder="http://192.168.1.15:8000"
             autoCapitalize="none"
             autoCorrect={false}
             keyboardType="url"

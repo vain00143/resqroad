@@ -8,7 +8,7 @@ import { FormScreen } from "@/components/FormScreen";
 import { Notice } from "@/components/Notice";
 import { ServerSettings } from "@/components/ServerSettings";
 import { TextField } from "@/components/TextField";
-import { errorMessage } from "@/lib/api";
+import { errorMessage, NetworkError } from "@/lib/api";
 import { useSession } from "@/lib/session";
 
 // Quick checks before sending; the server applies the same rules.
@@ -35,6 +35,7 @@ export default function Register() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [unreachable, setUnreachable] = useState(false);
   const emailRef = useRef<TextInputInstance>(null);
   const passwordRef = useRef<TextInputInstance>(null);
 
@@ -50,6 +51,7 @@ export default function Register() {
       await register(name.trim(), email.trim(), password);
     } catch (caught) {
       setError(errorMessage(caught));
+      setUnreachable(caught instanceof NetworkError);
       setBusy(false);
     }
   }
@@ -119,7 +121,7 @@ export default function Register() {
         </Link>
       </View>
 
-      <ServerSettings />
+      <ServerSettings unreachable={unreachable} />
     </FormScreen>
   );
 }
