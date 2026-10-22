@@ -52,6 +52,7 @@ CREATE TABLE IF NOT EXISTS reports (
   assigned_to         INT UNSIGNED  NULL,
   assigned_name       VARCHAR(80)   NULL COMMENT 'Kept even if the crew account is deleted',
   repair_notes        TEXT          NULL,
+  repair_client_key   VARCHAR(64)   NULL COMMENT 'Idempotency-Key of the latest repair upload',
   repair_submitted_at DATETIME(3)   NULL,
   reported_at         DATETIME(3)   NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   updated_at          DATETIME(3)   NOT NULL DEFAULT CURRENT_TIMESTAMP(3),

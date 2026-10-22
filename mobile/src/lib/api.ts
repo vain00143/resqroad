@@ -43,8 +43,25 @@ let awakeAt = 0;
 export function configureApi(update: Partial<Config>) {
   if (update.baseUrl !== undefined && update.baseUrl !== config.baseUrl) {
     awakeAt = 0;
+    configureReachability(update.baseUrl);
   }
   Object.assign(config, update);
+}
+
+// NetInfo's "internet reachable" check asks the ResQRoad server itself, not
+// Google (Android's own check, used by default, also goes to Google), so a
+// network that can reach the server is never called offline. Because the
+// check fails while the hosted server is asleep too, only "no network at all"
+// (isConnected false) is treated as offline; see offlineError.
+function configureReachability(baseUrl: string) {
+  if (!baseUrl) {
+    return;
+  }
+  NetInfo.configure({
+    reachabilityUrl: baseUrl + "/api/health",
+    reachabilityTest: async (response) => response.status === 200,
+    useNativeReachability: false,
+  });
 }
 
 export function getServerUrl() {
@@ -111,7 +128,7 @@ function unreachableMessage(baseUrl: string) {
     "Can't reach the ResQRoad server at " +
     baseUrl +
     (isHostedServer(baseUrl)
-      ? ". It may still be starting up; try again in a minute."
+      ? ". If this phone's internet is working, the server may still be starting up; try again in a minute."
       : ". Make sure the server is running and this phone is on the same Wi-Fi, or change the address under Server settings.")
   );
 }
@@ -122,10 +139,12 @@ function timeoutMessage(baseUrl: string) {
     : "The ResQRoad server at " + baseUrl + " took too long to answer. Check that it's still running and try again.";
 }
 
-// Null when the phone is online (or can't tell).
+// Null unless the phone has no network at all (Wi-Fi and mobile data off, or
+// airplane mode). "Internet not reachable" isn't enough: that check asks the
+// server, which also fails while it's asleep.
 async function offlineError(): Promise<NetworkError | null> {
   const state = await NetInfo.fetch().catch(() => null);
-  if (state && (state.isConnected === false || state.isInternetReachable === false)) {
+  if (state && state.isConnected === false) {
     return new NetworkError(
       "This phone isn't connected to the internet. Turn on Wi-Fi or mobile data and try again.",
       "offline",
@@ -283,19 +302,39 @@ export async function upload<T>(path: string, form: FormData, options: UploadOpt
 // The free hosted server sleeps after about 15 minutes without visitors and
 // takes 30–60 seconds to start. Screens about to upload call this early so
 // the wait happens while people fill in the form; it resolves at once if the
-// server answered anything in the last few minutes.
+// server answered anything in the last few minutes. A start that runs past
+// the time limit gets one more wait before "took too long" is shown.
 let waking: Promise<void> | null = null;
+
+function pingHealth() {
+  // GET /api/health
+  return api("/health", { token: null, timeoutMs: uploadTimeout(config.baseUrl) });
+}
 
 export function wakeServer(): Promise<void> {
   if (Date.now() - awakeAt < 5 * 60 * 1000) {
     return Promise.resolve();
   }
-  waking ??= api("/health", { token: null, timeoutMs: uploadTimeout(config.baseUrl) })
+  waking ??= pingHealth()
+    .catch((error) => {
+      if (error instanceof NetworkError && error.problem === "timeout") {
+        return pingHealth();
+      }
+      throw error;
+    })
     .then(() => undefined)
     .finally(() => {
       waking = null;
     });
   return waking;
+}
+
+// Shown while an upload waits for the server or tries again.
+export const wakingMessage =
+  "Waking up the ResQRoad server. It sleeps when nobody's using it and can take up to a minute to start.";
+
+export function retryMessage(attempt: number, of: number) {
+  return "No answer from the server yet. Trying again (" + attempt + " of " + of + ")…";
 }
 
 // Worth sending again: the server didn't answer or is restarting. Never
