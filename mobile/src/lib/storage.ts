@@ -7,6 +7,8 @@ import { Platform } from "react-native";
 
 export const storageKeys = {
   server: "resqroad.server",
+  // The app's built-in address when `server` was saved.
+  serverDefault: "resqroad.serverDefault",
   token: "resqroad.token",
   user: "resqroad.user",
 } as const;

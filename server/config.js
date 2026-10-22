@@ -18,6 +18,15 @@ function list(value) {
     .filter(Boolean);
 }
 
+// Express "trust proxy" setting: a number of proxy hops (behind a host such
+// as Railway, 1) or a keyword like "loopback" (the default, for this computer).
+function proxySetting(value) {
+  if (!value) {
+    return "loopback";
+  }
+  return /^\d+$/.test(value) ? Number(value) : value;
+}
+
 export const config = {
   db: {
     host: process.env.DB_HOST || "127.0.0.1",
@@ -30,6 +39,7 @@ export const config = {
   port: Number(process.env.PORT || 8000),
   cookieSecure: process.env.COOKIE_SECURE === "true",
   corsOrigins: list(process.env.CORS_ORIGINS),
+  trustProxy: proxySetting(process.env.TRUST_PROXY),
   storageDir: path.resolve(rootDir, process.env.STORAGE_DIR || "storage"),
   sessionDays: 30,
   maxPhotoBytes: 8 * 1024 * 1024,

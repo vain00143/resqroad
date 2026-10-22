@@ -27,7 +27,7 @@ function noCache(response) {
 export function createApp() {
   const app = express();
   app.disable("x-powered-by");
-  app.set("trust proxy", "loopback");
+  app.set("trust proxy", config.trustProxy);
 
   app.use(function (request, response, next) {
     response.setHeader("X-Content-Type-Options", "nosniff");
