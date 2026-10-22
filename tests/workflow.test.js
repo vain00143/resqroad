@@ -462,6 +462,66 @@ test("a retried upload with the same Idempotency-Key files the report only once"
   assert.equal(twins[0].body.report.id, twins[1].body.report.id);
 });
 
+test("a report can carry five phone-sized photos at once, and a sixth is refused", async function () {
+  // About the size of a photo resized by the app (1280 px JPEG).
+  const phonePhoto = Buffer.concat([jpeg.subarray(0, 4), Buffer.alloc(300 * 1024, 7)]);
+  const five = [1, 2, 3, 4, 5].map((n) => ["photos", phonePhoto, "pothole-" + n + ".jpg", "image/jpeg"]);
+  const report = await resident.request(
+    "POST",
+    "/api/reports",
+    reportForm({ title: "Pothole field", latitude: 14.74, longitude: 120.81 }, five),
+    { "Idempotency-Key": "five-photos-0001" },
+  );
+  assert.equal(report.status, 201, JSON.stringify(report.body));
+  assert.equal(report.body.report.evidencePhotos.length, 5);
+  for (const photo of report.body.report.evidencePhotos) {
+    const file = await fetch(base + photo.src);
+    assert.equal(file.status, 200, photo.src);
+    assert.equal((await file.arrayBuffer()).byteLength, phonePhoto.length);
+  }
+
+  const six = five.concat([["photos", png, "extra.png", "image/png"]]);
+  const tooMany = await resident.request("POST", "/api/reports", reportForm({ latitude: 14.72, longitude: 120.79 }, six));
+  assert.equal(tooMany.status, 400);
+  assert.equal(tooMany.body.error, "Choose no more than 5 photos.");
+});
+
+test("a retried repair upload with the same Idempotency-Key is applied once", async function () {
+  const job = await resident.request("POST", "/api/reports", reportForm({ title: "Broken curb", latitude: 14.7, longitude: 120.77 }));
+  assert.equal(job.status, 201);
+  const id = job.body.report.id;
+  assert.equal((await admin.request("POST", "/api/reports/" + id + "/status", { status: "verified" })).status, 200);
+  assert.equal((await admin.request("POST", "/api/reports/" + id + "/assign", { crewId: ids.crew })).status, 200);
+  assert.equal((await crew.request("POST", "/api/reports/" + id + "/start")).status, 200);
+
+  const repairForm = () =>
+    photoForm({ notes: "Rebuilt the curb." }, [
+      ["before", jpeg, "before.jpg", "image/jpeg"],
+      ["after", png, "after.png", "image/png"],
+    ]);
+  const submissions = (report) => report.history.filter((entry) => entry.status === "repair_submitted").length;
+  const key = { "Idempotency-Key": "repair-test-0001" };
+  const first = await crew.request("POST", "/api/reports/" + id + "/repair", repairForm(), key);
+  assert.equal(first.status, 200, JSON.stringify(first.body));
+  assert.equal(first.body.report.status, "repair_submitted");
+
+  // The app never got the answer and sends the same repair again.
+  const retry = await crew.request("POST", "/api/reports/" + id + "/repair", repairForm(), key);
+  assert.equal(retry.status, 200, "a retry gets the submitted repair, not 'no longer assigned'");
+  assert.equal(retry.body.report.repair.afterPhotos.length, 1, "the retry's photos aren't added");
+  assert.equal(submissions(retry.body.report), 1);
+
+  // Without the key, or from another crew, a second submission is refused.
+  assert.equal((await crew.request("POST", "/api/reports/" + id + "/repair", repairForm())).status, 409);
+  assert.equal((await otherCrew.request("POST", "/api/reports/" + id + "/repair", repairForm(), key)).status, 409);
+
+  // Sent back for more work: the next update, with a new key, goes through.
+  assert.equal((await admin.request("POST", "/api/reports/" + id + "/status", { status: "in_progress", note: "Paint it." })).status, 200);
+  const again = await crew.request("POST", "/api/reports/" + id + "/repair", repairForm(), { "Idempotency-Key": "repair-test-0002" });
+  assert.equal(again.status, 200, JSON.stringify(again.body));
+  assert.equal(submissions(again.body.report), 2);
+});
+
 /* ---------- Accounts and sign-in ---------- */
 
 test("sign-in checks the password and the account's role decides access", async function () {

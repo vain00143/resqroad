@@ -88,6 +88,13 @@ const addedColumns = [
       "COMMENT 'Idempotency-Key from the app: a retried upload returns this report' AFTER reporter_id, " +
       "ADD UNIQUE KEY reports_client_key (reporter_id, client_key)",
   },
+  {
+    table: "reports",
+    column: "repair_client_key",
+    alter:
+      "ALTER TABLE reports ADD COLUMN repair_client_key VARCHAR(64) NULL " +
+      "COMMENT 'Idempotency-Key of the latest repair upload' AFTER repair_notes",
+  },
 ];
 
 export async function addMissingColumns(connection) {

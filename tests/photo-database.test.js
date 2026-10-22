@@ -150,6 +150,36 @@ test("evidence photos are saved in MySQL and served from /uploads/", async funct
   assert.equal(stored.n, 2);
 });
 
+test("five phone-sized photos at once are saved in MySQL", async function () {
+  // About the size of a photo resized by the app (1280 px JPEG), as on Render.
+  const phonePhoto = Buffer.concat([jpeg.subarray(0, 4), Buffer.alloc(300 * 1024, 9)]);
+  const created = await call(
+    "resident",
+    "POST",
+    "/api/reports",
+    form(
+      {
+        title: "Five photos of a sinkhole",
+        road: "Mabini Street",
+        location: "Poblacion, Pulilan",
+        description: "A sinkhole across both lanes.",
+        severity: "High",
+        latitude: 14.9021,
+        longitude: 120.8489,
+      },
+      [1, 2, 3, 4, 5].map((n) => ["photos", phonePhoto, "sinkhole-" + n + ".jpg", "image/jpeg"]),
+    ),
+  );
+  assert.equal(created.status, 201, JSON.stringify(created.body));
+  assert.equal(created.body.report.evidencePhotos.length, 5);
+  assert.deepEqual(filesOnDisk(), [], "nothing is written to disk");
+  for (const photo of created.body.report.evidencePhotos) {
+    const response = await fetch(base + photo.src);
+    assert.equal(response.status, 200);
+    assert.ok(Buffer.from(await response.arrayBuffer()).equals(phonePhoto));
+  }
+});
+
 test("unknown photo addresses and path tricks are not served", async function () {
   assert.equal((await fetch(base + "/uploads/2026/10/evidence-0000000000000000.jpg")).status, 404);
   // Tricks are refused (403 or 400 from the file fallback) and leak nothing.

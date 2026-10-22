@@ -203,8 +203,8 @@ function text(value, label, max, required) {
   return clean;
 }
 
-// The app's Idempotency-Key header: one key per report form, sent again with
-// every retry of that form's upload. Null when the request has none.
+// The app's Idempotency-Key header: one key per report or repair form, sent
+// again with every retry of that form's upload. Null when the request has none.
 function idempotencyKey(request) {
   const value = request.get("Idempotency-Key");
   if (value === undefined) {
@@ -451,13 +451,32 @@ reportRoutes.post(
     if (!before.length || !after.length) {
       throw new HttpError(400, "Add repair notes and choose at least one before and after photo.");
     }
+    const clientKey = idempotencyKey(request);
+    // A retry of a repair that already went through: send the report again.
+    if (clientKey) {
+      const earlier = await one("SELECT id FROM reports WHERE id = ? AND assigned_to = ? AND repair_client_key = ?", [
+        id,
+        request.user.id,
+        clientKey,
+      ]);
+      if (earlier) {
+        response.json({ report: forViewer(await loadReport(id), request.user) });
+        return;
+      }
+    }
     const prefix = reportCode(id);
     const savedBefore = await savePhotos(before, prefix + "-before");
     let savedAfter = [];
+    let repeated = false;
     try {
       savedAfter = await savePhotos(after, prefix + "-after");
       await transaction(async function (connection) {
         const report = await lockReport(connection, id);
+        // The same upload arriving twice at once: the first copy went through.
+        if (clientKey && report.repair_client_key === clientKey && String(report.assigned_to) === request.user.id) {
+          repeated = true;
+          return;
+        }
         if (String(report.assigned_to) !== request.user.id || report.status !== "in_progress") {
           throw new HttpError(409, "This repair is no longer assigned to you.");
         }
@@ -469,14 +488,19 @@ reportRoutes.post(
         await insertPhotos(connection, id, "before", savedBefore, request.user);
         await insertPhotos(connection, id, "after", savedAfter, request.user);
         await connection.query(
-          "UPDATE reports SET status = 'repair_submitted', repair_notes = ?, repair_submitted_at = UTC_TIMESTAMP(3), updated_at = UTC_TIMESTAMP(3) WHERE id = ?",
-          [notes, id],
+          "UPDATE reports SET status = 'repair_submitted', repair_notes = ?, repair_client_key = ?, repair_submitted_at = UTC_TIMESTAMP(3), updated_at = UTC_TIMESTAMP(3) WHERE id = ?",
+          [notes, clientKey, id],
         );
         await addHistory(connection, id, "repair_submitted", "Repair submitted for admin verification.", request.user);
       });
     } catch (error) {
       await removePhotoFiles(savedBefore.concat(savedAfter));
       throw error;
+    }
+    if (repeated) {
+      await removePhotoFiles(savedBefore.concat(savedAfter));
+      response.json({ report: forViewer(await loadReport(id), request.user) });
+      return;
     }
     const report = await publishReport(id);
     response.json({ report: forViewer(report, request.user) });
