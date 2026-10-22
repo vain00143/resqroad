@@ -19,3 +19,7 @@ node_modules/
 # Local settings and uploaded photos.
 .env
 storage/
+
+# Database exports of real data (database/resqroad-sample-data.sql is the
+# shareable one with sample data only).
+database/resqroad-backup*.sql
