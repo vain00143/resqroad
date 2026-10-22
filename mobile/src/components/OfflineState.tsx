@@ -4,6 +4,7 @@ import { StyleSheet, View } from "react-native";
 import { AppText } from "@/components/AppText";
 import { Button } from "@/components/Button";
 import { Icon } from "@/components/Icon";
+import { isHostedServer } from "@/lib/api";
 import { useSession } from "@/lib/session";
 import { radius, useTheme } from "@/theme";
 
@@ -41,7 +42,9 @@ export function OfflineState({ compact = false }: { compact?: boolean }) {
         Can't reach the ResQRoad server
       </AppText>
       <AppText tone="text2" style={styles.center}>
-        Check that the server is running and that your phone is on the same Wi-Fi as {serverUrl || "the server"}.
+        {isHostedServer(serverUrl)
+          ? "Check this phone's internet connection. If ResQRoad hasn't been used for a while, the server can take up to a minute to wake up."
+          : "Check that the server is running and that your phone is on the same Wi-Fi as " + (serverUrl || "the server") + "."}
       </AppText>
       <Button label="Try again" loading={retrying} onPress={retry} style={styles.button} />
     </View>

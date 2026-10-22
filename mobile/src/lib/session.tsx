@@ -110,8 +110,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       ]);
       // An app update with a new built-in address (say, the server moved from
       // a laptop online) replaces an address saved under the old one, along
-      // with that server's sign-in.
-      if (savedServer && savedDefault !== defaultServer) {
+      // with the sign-in, which only works on the server that made it.
+      if ((savedServer || savedToken) && savedDefault !== defaultServer) {
         await Promise.all([
           removeItem(storageKeys.server),
           removeItem(storageKeys.serverDefault),
@@ -204,6 +204,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       await Promise.all([
         writeItem(storageKeys.token, response.token),
         writeItem(storageKeys.user, JSON.stringify(response.user)),
+        writeItem(storageKeys.serverDefault, defaultServer),
       ]);
       setNotice(null);
       setToken(response.token);
