@@ -7,6 +7,7 @@ import { Button } from "@/components/Button";
 import { FormScreen } from "@/components/FormScreen";
 import { Icon } from "@/components/Icon";
 import { Notice } from "@/components/Notice";
+import { BuildInfo } from "@/components/BuildInfo";
 import { ServerSettings } from "@/components/ServerSettings";
 import { TextField } from "@/components/TextField";
 import { errorMessage, NetworkError } from "@/lib/api";
@@ -95,6 +96,7 @@ export default function Login() {
       </View>
 
       <ServerSettings unreachable={unreachable} />
+      <BuildInfo />
     </FormScreen>
   );
 }

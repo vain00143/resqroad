@@ -27,7 +27,16 @@ import { ReportTimeline } from "@/components/ReportTimeline";
 import { SeverityBadge } from "@/components/SeverityBadge";
 import { StatusPill } from "@/components/StatusPill";
 import { TextField } from "@/components/TextField";
-import { api, errorMessage } from "@/lib/api";
+import {
+  api,
+  errorMessage,
+  newIdempotencyKey,
+  retryMessage,
+  upload,
+  wakeServer,
+  wakingMessage,
+  withRetries,
+} from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import { directionsUrl, lastEvent, moreWorkNote } from "@/lib/jobs";
 import { appendPhoto, type LocalPhoto } from "@/lib/photos";
@@ -41,6 +50,20 @@ type Draft = { notes: string; before: LocalPhoto[]; after: LocalPhoto[] };
 // screens, as on the website.
 const drafts = new Map<string, Draft>();
 const emptyDraft: Draft = { notes: "", before: [], after: [] };
+
+// One key per job's repair update, sent with every attempt to submit it, so a
+// retry after a lost answer isn't refused as "no longer assigned"; a new key
+// after each update that goes through.
+const repairKeys = new Map<string, string>();
+
+function repairKey(reportId: string) {
+  let key = repairKeys.get(reportId);
+  if (!key) {
+    key = newIdempotencyKey();
+    repairKeys.set(reportId, key);
+  }
+  return key;
+}
 
 // A result message belongs to the moment it describes (the job's history
 // length then), so it hides as soon as anything else happens to the job.
@@ -60,6 +83,8 @@ export default function JobDetail() {
   const [formError, setFormError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  // What the repair upload is waiting for (waking the server, progress).
+  const [progress, setProgress] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -88,13 +113,8 @@ export default function JobDetail() {
     scroll.current?.scrollTo({ y: 0, animated: true });
   }
 
-  // Returns how many history entries the job has after the action.
-  async function act(path: "start" | "repair", form?: FormData) {
-    const { report: updated } = await api<{ report: Report }>("/reports/" + reportId + "/" + path, {
-      method: "POST",
-      form,
-      timeoutMs: form ? 90000 : 15000,
-    });
+  // Returns how many history entries the job has after the update.
+  function keep(updated: Report) {
     upsertReport(updated);
     return updated.history.length;
   }
@@ -102,8 +122,9 @@ export default function JobDetail() {
   async function start() {
     setStarting(true);
     try {
-      const version = await act("start");
-      show({ tone: "success", text: "Repair started on " + reportId + ".", version });
+      // The default time limit, so a sleeping hosted server has time to wake.
+      const { report: updated } = await api<{ report: Report }>("/reports/" + reportId + "/start", { method: "POST" });
+      show({ tone: "success", text: "Repair started on " + reportId + ".", version: keep(updated) });
     } catch (error) {
       show({ tone: "error", text: errorMessage(error), version: report?.history.length ?? 0 });
     } finally {
@@ -132,13 +153,31 @@ export default function JobDetail() {
       for (const photo of draft.after) {
         await appendPhoto(form, "after", photo);
       }
-      const version = await act("repair", form);
+      const slow = setTimeout(() => setProgress(wakingMessage), 1500);
+      try {
+        await wakeServer();
+      } finally {
+        clearTimeout(slow);
+      }
+      const count = draft.before.length + draft.after.length;
+      const sendingText = "Sending the repair and " + count + (count === 1 ? " photo" : " photos");
+      setProgress(sendingText + "…");
+      const { report: updated } = await withRetries(
+        () =>
+          upload<{ report: Report }>("/reports/" + reportId + "/repair", form, {
+            idempotencyKey: repairKey(reportId),
+            onProgress: (fraction) => setProgress(sendingText + "… " + Math.round(fraction * 100) + "%"),
+          }),
+        (attempt, of) => setProgress(retryMessage(attempt, of)),
+      );
+      repairKeys.delete(reportId);
       drafts.delete(reportId);
       setDraftState(emptyDraft);
-      show({ tone: "success", text: reportId + " sent to the administrator for verification.", version });
+      show({ tone: "success", text: reportId + " sent to the administrator for verification.", version: keep(updated) });
     } catch (error) {
       setFormError(errorMessage(error));
     } finally {
+      setProgress(null);
       setSubmitting(false);
     }
   }
@@ -253,6 +292,7 @@ export default function JobDetail() {
             <AppText variant="caption">
               Choose at least one photo for both. They're resized before upload so the administrator can compare them.
             </AppText>
+            {progress ? <Notice tone="info" message={progress} /> : null}
             {formError ? <Notice tone="error" message={formError} /> : null}
             <Button
               label="Submit repair for review"

@@ -4,6 +4,7 @@ import { RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppText } from "@/components/AppText";
+import { BuildInfo } from "@/components/BuildInfo";
 import { Button } from "@/components/Button";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Icon } from "@/components/Icon";
@@ -122,6 +123,7 @@ export function HomeScaffold({ subtitle, stats, listTitle, reports, emptyText, a
             icon={<Icon name="log-out" size={16} color={colors.text} />}
           />
         </View>
+        <BuildInfo />
       </ScrollView>
 
       <ConfirmDialog

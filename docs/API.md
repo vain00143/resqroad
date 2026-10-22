@@ -109,12 +109,12 @@ Statuses: `submitted`, `under_review`, `verified`, `assigned`, `in_progress`,
 | `POST /api/auth/password` | Signed in | `{ currentPassword, newPassword }`; signs out the account's other devices. |
 | `GET /api/reports` | Anyone | `{ reports }`. |
 | `GET /api/reports/:id` | Anyone | `{ report }` (`:id` is `RPT-1054` or `1054`). |
-| `POST /api/reports` | Resident | Multipart form: `title`, `road`, `location`, `description`, `severity` (`Low`\|`Medium`\|`High`), `latitude`, `longitude`, and up to five `photos` files. → `201 { report }`. |
+| `POST /api/reports` | Resident | Multipart form: `title`, `road`, `location`, `description`, `severity` (`Low`\|`Medium`\|`High`), `latitude`, `longitude`, and up to five `photos` files. → `201 { report }`. An optional `Idempotency-Key` header (8–64 letters, numbers, `-`, `_`; one per report form) makes retries safe: sending the same key again returns `200 { report }` with the report it already filed. |
 | `POST /api/reports/:id/status` | Admin | `{ status, note? }`: `under_review`, `verified`, `rejected`, `duplicate` (from submitted/under review), `resolved` or `in_progress` (= request more work, from repair submitted). |
 | `POST /api/reports/:id/notes` | Admin | `{ note }`: internal note. |
 | `POST /api/reports/:id/assign` | Admin | `{ crewId }`: assign or reassign a verified report. |
 | `POST /api/reports/:id/start` | Assigned crew | Start the repair. |
-| `POST /api/reports/:id/repair` | Assigned crew | Multipart form: `notes`, and one to five `before` and `after` files each. |
+| `POST /api/reports/:id/repair` | Assigned crew | Multipart form: `notes`, and one to five `before` and `after` files each. An optional `Idempotency-Key` header (one per repair update) makes retries safe: the same key again returns `200 { report }` instead of "no longer assigned". |
 | `GET /api/crews` | Anyone | `{ crews: [{ id, name, team }] }`. |
 | `GET /api/users` | Admin | `{ users }` (never includes passwords). |
 | `POST /api/users` | Admin | `{ name, email, team, password }`: add a crew account with a temporary password. |
@@ -131,8 +131,17 @@ const form = new FormData();
 form.append("title", title);
 // … the other fields …
 photos.forEach((photo) => form.append("photos", { uri: photo.uri, name: "photo.jpg", type: "image/jpeg" }));
-await fetch(server + "/api/reports", { method: "POST", headers: { Authorization: "Bearer " + token }, body: form });
+const xhr = new XMLHttpRequest();
+xhr.open("POST", server + "/api/reports");
+xhr.setRequestHeader("Authorization", "Bearer " + token);
+xhr.setRequestHeader("Idempotency-Key", formKey);
+xhr.send(form);
 ```
+
+Send it with `XMLHttpRequest`, not `fetch`: from Expo SDK 58 the global
+`fetch` is `expo/fetch`, which throws "Unsupported FormDataPart
+implementation" for `{ uri, name, type }` parts before sending anything.
+Don't set `Content-Type` yourself; the multipart boundary is added for you.
 
 Photos must be JPEG, PNG, or WebP (checked from the file contents) and under
 8 MB each. Resize large camera photos first (for example with

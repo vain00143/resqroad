@@ -203,6 +203,19 @@ function text(value, label, max, required) {
   return clean;
 }
 
+// The app's Idempotency-Key header: one key per report or repair form, sent
+// again with every retry of that form's upload. Null when the request has none.
+function idempotencyKey(request) {
+  const value = request.get("Idempotency-Key");
+  if (value === undefined) {
+    return null;
+  }
+  if (!/^[\w-]{8,64}$/.test(value)) {
+    throw new HttpError(400, "The Idempotency-Key header must be 8 to 64 letters, numbers, dashes, or underscores.");
+  }
+  return value;
+}
+
 async function lockReport(connection, id) {
   const [rows] = await connection.query("SELECT * FROM reports WHERE id = ? FOR UPDATE", [id]);
   if (!rows[0]) {
@@ -282,17 +295,33 @@ reportRoutes.post("/reports", requireRole("citizen"), photoUpload(["photos"]), a
   ) {
     throw new HttpError(400, "Enter valid GPS coordinates for Bulacan.");
   }
+  const clientKey = idempotencyKey(request);
+  // A retry of an upload that already filed its report (the app never got
+  // the answer): send that report again.
+  if (clientKey) {
+    const earlier = await one("SELECT id FROM reports WHERE reporter_id = ? AND client_key = ?", [user.id, clientKey]);
+    if (earlier) {
+      response.json({ report: forViewer(await loadReport(earlier.id), user) });
+      return;
+    }
+  }
   const photos = checkPhotos(request.files && request.files.photos);
 
   const saved = await savePhotos(photos, "evidence");
   let reportId;
+  let repeated = false;
   try {
     reportId = await transaction(async function (connection) {
       // A pothole can come back after a repair, so only open reports count.
       const [nearby] = await connection.query(
-        "SELECT id FROM reports WHERE status IN (?) AND ABS(latitude - ?) < 0.001 AND ABS(longitude - ?) < 0.001 LIMIT 1 FOR UPDATE",
+        "SELECT id, reporter_id, client_key FROM reports WHERE status IN (?) AND ABS(latitude - ?) < 0.001 AND ABS(longitude - ?) < 0.001 LIMIT 1 FOR UPDATE",
         [openStatuses, latitude, longitude],
       );
+      // The same upload arriving twice at once: the first copy filed it.
+      if (nearby[0] && clientKey && nearby[0].client_key === clientKey && String(nearby[0].reporter_id) === user.id) {
+        repeated = true;
+        return nearby[0].id;
+      }
       if (nearby[0]) {
         const duplicateId = reportCode(nearby[0].id);
         throw new HttpError(
@@ -302,9 +331,9 @@ reportRoutes.post("/reports", requireRole("citizen"), photoUpload(["photos"]), a
         );
       }
       const [result] = await connection.query(
-        "INSERT INTO reports (title, road, location, latitude, longitude, severity, description, status, reporter_id, reported_at, updated_at) " +
-          "VALUES (?, ?, ?, ?, ?, ?, ?, 'submitted', ?, UTC_TIMESTAMP(3), UTC_TIMESTAMP(3))",
-        [title, road, location, latitude, longitude, severity, description, user.id],
+        "INSERT INTO reports (title, road, location, latitude, longitude, severity, description, status, reporter_id, client_key, reported_at, updated_at) " +
+          "VALUES (?, ?, ?, ?, ?, ?, ?, 'submitted', ?, ?, UTC_TIMESTAMP(3), UTC_TIMESTAMP(3))",
+        [title, road, location, latitude, longitude, severity, description, user.id, clientKey],
       );
       await addHistory(connection, result.insertId, "submitted", "Report received from a citizen.", user);
       await insertPhotos(connection, result.insertId, "evidence", saved, user);
@@ -313,6 +342,11 @@ reportRoutes.post("/reports", requireRole("citizen"), photoUpload(["photos"]), a
   } catch (error) {
     await removePhotoFiles(saved);
     throw error;
+  }
+  if (repeated) {
+    await removePhotoFiles(saved);
+    response.json({ report: forViewer(await loadReport(reportId), user) });
+    return;
   }
 
   const report = await publishReport(reportId);
@@ -417,13 +451,32 @@ reportRoutes.post(
     if (!before.length || !after.length) {
       throw new HttpError(400, "Add repair notes and choose at least one before and after photo.");
     }
+    const clientKey = idempotencyKey(request);
+    // A retry of a repair that already went through: send the report again.
+    if (clientKey) {
+      const earlier = await one("SELECT id FROM reports WHERE id = ? AND assigned_to = ? AND repair_client_key = ?", [
+        id,
+        request.user.id,
+        clientKey,
+      ]);
+      if (earlier) {
+        response.json({ report: forViewer(await loadReport(id), request.user) });
+        return;
+      }
+    }
     const prefix = reportCode(id);
     const savedBefore = await savePhotos(before, prefix + "-before");
     let savedAfter = [];
+    let repeated = false;
     try {
       savedAfter = await savePhotos(after, prefix + "-after");
       await transaction(async function (connection) {
         const report = await lockReport(connection, id);
+        // The same upload arriving twice at once: the first copy went through.
+        if (clientKey && report.repair_client_key === clientKey && String(report.assigned_to) === request.user.id) {
+          repeated = true;
+          return;
+        }
         if (String(report.assigned_to) !== request.user.id || report.status !== "in_progress") {
           throw new HttpError(409, "This repair is no longer assigned to you.");
         }
@@ -435,14 +488,19 @@ reportRoutes.post(
         await insertPhotos(connection, id, "before", savedBefore, request.user);
         await insertPhotos(connection, id, "after", savedAfter, request.user);
         await connection.query(
-          "UPDATE reports SET status = 'repair_submitted', repair_notes = ?, repair_submitted_at = UTC_TIMESTAMP(3), updated_at = UTC_TIMESTAMP(3) WHERE id = ?",
-          [notes, id],
+          "UPDATE reports SET status = 'repair_submitted', repair_notes = ?, repair_client_key = ?, repair_submitted_at = UTC_TIMESTAMP(3), updated_at = UTC_TIMESTAMP(3) WHERE id = ?",
+          [notes, clientKey, id],
         );
         await addHistory(connection, id, "repair_submitted", "Repair submitted for admin verification.", request.user);
       });
     } catch (error) {
       await removePhotoFiles(savedBefore.concat(savedAfter));
       throw error;
+    }
+    if (repeated) {
+      await removePhotoFiles(savedBefore.concat(savedAfter));
+      response.json({ report: forViewer(await loadReport(id), request.user) });
+      return;
     }
     const report = await publishReport(id);
     response.json({ report: forViewer(report, request.user) });

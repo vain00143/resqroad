@@ -1,6 +1,6 @@
 import * as Location from "expo-location";
 import { router } from "expo-router";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View, type ScrollViewInstance } from "react-native";
 
 import { AppText } from "@/components/AppText";
@@ -13,9 +13,19 @@ import { Notice } from "@/components/Notice";
 import { PhotoPicker } from "@/components/PhotoPicker";
 import { SeverityPicker } from "@/components/SeverityPicker";
 import { TextField } from "@/components/TextField";
-import { api, ApiError, errorMessage } from "@/lib/api";
+import {
+  ApiError,
+  errorMessage,
+  newIdempotencyKey,
+  retryMessage,
+  upload,
+  wakeServer,
+  wakingMessage,
+  withRetries,
+} from "@/lib/api";
 import { appendPhoto, type LocalPhoto } from "@/lib/photos";
 import { inBulacan, isOpen, type Report, type Severity } from "@/lib/reports";
+import { clearReportDraft, loadReportDraft, saveReportDraft } from "@/lib/reportDraft";
 import { useSession } from "@/lib/session";
 import { brand, mix, radius, severityColors, useTheme } from "@/theme";
 
@@ -38,7 +48,8 @@ async function currentPosition(): Promise<MapPoint> {
 
 export default function ReportProblem() {
   const { colors } = useTheme();
-  const { reports, upsertReport } = useSession();
+  const { reports, upsertReport, user } = useSession();
+  const userId = user?.id ?? null;
   const scroll = useRef<ScrollViewInstance>(null);
 
   const [title, setTitle] = useState("");
@@ -54,7 +65,73 @@ export default function ReportProblem() {
   const [error, setError] = useState<string | null>(null);
   const [duplicateId, setDuplicateId] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
+  // What the submit button is waiting for (waking the server, upload progress).
+  const [progress, setProgress] = useState<string | null>(null);
+  const [waking, setWaking] = useState(false);
   const [submitted, setSubmitted] = useState<Report | null>(null);
+  // Sent with every attempt to submit this form, so a retry after a lost
+  // answer returns the report already filed instead of a second one.
+  const idempotencyKey = useRef(newIdempotencyKey());
+
+  // The unsent report saved on this phone (lib/reportDraft): restored once,
+  // then saved again as people fill in the form.
+  const [draftReady, setDraftReady] = useState(false);
+  const [restored, setRestored] = useState(false);
+
+  useEffect(() => {
+    if (!userId) {
+      return;
+    }
+    let active = true;
+    loadReportDraft(userId).then((draft) => {
+      if (!active) {
+        return;
+      }
+      if (draft) {
+        setTitle(draft.title);
+        setSeverity(draft.severity);
+        setDescription(draft.description);
+        setPoint(draft.point);
+        setRoad(draft.road);
+        setLocation(draft.location);
+        setPhotos(draft.photos);
+        setRestored(true);
+        if (draft.point) {
+          setPanKey((key) => key + 1);
+        }
+      }
+      setDraftReady(true);
+    });
+    return () => {
+      active = false;
+    };
+  }, [userId]);
+
+  useEffect(() => {
+    if (!userId || !draftReady || submitted) {
+      return;
+    }
+    const timer = setTimeout(() => {
+      void saveReportDraft(userId, { title, severity, description, point, road, location, photos });
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [userId, draftReady, submitted, title, severity, description, point, road, location, photos]);
+
+  // Wake the hosted server while people fill in the form.
+  useEffect(() => {
+    let active = true;
+    const slow = setTimeout(() => active && setWaking(true), 2500);
+    wakeServer()
+      .catch(() => {})
+      .finally(() => {
+        clearTimeout(slow);
+        if (active) setWaking(false);
+      });
+    return () => {
+      active = false;
+      clearTimeout(slow);
+    };
+  }, []);
 
   // Reports already open nearby, so people can see what's been filed.
   const markers = useMemo<MapMarker[]>(
@@ -124,7 +201,28 @@ export default function ReportProblem() {
       for (const photo of photos) {
         await appendPhoto(form, "photos", photo);
       }
-      const { report } = await api<{ report: Report }>("/reports", { form, timeoutMs: 60000 });
+      const slow = setTimeout(() => setProgress(wakingMessage), 1500);
+      try {
+        await wakeServer();
+      } finally {
+        clearTimeout(slow);
+      }
+      const sendingText =
+        "Sending your report" + (photos.length ? " and " + photos.length + (photos.length === 1 ? " photo" : " photos") : "");
+      setProgress(sendingText + "…");
+      const { report } = await withRetries(
+        () =>
+          upload<{ report: Report }>("/reports", form, {
+            idempotencyKey: idempotencyKey.current,
+            onProgress: (fraction) => setProgress(sendingText + "… " + Math.round(fraction * 100) + "%"),
+          }),
+        (attempt, of) => setProgress(retryMessage(attempt, of)),
+      );
+      idempotencyKey.current = newIdempotencyKey();
+      if (userId) {
+        void clearReportDraft(userId);
+      }
+      setRestored(false);
       upsertReport(report);
       setSubmitted(report);
       scroll.current?.scrollTo({ y: 0, animated: false });
@@ -134,6 +232,7 @@ export default function ReportProblem() {
         setDuplicateId(caught.data.duplicateId);
       }
     } finally {
+      setProgress(null);
       setSending(false);
     }
   }
@@ -149,6 +248,8 @@ export default function ReportProblem() {
     setError(null);
     setDuplicateId(null);
     setSubmitted(null);
+    setRestored(false);
+    idempotencyKey.current = newIdempotencyKey();
   }
 
   if (submitted) {
@@ -185,6 +286,9 @@ export default function ReportProblem() {
         keyboardShouldPersistTaps="handled"
         scrollEnabled={!mapTouched}
       >
+        {restored ? (
+          <Notice message="Your unsent report was restored. Check it, then tap Submit report." />
+        ) : null}
         <FormSection step={1} title="What's the problem?" text="Give the road damage a short title and tell us how serious it is.">
           <TextField
             label="Title"
@@ -260,6 +364,7 @@ export default function ReportProblem() {
         </FormSection>
 
         <View style={[styles.submit, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          {progress || waking ? <Notice tone="info" message={progress ?? wakingMessage} /> : null}
           {error ? <Notice tone="error" message={error} /> : null}
           {duplicateId ? (
             <Button

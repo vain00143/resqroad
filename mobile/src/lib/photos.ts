@@ -9,7 +9,8 @@ import { serverAsset } from "@/lib/api";
 import type { Photo } from "@/lib/reports";
 
 export const maxPhotos = 5;
-const longestSide = 1600;
+// About 150–300 KB per photo: still sharp enough to judge road damage.
+const longestSide = 1280;
 
 export type LocalPhoto = { uri: string; name: string };
 
@@ -22,7 +23,7 @@ async function shrink(asset: ImagePicker.ImagePickerAsset, index: number): Promi
     context.resize(width >= height ? { width: longestSide } : { height: longestSide });
   }
   const image = await context.renderAsync();
-  const saved = await image.saveAsync({ compress: 0.75, format: SaveFormat.JPEG });
+  const saved = await image.saveAsync({ compress: 0.7, format: SaveFormat.JPEG });
   const base = (asset.fileName ?? "photo-" + (Date.now() + index)).replace(/\.[^.]+$/, "");
   return { uri: saved.uri, name: base + ".jpg" };
 }
@@ -52,7 +53,9 @@ export async function addPhotos(source: "camera" | "library", room: number): Pro
   return Promise.all(result.assets.slice(0, room).map(shrink));
 }
 
-// React Native sends { uri, name, type } as a file; browsers need a Blob.
+// React Native sends { uri, name, type } as a file (the file:// address from
+// the image manipulator); browsers need a Blob. Send the form with `upload`
+// from lib/api: Expo's fetch can't send { uri } parts.
 export async function appendPhoto(form: FormData, field: string, photo: LocalPhoto) {
   if (Platform.OS === "web") {
     const blob = await (await fetch(photo.uri)).blob();

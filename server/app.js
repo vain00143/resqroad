@@ -46,7 +46,7 @@ export function createApp() {
     if (origin && config.corsOrigins.includes(origin)) {
       response.setHeader("Access-Control-Allow-Origin", origin);
       response.setHeader("Access-Control-Allow-Credentials", "true");
-      response.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-ResQRoad-Client");
+      response.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-ResQRoad-Client, Idempotency-Key");
       response.setHeader("Access-Control-Allow-Methods", "GET, POST, PATCH, DELETE, OPTIONS");
       response.setHeader("Vary", "Origin");
       if (request.method === "OPTIONS") {
