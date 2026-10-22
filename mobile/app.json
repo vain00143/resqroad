@@ -75,6 +75,12 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "owner": "resqroad",
+    "extra": {
+      "eas": {
+        "projectId": "c623270b-7bbb-4c6b-8c5a-de3efc3af86b"
+      }
     }
   }
 }
