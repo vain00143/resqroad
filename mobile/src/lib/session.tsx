@@ -102,11 +102,28 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     configureApi({ onUnauthorized: () => void endLocally(sessionEnded) });
     (async () => {
-      const [savedServer, savedToken, savedUser] = await Promise.all([
+      const [savedServer, savedDefault, savedToken, savedUser] = await Promise.all([
         readItem(storageKeys.server),
+        readItem(storageKeys.serverDefault),
         readItem(storageKeys.token),
         readItem(storageKeys.user),
       ]);
+      // An app update with a new built-in address (say, the server moved from
+      // a laptop online) replaces an address saved under the old one, along
+      // with that server's sign-in.
+      if (savedServer && savedDefault !== defaultServer) {
+        await Promise.all([
+          removeItem(storageKeys.server),
+          removeItem(storageKeys.serverDefault),
+          removeItem(storageKeys.token),
+          removeItem(storageKeys.user),
+        ]);
+        setServerUrlState(defaultServer);
+        configureApi({ baseUrl: defaultServer });
+        setNotice("ResQRoad moved to a new server. Sign in again to continue.");
+        setStatus("signedOut");
+        return;
+      }
       const server = savedServer || defaultServer;
       setServerUrlState(server);
       configureApi({ baseUrl: server });
@@ -211,7 +228,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         const normalized = normalizeServerUrl(url);
         configureApi({ baseUrl: normalized });
         setServerUrlState(normalized);
-        await writeItem(storageKeys.server, normalized);
+        await Promise.all([
+          writeItem(storageKeys.server, normalized),
+          writeItem(storageKeys.serverDefault, defaultServer),
+        ]);
       },
       async signIn(email, password) {
         await startSession(await api<SignInResponse>("/auth/login", { body: { email, password }, token: null }));
