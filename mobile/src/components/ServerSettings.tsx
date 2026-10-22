@@ -6,13 +6,14 @@ import { Button } from "@/components/Button";
 import { Icon } from "@/components/Icon";
 import { Notice } from "@/components/Notice";
 import { TextField } from "@/components/TextField";
-import { api, errorMessage, normalizeServerUrl } from "@/lib/api";
+import { api, errorMessage, isHostedServer, normalizeServerUrl } from "@/lib/api";
 import { useSession } from "@/lib/session";
 import { radius, useTheme } from "@/theme";
 
-// The server runs on a laptop whose Wi-Fi address changes, so the address
-// can be changed and tested from the sign-in screens. `unreachable` opens it
-// when signing in couldn't reach the server.
+// The app uses the hosted server by default; for testing it can point at a
+// laptop on the same Wi-Fi instead, so the address can be changed and tested
+// from the sign-in screens. `unreachable` opens it when signing in couldn't
+// reach the server.
 export function ServerSettings({ unreachable = false }: { unreachable?: boolean }) {
   const { colors } = useTheme();
   const { serverUrl, setServerUrl } = useSession();
@@ -36,7 +37,8 @@ export function ServerSettings({ unreachable = false }: { unreachable?: boolean 
     setTesting(true);
     setResult(null);
     try {
-      await api("/health", { baseUrl: url, token: null, timeoutMs: 8000 });
+      // A sleeping hosted server can take up to a minute to answer.
+      await api("/health", { baseUrl: url, token: null, timeoutMs: isHostedServer(url) ? 60000 : 8000 });
       await setServerUrl(url);
       setAddress(url);
       setResult({ ok: true, message: "Connected to " + url + "." });
@@ -76,13 +78,13 @@ export function ServerSettings({ unreachable = false }: { unreachable?: boolean 
               setAddress(text);
               setResult(null);
             }}
-            placeholder="http://192.168.1.15:8000"
+            placeholder="https://resqroad.onrender.com"
             autoCapitalize="none"
             autoCorrect={false}
             keyboardType="url"
             returnKeyType="done"
             onSubmitEditing={test}
-            hint="Use the address the server prints when it starts. Your phone must be on the same Wi-Fi."
+            hint="Usually https://resqroad.onrender.com. For a server on a laptop, use the address it prints when it starts; your phone must be on the same Wi-Fi."
           />
           <Button label="Save and test connection" variant="secondary" loading={testing} onPress={test} />
           {result ? <Notice tone={result.ok ? "success" : "error"} message={result.message} /> : null}
