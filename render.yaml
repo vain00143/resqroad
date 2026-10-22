@@ -1,0 +1,37 @@
+# Render Blueprint for ResQRoad: one free web service that runs the website,
+# the API for the mobile app, and live updates. MySQL is on Aiven (free); photos
+# are kept in MySQL because free Render services have no permanent disk.
+# The values marked `sync: false` are entered in Render when the Blueprint is
+# created (they come from the Aiven service's connection details).
+services:
+  - type: web
+    name: resqroad
+    runtime: node
+    plan: free
+    region: singapore
+    branch: develop
+    buildCommand: npm ci
+    startCommand: npm run db:setup && npm start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: TRUST_PROXY
+        value: "1"
+      - key: PHOTO_STORAGE
+        value: database
+      - key: DB_NAME
+        value: resqroad
+      - key: DB_HOST
+        sync: false
+      - key: DB_PORT
+        sync: false
+      - key: DB_USER
+        sync: false
+      - key: DB_PASSWORD
+        sync: false
+      - key: DB_SSL_CA
+        sync: false

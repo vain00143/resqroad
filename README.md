@@ -154,7 +154,8 @@ safe to run again). All times are stored in UTC.
 | `reports` | Reports. The public ID is `RPT-` + `id` (new reports continue from the highest number). `title`, `road`, `location`, `latitude`, `longitude`, `severity`, `description`, `status`, `reporter_id` → `users`, `assigned_to` → `users`, `assigned_name`, `repair_notes`, `repair_submitted_at`, `reported_at`, `updated_at`. |
 | `report_history` | Each workflow step: `report_id`, `status`, `description`, `actor` (name), `actor_id`, `note` (reason shown to the resident or crew), `created_at`. |
 | `report_notes` | Internal staff notes (administrators only): `report_id`, `note`, `actor`, `created_at`. |
-| `photos` | Evidence (`kind` = `evidence`) and repair (`before` \| `after`) photos: `report_id`, original `name`, `file_path` (inside `storage/photos/`), `mime_type`, `size_bytes`, `uploaded_by`, `replaced_at` (earlier repair photos after a resubmission). Sample reports list file names only (`file_path` is empty) and the website shows stock road photos for them. |
+| `photos` | Evidence (`kind` = `evidence`) and repair (`before` \| `after`) photos: `report_id`, original `name`, `file_path` (inside `storage/photos/`, and the address under `/uploads/`), `mime_type`, `size_bytes`, `uploaded_by`, `replaced_at` (earlier repair photos after a resubmission). Sample reports list file names only (`file_path` is empty) and the website shows stock road photos for them. |
+| `photo_data` | The photo files themselves when `PHOTO_STORAGE=database` (used on hosts without a permanent disk): `photo_id`, `file_path`, `mime_type`, `data`. Deleted together with their photo. |
 
 **What each person can see.** Reports are public (the landing page, map, and
 tracker need them), but the reporter's identity is only shown to
@@ -163,7 +164,10 @@ account details only to administrators and the account's owner.
 
 **Photos** are checked on the server (JPEG, PNG, or WebP, up to 8 MB and five
 per set), saved as `storage/photos/YYYY/MM/<random name>`, and served from
-`/uploads/...`. Back up the `storage/` folder together with the database.
+`/uploads/...`. Back up the `storage/` folder together with the database. With
+`PHOTO_STORAGE=database` (the hosted setup below), photos are kept in the
+`photo_data` table instead, served from the same `/uploads/...` addresses, so a
+database backup includes them.
 
 ## Architecture
 
@@ -203,7 +207,9 @@ storage, duplicate detection, sign-in for the website and the app,
 deactivation, crew accounts, and that server files are never served. A second
 test runs `npm run import:firebase` against a fake Firebase on this computer
 (database `resqroad_import_test`) and checks that people then sign in with
-their Firebase passwords.
+their Firebase passwords. A third runs with `PHOTO_STORAGE=database` (database
+`resqroad_photo_test`) and checks that photos are stored in MySQL, served back
+unchanged, and removed with their report.
 
 ## Moving data from Firebase
 
@@ -234,12 +240,31 @@ An administrator can give anyone left over a new temporary password
 
 ## Deploying
 
-Firebase Hosting only serves static files, so it can't run this version. Host
-the Node.js server and a MySQL 8 database together, for example on a VPS, a
-school or LGU server, or a platform such as Railway or Render with a managed
-MySQL database. Set the `.env` values there, run `npm run db:setup` and
-`npm run create-admin`, start it with `npm start`, and put it behind HTTPS
-(then set `COOKIE_SECURE=true`).
+Firebase Hosting only serves static files, so it can't run this version. The
+hosted copy runs for free on **Render** (the Node.js server: website, API, and
+live updates) with **Aiven** (MySQL), kept awake by **UptimeRobot**:
+
+1. **Aiven:** create a free MySQL service. From its overview, note the host,
+   port, user (`avnadmin`), and password, and download the CA certificate.
+2. **Render:** New → Blueprint → this GitHub repository. `render.yaml` sets
+   up a free web service from the `develop` branch with `PHOTO_STORAGE=database`
+   (free Render services have no permanent disk), `COOKIE_SECURE=true`, and
+   `TRUST_PROXY=1`. Enter `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, and
+   `DB_SSL_CA` (the whole CA certificate) when asked. Each start runs
+   `npm run db:setup`, so the tables are created on the first deploy.
+3. **Data:** load accounts and reports with `npm run seed` or a
+   `mysqldump --no-create-info` export of another copy, run with the Aiven
+   values in the environment.
+4. **UptimeRobot:** an HTTP(S) monitor every 5 minutes on
+   `https://<your service>.onrender.com/api/health/db`. Free Render services
+   sleep after 15 minutes without visitors, and Aiven powers off free databases
+   that stay idle; this check keeps both awake.
+
+Any other host works too: set the `.env` values there, run `npm run db:setup`
+and `npm run create-admin`, start it with `npm start`, and put it behind HTTPS
+(then set `COOKIE_SECURE=true`). Use `PHOTO_STORAGE=database` when the host has
+no permanent disk, `DB_SSL_CA` (or `DB_SSL=true`) when the database requires
+encrypted connections, and `TRUST_PROXY=1` behind the host's proxy.
 
 ## Mobile app
 
@@ -384,6 +409,8 @@ tools/seed.js, seed-data.js   npm run seed (sample accounts and reports)
 tools/import-firebase.js      npm run import:firebase
 tests/workflow.test.js        npm test: the whole workflow end to end
 tests/firebase-import.test.js npm test: Firebase import and password carry-over
+tests/photo-database.test.js  npm test: photos kept in MySQL (PHOTO_STORAGE=database)
+render.yaml                   Render Blueprint for the hosted copy (with Aiven MySQL)
 docs/API.md                   API for the mobile app
 firebase/                     The previous Firebase configuration (reference)
 assets/css/core.css           Design tokens, base styles, shared components

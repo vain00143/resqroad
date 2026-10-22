@@ -9,8 +9,8 @@ import { config, rootDir } from "./config.js";
 import { HttpError, authenticate } from "./auth.js";
 import { accountRoutes } from "./accounts.js";
 import { reportRoutes } from "./reports.js";
-import { photosDir, photoUrlPrefix } from "./photos.js";
-import { explainDatabaseError } from "./db.js";
+import { photoFromDatabase, photosDir, photoUrlPrefix } from "./photos.js";
+import { explainDatabaseError, query } from "./db.js";
 
 // Only the website's own pages are served from the project folder (never
 // .env, the server code, or the database files).
@@ -61,6 +61,12 @@ export function createApp() {
   api.get("/health", function (request, response) {
     response.json({ ok: true });
   });
+  // Also checks MySQL, so an uptime monitor calling it keeps a free hosted
+  // database from being powered off as idle.
+  api.get("/health/db", async function (request, response) {
+    await query("SELECT 1");
+    response.json({ ok: true, database: true });
+  });
   api.use(accountRoutes);
   api.use(reportRoutes);
   api.use(function () {
@@ -99,6 +105,31 @@ export function createApp() {
 
   /* ---------- Photos and the website ---------- */
 
+  // Photos kept in MySQL (PHOTO_STORAGE=database) come first; files on disk
+  // are the fallback.
+  app.use(photoUrlPrefix, async function (request, response, next) {
+    if (config.photoStorage !== "database" || (request.method !== "GET" && request.method !== "HEAD")) {
+      next();
+      return;
+    }
+    let filePath;
+    try {
+      filePath = decodeURIComponent(request.path.replace(/^\/+/, ""));
+    } catch (error) {
+      next();
+      return;
+    }
+    const photo =
+      /^[\w./-]+$/.test(filePath) && !filePath.includes("..") ? await photoFromDatabase(filePath) : null;
+    if (!photo) {
+      next();
+      return;
+    }
+    response.setHeader("Content-Type", photo.mime_type);
+    response.setHeader("Cache-Control", "public, max-age=2592000, immutable");
+    response.setHeader("Content-Security-Policy", "default-src 'none'; img-src 'self'");
+    response.send(photo.data);
+  });
   app.use(
     photoUrlPrefix,
     express.static(photosDir, {

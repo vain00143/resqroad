@@ -10,7 +10,7 @@ import express from "express";
 import { HttpError, requireRole } from "./auth.js";
 import { one, query, transaction } from "./db.js";
 import { broadcast } from "./live.js";
-import { checkPhotos, photoUpload, photoUrl, removePhotoFiles, savePhotos } from "./photos.js";
+import { checkPhotos, photoUpload, photoUrl, removePhotoFiles, savePhotos, storePhotoData } from "./photos.js";
 
 export const statuses = [
   "submitted",
@@ -225,18 +225,15 @@ function addHistory(connection, reportId, status, description, user, note) {
   );
 }
 
-function insertPhotos(connection, reportId, kind, photos, user) {
-  if (!photos.length) {
-    return null;
+// Adds the photos' rows (and, with PHOTO_STORAGE=database, their bytes).
+async function insertPhotos(connection, reportId, kind, photos, user) {
+  for (const [index, photo] of photos.entries()) {
+    const [result] = await connection.query(
+      "INSERT INTO photos (report_id, kind, name, file_path, mime_type, size_bytes, sort_order, uploaded_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+      [reportId, kind, photo.name, photo.filePath, photo.mime, photo.size, index, user.id],
+    );
+    await storePhotoData(connection, result.insertId, photo);
   }
-  return connection.query(
-    "INSERT INTO photos (report_id, kind, name, file_path, mime_type, size_bytes, sort_order, uploaded_by) VALUES ?",
-    [
-      photos.map(function (photo, index) {
-        return [reportId, kind, photo.name, photo.filePath, photo.mime, photo.size, index, user.id];
-      }),
-    ],
-  );
 }
 
 /* ---------- Routes ---------- */

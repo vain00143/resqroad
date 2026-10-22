@@ -22,6 +22,9 @@ node_modules/
 !.env.example
 storage/
 
+# Database certificates (e.g. the Aiven CA certificate) stay on this computer.
+*.pem
+
 # Database exports of real data (database/resqroad-sample-data.sql is the
 # shareable one with sample data only).
 database/resqroad-backup*.sql
