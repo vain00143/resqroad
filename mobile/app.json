@@ -19,6 +19,7 @@
         "monochromeImage": "./assets/images/adaptive-icon-monochrome.png",
         "backgroundColor": "#FDF6EC"
       },
+      "blockedPermissions": ["android.permission.SYSTEM_ALERT_WINDOW"],
       "predictiveBackGestureEnabled": false
     },
     "web": {

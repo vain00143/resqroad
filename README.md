@@ -283,6 +283,7 @@ residents can register in the app. Administrators are pointed to the website.
 - **Maps** are the website's Leaflet + OpenStreetMap maps running in a WebView,
   so no map API key is needed (the phone needs internet for the map tiles).
   Open reports appear as grey dots on the reporting map.
+
 The sign-in token is kept in the phone's secure storage; live updates arrive
 over the same WebSocket as the website, and the app reconnects and catches up
 after losing the connection.
@@ -292,6 +293,32 @@ The app follows the brand in
 and splash screen are made from the Q mark. Headlines use the static
 Archivo Expanded ExtraBold file in `mobile/assets/fonts/` (SIL Open Font
 License).
+
+### Build the APK
+
+The APK is built in the cloud with [EAS Build](https://docs.expo.dev/build/introduction/),
+so no Android SDK or Java setup is needed on this computer. You need a free
+[Expo account](https://expo.dev/signup).
+
+```powershell
+cd mobile
+npx eas-cli@latest login
+npx eas-cli@latest build -p android --profile preview
+```
+
+The first build asks to create the EAS project (answer yes; this adds its ID
+to `app.json`) and to generate an Android keystore (answer yes; Expo stores
+it, and every later build is signed with it so updates install over the old
+app). The build takes about 10–20 minutes and ends with a link and QR code.
+Open it on the phone, download the APK, allow **Install unknown apps** for
+the browser when Android asks, and install it.
+
+The `preview` profile in `mobile/eas.json` builds an APK with the server
+address `http://192.168.1.13:8000` built in (change `EXPO_PUBLIC_API_URL`
+there before building if your laptop's address differs). The address can
+always be changed in the app under **Server settings**. Plain `http://` is
+allowed in this build (`usesCleartextTraffic`), because the server runs on
+the local network without HTTPS.
 
 ## Brand and design
 
