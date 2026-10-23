@@ -1,11 +1,13 @@
-/* Citizen portal: report road damage (with a map pin and photos) and follow
-   the reports you've filed. Status changes made by staff in other tabs show
-   up live, with a notification. */
+/* Citizen portal: report road damage (with a map pin and photos), follow the
+   reports you've filed and open their details, and — without leaving the
+   portal — track a report by ID, browse the live map, and see the public
+   site. Status changes made by staff show up live, with a notification. */
 (async function () {
   "use strict";
 
   const store = window.RoadWatchStore;
   const ui = window.RoadWatchUI;
+  const publicView = window.RoadWatchPublicView;
   const icon = ui.icon;
   const esc = ui.escapeHtml;
   const currentUser = await window.RoadWatchAuth.requireRole("citizen", "login.html");
@@ -16,6 +18,7 @@
   const maxPhotos = 5;
   const recentKey = "resqroad-recent-tracks";
   const bulacan = { south: 14.5, north: 15.2, west: 120.3, east: 121.2 };
+  const severityRank = { High: 3, Medium: 2, Low: 1 };
   const $ = function (selector) {
     return document.querySelector(selector);
   };
@@ -27,12 +30,29 @@
   const errorBox = $("#report-error");
   const latInput = form.elements.namedItem("latitude");
   const lngInput = form.elements.namedItem("longitude");
+  const drawer = {
+    panel: $("#report-drawer"),
+    scrim: $("#drawer-scrim"),
+    meta: $("#drawer-meta"),
+    body: $("#drawer-body"),
+    actions: $("#drawer-actions"),
+    close: $("#drawer-close"),
+  };
   let state = null;
   let citizen = null;
   let photos = [];
   let picker = null;
   let myFilter = "all";
   let knownStatuses = new Map();
+  let currentView = "report";
+  let trackId = "";
+  let trackMap = null;
+  let liveMap = null;
+  let liveSeverity = "all";
+  let openReportId = null;
+  let drawerOpener = null;
+  let restoreDrawerInert = null;
+  let detailMap = null;
 
   function loadState() {
     state = store.getState();
@@ -113,15 +133,45 @@
 
   /* ---------- Views ---------- */
 
+  // Every page of the portal lives here, so the sidebar never goes away.
+  // Addresses: #report, #reports, #track (or #track/RPT-1048), #map, #public.
   const viewDetails = {
     report: { crumb: "Report a problem", title: "Report a problem" },
     reports: { crumb: "My reports", title: "My reports" },
+    track: { crumb: "Track a report", title: "Track a report" },
+    map: { crumb: "Live map", title: "Live map" },
+    public: { crumb: "Public site", title: "Public site" },
   };
 
-  function setTab(name) {
-    const tab = name === "reports" ? "reports" : "report";
+  function parseHash(hash) {
+    const parts = String(hash || "").replace(/^#/, "").split("/");
+    const name = Object.prototype.hasOwnProperty.call(viewDetails, parts[0]) ? parts[0] : "report";
+    let id = "";
+    if (name === "track" && parts[1]) {
+      try {
+        id = publicView.normalizeId(decodeURIComponent(parts[1]));
+      } catch (error) {
+        id = "";
+      }
+    }
+    return { name: name, id: id };
+  }
+
+  function hashFor(name, id) {
+    return "#" + name + (name === "track" && id ? "/" + encodeURIComponent(id) : "");
+  }
+
+  // Shows one page of the portal. `push` adds a browser history entry (for
+  // clicks), so Back and Forward move between the portal's pages.
+  function showView(name, options) {
+    const settings = options || {};
+    const view = Object.prototype.hasOwnProperty.call(viewDetails, name) ? name : "report";
+    currentView = view;
+    if (view === "track") {
+      trackId = settings.id || "";
+    }
     $$(".nav-item[data-portal-tab]").forEach(function (link) {
-      const active = link.dataset.portalTab === tab;
+      const active = link.dataset.portalTab === view;
       link.classList.toggle("is-active", active);
       if (active) {
         link.setAttribute("aria-current", "page");
@@ -130,7 +180,7 @@
       }
     });
     $$("[data-portal-panel]").forEach(function (panel) {
-      const active = panel.dataset.portalPanel === tab;
+      const active = panel.dataset.portalPanel === view;
       if (active && panel.hidden) {
         panel.hidden = false;
         panel.style.animation = "none";
@@ -140,15 +190,37 @@
         panel.hidden = true;
       }
     });
-    $("#crumb-current").textContent = viewDetails[tab].crumb;
-    document.title = viewDetails[tab].title + " | ResQRoad";
-    if (window.location.hash !== "#" + tab) {
-      history.replaceState(null, "", "#" + tab);
+    $("#crumb-current").textContent = viewDetails[view].crumb;
+    document.title = (view === "track" && trackId ? trackId + " · " : "") + viewDetails[view].title + " | ResQRoad";
+    const hash = hashFor(view, view === "track" ? trackId : "");
+    if (window.location.hash !== hash) {
+      if (settings.push) {
+        history.pushState(null, "", hash);
+      } else {
+        history.replaceState(null, "", hash);
+      }
     }
-    if (tab === "report" && picker) {
+    if (view === "report" && picker) {
       window.setTimeout(function () {
         picker.map.invalidateSize();
       }, 50);
+    }
+    if (state) {
+      renderTrack();
+      renderLiveMap();
+      renderPublic();
+    }
+  }
+
+  // Opens a report from a map or list: the resident's own reports open their
+  // full details; anyone else's open in the tracker, as the public sees it.
+  function openReport(reportId, opener) {
+    const report = store.getReport(reportId);
+    if (report && citizen && report.reporterId === citizen.id) {
+      openDetails(report.id, opener);
+    } else {
+      showView("track", { push: true, id: publicView.normalizeId(reportId) });
+      window.scrollTo({ top: 0, behavior: "instant" });
     }
   }
 
@@ -430,9 +502,9 @@
       esc(report.id) +
       '</div><div class="journey-card">' +
       ui.journey(report) +
-      '</div><div class="success-actions"><a class="btn btn-primary" href="track.html?id=' +
-      encodeURIComponent(report.id) +
-      '">' +
+      '</div><div class="success-actions"><a class="btn btn-primary" href="' +
+      esc(hashFor("track", report.id)) +
+      '" data-portal-tab="track">' +
       icon("search", "icon-sm") +
       'Track this report</a><button class="btn btn-secondary" type="button" data-show-reports>' +
       icon("clipboard-list", "icon-sm") +
@@ -482,17 +554,9 @@
         const latest = (report.history || []).filter(function (entry) {
           return entry.status !== "note";
         }).slice(-1)[0];
-        // Once a repair is verified, residents see the crew's notes and photos.
-        const repairNotes =
-          report.status === "resolved" && report.repair
-            ? '<div class="callout"><p class="section-label">What the crew did</p>' +
-              (report.repair.notes ? '<p class="detail-description">' + esc(report.repair.notes) + "</p>" : "") +
-              '<div class="before-after"><div><h4>Before</h4>' +
-              ui.photoGallery(ui.repairPhotos(report, "before"), "Before repair photos") +
-              "</div><div><h4>After</h4>" +
-              ui.photoGallery(ui.repairPhotos(report, "after"), "After repair photos") +
-              "</div></div></div>"
-            : "";
+        // Once a repair is verified, residents see the crew's notes and their
+        // photos of the finished repair.
+        const repairNotes = report.status === "resolved" && report.repair ? repairResult(report) : "";
         return (
           '<article class="card my-report" style="--i:' +
           Math.min(index, 10) +
@@ -509,9 +573,17 @@
           esc(report.road + " · " + report.location) +
           "</span>" +
           ui.severityBadge(report.severity) +
-          "</p></div>" +
+          '</p></div><div class="my-report-side">' +
           ui.statusPill(report.status) +
-          '</div><div class="my-report-body"><div class="journey-card">' +
+          '<button class="btn btn-secondary btn-sm" type="button" data-open-report="' +
+          esc(report.id) +
+          '">' +
+          icon("file-text", "icon-sm") +
+          'View details<span class="visually-hidden"> of ' +
+          esc(report.id) +
+          '</span></button></div></div><div class="my-report-body"><p class="my-report-desc">' +
+          esc(report.description) +
+          '</p><div class="journey-card">' +
           ui.journey(report) +
           "</div>" +
           repairNotes +
@@ -520,9 +592,9 @@
           icon("chevron-down", "icon-sm") +
           "</summary><div>" +
           ui.timeline(report, { publicOnly: true }) +
-          '<p style="margin: 1rem 0 0"><a class="link-button" href="track.html?id=' +
-          encodeURIComponent(report.id) +
-          '">Open the public tracking page' +
+          '<p style="margin: 1rem 0 0"><a class="link-button" href="' +
+          esc(hashFor("track", report.id)) +
+          '" data-portal-tab="track">Track this report' +
           icon("arrow-right", "icon-sm") +
           "</a></p></div></details></article>"
         );
@@ -566,6 +638,462 @@
         .join("");
   }
 
+  // The crew's notes and after-repair photos, once the office verified them.
+  function repairResult(report) {
+    const afterPhotos = ui.repairPhotos(report, "after");
+    return (
+      '<div class="callout"><p class="section-label">What the crew did</p>' +
+      (report.repair.notes ? '<p class="detail-description">' + esc(report.repair.notes) + "</p>" : "") +
+      (afterPhotos.length
+        ? '<div class="repair-photos"><h4>After-repair photos <span>' +
+          esc(ui.pluralize(afterPhotos.length, "photo")) +
+          "</span></h4>" +
+          ui.photoGallery(afterPhotos, "After-repair photos", "gallery-grid") +
+          "</div>"
+        : "") +
+      "</div>"
+    );
+  }
+
+  /* ---------- Track a report ---------- */
+
+  function rememberTracked(reportId) {
+    const list = [reportId]
+      .concat(
+        readTracked().filter(function (id) {
+          return typeof id === "string" && id !== reportId;
+        }),
+      )
+      .slice(0, 5);
+    try {
+      localStorage.setItem(recentKey, JSON.stringify(list));
+    } catch (error) {
+      // Recent searches are only a convenience.
+    }
+  }
+
+  function renderTrackRecent() {
+    const list = readTracked().filter(function (id) {
+      return typeof id === "string";
+    });
+    const box = $("#track-recent");
+    box.hidden = list.length === 0;
+    box.innerHTML =
+      "<span>Recent:</span>" +
+      list
+        .map(function (id) {
+          return '<button type="button" data-track-pick="' + esc(id) + '" aria-pressed="' + String(id === trackId) + '">' + esc(id) + "</button>";
+        })
+        .join("");
+  }
+
+  // The resident's own reports, to pick one to track.
+  function trackPicker() {
+    const reports = myReports();
+    if (reports.length === 0) {
+      return (
+        '<div class="card empty"><span class="empty-icon">' +
+        icon("search") +
+        "</span><h3>Enter a report ID</h3><p>Report IDs look like RPT-1048. Reports you file appear here so you can follow them.</p>" +
+        '<button class="btn btn-primary" type="button" data-start-report style="margin-top: 1rem">' +
+        icon("map-pin", "icon-sm") +
+        "Report a problem</button></div>"
+      );
+    }
+    return (
+      '<section class="card" aria-labelledby="track-mine-title"><div class="card-header"><div><h2 class="card-title" id="track-mine-title">' +
+      icon("clipboard-list") +
+      'Your reports</h2><p class="card-subtitle">Select a report to see where it is in the repair process.</p></div></div><div class="card-body"><ul class="track-picks">' +
+      reports
+        .map(function (report) {
+          return (
+            '<li><button class="track-pick" type="button" data-track-pick="' +
+            esc(report.id) +
+            '"><span class="track-pick-copy"><span class="id-tag">' +
+            esc(report.id + " · " + ui.formatDay(report.reportedAt)) +
+            "</span><strong>" +
+            esc(report.title) +
+            "</strong><span>" +
+            esc(report.road + " · " + report.location) +
+            '</span></span><span class="track-pick-tags">' +
+            ui.severityBadge(report.severity) +
+            ui.statusPill(report.status) +
+            "</span>" +
+            icon("chevron-right", "icon-sm") +
+            "</button></li>"
+          );
+        })
+        .join("") +
+      "</ul></div></section>"
+    );
+  }
+
+  function renderTrack() {
+    if (currentView !== "track") {
+      return;
+    }
+    const input = $("#portal-track-input");
+    if (document.activeElement !== input) {
+      input.value = trackId;
+    }
+    if (trackMap) {
+      trackMap.destroy();
+      trackMap = null;
+    }
+    const box = $("#portal-track-result");
+    if (!trackId) {
+      renderTrackRecent();
+      box.innerHTML = trackPicker();
+      return;
+    }
+    const report = store.getReport(trackId);
+    if (!report) {
+      renderTrackRecent();
+      box.innerHTML =
+        '<div class="card empty"><span class="empty-icon">' +
+        icon("alert-circle") +
+        "</span><h3>We couldn't find " +
+        esc(trackId) +
+        "</h3><p>Check the ID and try again. Report IDs look like RPT-1048.</p></div>" +
+        (myReports().length ? '<div style="margin-top: 1.25rem">' + trackPicker() + "</div>" : "");
+      return;
+    }
+    rememberTracked(report.id);
+    renderTrackRecent();
+    const mine = report.reporterId === citizen.id;
+    box.innerHTML = publicView.trackCard(report, {
+      headActions:
+        '<div class="toolbar-group">' +
+        (mine
+          ? '<button class="btn btn-primary btn-sm" type="button" data-open-report="' +
+            esc(report.id) +
+            '">' +
+            icon("file-text", "icon-sm") +
+            "View details</button>"
+          : "") +
+        '<button class="btn btn-secondary btn-sm" type="button" data-copy-track="' +
+        esc(report.id) +
+        '">' +
+        icon("copy", "icon-sm") +
+        "Copy link</button></div>",
+    });
+    trackMap = ui.renderMap(box.querySelector("[data-track-map]"), [report], {
+      popup: false,
+      zoom: 15,
+      emptyMessage: "Location unavailable.",
+    });
+  }
+
+  function copyTrackingLink(reportId) {
+    const link = new URL("track.html?id=" + encodeURIComponent(reportId), window.location.href).href;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(link).then(
+        function () {
+          ui.showMessage("Tracking link for " + reportId + " copied.", "success");
+        },
+        function () {
+          ui.showMessage(link, "info");
+        },
+      );
+    } else {
+      ui.showMessage(link, "info");
+    }
+  }
+
+  /* ---------- Live map ---------- */
+
+  // The public map (verified reports through to fixed) plus every report the
+  // resident filed that is still open or fixed.
+  function onLiveMap(report) {
+    const mine = report.reporterId === citizen.id;
+    return publicView.publicStatuses.includes(report.status) || (mine && !["rejected", "duplicate"].includes(report.status));
+  }
+
+  function liveMapReports() {
+    const scope = $("#live-map-scope").value;
+    return state.reports
+      .filter(function (report) {
+        if (!onLiveMap(report)) {
+          return false;
+        }
+        if (scope === "mine" && report.reporterId !== citizen.id) {
+          return false;
+        }
+        if (scope === "open" && !store.openStatuses.includes(report.status)) {
+          return false;
+        }
+        if (scope === "fixed" && report.status !== "resolved") {
+          return false;
+        }
+        return liveSeverity === "all" || report.severity === liveSeverity;
+      })
+      .sort(function (first, second) {
+        return severityRank[second.severity] - severityRank[first.severity] || Date.parse(second.reportedAt) - Date.parse(first.reportedAt);
+      });
+  }
+
+  function renderLiveMap() {
+    if (currentView !== "map") {
+      return;
+    }
+    const all = state.reports.filter(onLiveMap);
+    const count = function (test) {
+      return all.filter(test).length;
+    };
+    $("#live-map-stats").innerHTML = [
+      { label: "Reports on the map", value: all.length, icon: "map", tone: "var(--accent)" },
+      {
+        label: "Being repaired",
+        value: count(function (report) {
+          return ["assigned", "in_progress", "repair_submitted"].includes(report.status);
+        }),
+        icon: "construction",
+        tone: "var(--info)",
+      },
+      {
+        label: "Fixed roads",
+        value: count(function (report) {
+          return report.status === "resolved";
+        }),
+        icon: "check-circle",
+        tone: "var(--success)",
+      },
+      {
+        label: "Your open reports",
+        value: count(function (report) {
+          return report.reporterId === citizen.id && store.openStatuses.includes(report.status);
+        }),
+        icon: "clipboard-list",
+        tone: "var(--st-assigned)",
+      },
+    ]
+      .map(function (item) {
+        return (
+          '<div class="card mini-stat"><span class="kpi-icon" style="--tone:' +
+          item.tone +
+          '">' +
+          icon(item.icon) +
+          "</span><div><strong>" +
+          item.value +
+          "</strong><span>" +
+          esc(item.label) +
+          "</span></div></div>"
+        );
+      })
+      .join("");
+
+    const reports = liveMapReports();
+    liveMap = ui.renderMap($("#live-map"), reports, {
+      emptyMessage: "No reports match these filters.",
+      popup: function (report) {
+        return ui.reportPopup(report, {
+          action: "open",
+          actionLabel: report.reporterId === citizen.id ? "View details" : "Track this report",
+        });
+      },
+      onAction: function (action, reportId, button) {
+        openReport(reportId, button);
+      },
+      onSelect: highlightLiveItem,
+      pulse: function (report) {
+        return report.severity === "High" && store.openStatuses.includes(report.status);
+      },
+    });
+    $("#live-map-legend").innerHTML =
+      ui.mapLegend() + '<p class="field-hint" style="margin-top: 0.35rem">Select a pin to see the report. Your own reports open with full details.</p>';
+    $("#live-map-count").textContent = ui.pluralize(reports.length, "report") + " shown";
+    $("#live-map-list").innerHTML = reports.length
+      ? reports
+          .map(function (report) {
+            const mine = report.reporterId === citizen.id;
+            return (
+              '<li><button class="map-list-item" type="button" data-map-focus="' +
+              esc(report.id) +
+              '"><i class="legend-dot is-' +
+              esc(report.severity.toLowerCase()) +
+              '"></i><strong>' +
+              esc(report.title) +
+              "</strong><small><span>" +
+              esc(report.id + " · " + report.road) +
+              "</span>" +
+              (mine ? '<span class="map-list-tag">Yours</span>' : "") +
+              "</small></button></li>"
+            );
+          })
+          .join("")
+      : '<li class="empty"><p>No reports match these filters.</p></li>';
+  }
+
+  function highlightLiveItem(reportId) {
+    $$("#live-map-list .map-list-item").forEach(function (item) {
+      const active = item.dataset.mapFocus === reportId;
+      item.classList.toggle("is-active", active);
+      if (active) {
+        item.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      }
+    });
+  }
+
+  /* ---------- Public site ---------- */
+
+  function renderPublic() {
+    if (currentView !== "public") {
+      return;
+    }
+    publicView.render($("#public-view"), state, {
+      openLabel: "View report",
+      onOpen: openReport,
+    });
+  }
+
+  /* ---------- Report details ---------- */
+
+  // Everything about one of the resident's own reports. The server never
+  // sends internal notes or staff-only details to residents.
+  function renderDetails(reportId) {
+    const report = myReports().find(function (item) {
+      return item.id === reportId;
+    });
+    if (!report) {
+      throw new Error("This report is no longer available.");
+    }
+    const sameReport = drawer.body.dataset.reportId === reportId;
+    const scroll = sameReport ? drawer.body.scrollTop : 0;
+    if (detailMap) {
+      detailMap.destroy();
+      detailMap = null;
+    }
+    // Only the photos sent with the report; a report filed without photos
+    // says so instead of showing stand-in pictures. (Sample reports list file
+    // names only, so they keep the same sample photos as everywhere else.)
+    const listed = report.evidencePhotos || [];
+    const photos = ui.photosWithData(listed).length || listed.length ? ui.reportPhotos(report) : [];
+    drawer.meta.innerHTML = '<span class="drawer-report-id">' + esc(report.id) + "</span>";
+    drawer.body.innerHTML =
+      '<h2 class="detail-title" id="drawer-title">' +
+      esc(report.title) +
+      '</h2><p class="detail-sub"><span>' +
+      icon("map-pin") +
+      esc(report.road + " · " + report.location) +
+      "</span><span>" +
+      icon("calendar") +
+      esc("Reported " + ui.relativeTime(report.reportedAt)) +
+      '</span></p><p class="alert alert-brand">' +
+      icon("info") +
+      "<span>" +
+      esc(publicView.plainStatus[report.status] || "Status updated.") +
+      '</span></p><div class="journey-card">' +
+      ui.journey(report) +
+      '</div><section class="detail-block"><div class="detail-block-head"><h3>' +
+      icon("camera") +
+      "Road damage photos</h3>" +
+      (photos.length
+        ? '<span class="muted text-sm">' +
+          ui.pluralize(photos.length, "photo") +
+          " · select to enlarge</span></div>" +
+          ui.photoGallery(photos, "Road damage photos")
+        : '</div><p class="muted text-sm" style="margin: 0">You didn\'t add photos to this report.</p>') +
+      '</section><section class="detail-block detail-columns"><div class="detail-column"><div class="detail-block-head"><h3>' +
+      icon("info") +
+      'Information</h3></div><dl class="facts"><div><dt>Severity</dt><dd>' +
+      ui.severityBadge(report.severity) +
+      "</dd></div><div><dt>Status</dt><dd>" +
+      ui.statusPill(report.status) +
+      "</dd></div><div><dt>Reported on</dt><dd>" +
+      esc(ui.formatDate(report.reportedAt)) +
+      "</dd></div><div><dt>Last update</dt><dd>" +
+      esc(ui.relativeTime(publicView.lastUpdate(report))) +
+      '</dd></div><div class="facts-wide"><dt>Road and place</dt><dd>' +
+      esc(report.road + " · " + report.location) +
+      '</dd></div><div class="facts-wide"><dt>GPS coordinates</dt><dd class="mono">' +
+      esc(report.coordinates.lat + ", " + report.coordinates.lng) +
+      ' · <a href="' +
+      esc(ui.osmUrl(report.coordinates)) +
+      '" target="_blank" rel="noreferrer">Open in OpenStreetMap</a></dd></div></dl></div><div class="detail-column"><div class="detail-block-head"><h3>' +
+      icon("map") +
+      'Map</h3></div><div class="detail-map"><div class="map" id="detail-map"></div></div></div></section>' +
+      '<section class="detail-block"><div class="detail-block-head"><h3>' +
+      icon("file-text") +
+      'Description</h3></div><p class="detail-description">' +
+      esc(report.description) +
+      "</p></section>" +
+      (report.status === "resolved" && report.repair
+        ? '<section class="detail-block"><div class="detail-block-head"><h3>' +
+          icon("wrench") +
+          "Repair result</h3>" +
+          (report.repair.submittedAt
+            ? '<span class="muted text-sm">' + esc("Repaired " + ui.formatDay(report.repair.submittedAt)) + "</span>"
+            : "") +
+          "</div>" +
+          repairResult(report) +
+          "</section>"
+        : "") +
+      '<section class="detail-block"><div class="detail-block-head"><h3>' +
+      icon("activity") +
+      "Progress updates</h3></div>" +
+      ui.timeline(report, { publicOnly: true }) +
+      "</section>";
+    drawer.actions.innerHTML =
+      '<p class="footer-note">Only you and the Road Maintenance Office can see that you filed this report.</p>' +
+      '<a class="btn btn-secondary" href="' +
+      esc(hashFor("track", report.id)) +
+      '" data-portal-tab="track">' +
+      icon("search", "icon-sm") +
+      "Track this report</a>";
+    detailMap = ui.renderMap(drawer.body.querySelector("#detail-map"), [report], {
+      popup: false,
+      zoom: 15,
+      emptyMessage: "Location coordinates are unavailable.",
+    });
+    drawer.body.dataset.reportId = reportId;
+    drawer.body.scrollTop = scroll;
+  }
+
+  function openDetails(reportId, opener) {
+    try {
+      renderDetails(reportId);
+    } catch (error) {
+      ui.showMessage(error.message, "error");
+      return;
+    }
+    openReportId = reportId;
+    if (drawer.panel.classList.contains("is-open")) {
+      return;
+    }
+    drawerOpener = opener || document.activeElement;
+    drawer.panel.classList.add("is-open");
+    drawer.scrim.classList.add("is-open");
+    drawer.panel.setAttribute("aria-hidden", "false");
+    restoreDrawerInert = ui.setBackgroundInert([drawer.panel, drawer.scrim]);
+    document.documentElement.style.overflow = "hidden";
+    drawer.body.scrollTop = 0;
+    drawer.close.focus({ preventScroll: true });
+    window.setTimeout(function () {
+      if (detailMap) {
+        detailMap.refresh();
+      }
+    }, 380);
+  }
+
+  function closeDetails(restoreFocus) {
+    if (!drawer.panel.classList.contains("is-open")) {
+      return;
+    }
+    drawer.panel.classList.remove("is-open");
+    drawer.scrim.classList.remove("is-open");
+    drawer.panel.setAttribute("aria-hidden", "true");
+    document.documentElement.style.overflow = "";
+    if (restoreDrawerInert) {
+      restoreDrawerInert();
+      restoreDrawerInert = null;
+    }
+    openReportId = null;
+    if (restoreFocus !== false && drawerOpener && drawerOpener.isConnected) {
+      drawerOpener.focus({ preventScroll: true });
+    }
+    drawerOpener = null;
+  }
+
   function rememberStatuses() {
     knownStatuses = new Map(
       myReports().map(function (report) {
@@ -579,33 +1107,125 @@
     renderHeader();
     renderMyReports();
     renderRecent();
+    renderTrack();
+    renderLiveMap();
+    renderPublic();
+    if (openReportId && drawer.panel.classList.contains("is-open")) {
+      try {
+        renderDetails(openReportId);
+      } catch (error) {
+        closeDetails(false);
+      }
+    }
   }
 
   /* ---------- Events ---------- */
 
-  $$("[data-portal-tab]").forEach(function (link) {
-    link.addEventListener("click", function (event) {
-      event.preventDefault();
-      setTab(link.dataset.portalTab);
-      window.scrollTo({ top: 0, behavior: "instant" });
-    });
+  // Links and buttons to the portal's pages (sidebar, account menu, and
+  // buttons in the pages) switch pages in place.
+  document.addEventListener("click", function (event) {
+    const link = event.target.closest("[data-portal-tab]");
+    // Ctrl/Cmd/Shift-click still opens the page in a new tab or window.
+    if (!link || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) {
+      return;
+    }
+    event.preventDefault();
+    const target = parseHash(link.getAttribute("href") || link.dataset.portalTab);
+    closeDetails(false);
+    showView(target.name, { push: true, id: target.id });
+    window.scrollTo({ top: 0, behavior: "instant" });
   });
+  // Back and Forward, and addresses typed or linked with a #page.
   window.addEventListener("hashchange", function () {
-    setTab(window.location.hash.replace("#", ""));
+    const target = parseHash(window.location.hash);
+    closeDetails(false);
+    showView(target.name, { id: target.id });
   });
 
   document.addEventListener("click", function (event) {
     if (event.target.closest("[data-show-reports]")) {
-      setTab("reports");
+      showView("reports", { push: true });
       window.scrollTo({ top: 0, behavior: "smooth" });
     } else if (event.target.closest("[data-report-another]") || event.target.closest("[data-start-report]")) {
       $("#report-success").hidden = true;
       $("#report-layout").hidden = false;
-      setTab("report");
+      showView("report", { push: true });
       window.scrollTo({ top: 0, behavior: "smooth" });
       window.setTimeout(function () {
         form.elements.namedItem("title").focus({ preventScroll: true });
       }, 300);
+    } else if (event.target.closest("[data-open-report]")) {
+      const button = event.target.closest("[data-open-report]");
+      openDetails(button.dataset.openReport, button);
+    } else if (event.target.closest("[data-track-pick]")) {
+      showView("track", { push: true, id: event.target.closest("[data-track-pick]").dataset.trackPick });
+    } else if (event.target.closest("[data-copy-track]")) {
+      copyTrackingLink(event.target.closest("[data-copy-track]").dataset.copyTrack);
+    }
+  });
+
+  $("#portal-track-form").addEventListener("submit", function (event) {
+    event.preventDefault();
+    const id = publicView.normalizeId($("#portal-track-input").value);
+    showView("track", { push: id !== trackId, id: id });
+  });
+
+  $("#portal-track-result").addEventListener("click", function (event) {
+    const photo = event.target.closest("[data-gallery-index]");
+    if (photo) {
+      const images = Array.from(photo.closest("[data-gallery-group]").querySelectorAll("img")).map(function (image) {
+        return { src: image.currentSrc || image.src, alt: image.alt };
+      });
+      ui.openLightbox(images, Number(photo.dataset.galleryIndex), photo);
+    }
+  });
+
+  $("#live-map-severity").addEventListener("click", function (event) {
+    const chip = event.target.closest("[data-severity]");
+    if (!chip) {
+      return;
+    }
+    liveSeverity = chip.dataset.severity;
+    $$("#live-map-severity [data-severity]").forEach(function (button) {
+      button.setAttribute("aria-pressed", String(button === chip));
+    });
+    renderLiveMap();
+  });
+  $("#live-map-scope").addEventListener("change", renderLiveMap);
+  $("#live-map-list").addEventListener("click", function (event) {
+    const item = event.target.closest("[data-map-focus]");
+    if (item && liveMap) {
+      highlightLiveItem(item.dataset.mapFocus);
+      liveMap.focus(item.dataset.mapFocus);
+    }
+  });
+
+  // Report details panel.
+  drawer.body.addEventListener("click", function (event) {
+    const photo = event.target.closest("[data-gallery-index]");
+    if (photo) {
+      const images = Array.from(photo.closest("[data-gallery-group]").querySelectorAll("img")).map(function (image) {
+        return { src: image.currentSrc || image.src, alt: image.alt };
+      });
+      ui.openLightbox(images, Number(photo.dataset.galleryIndex), photo);
+    }
+  });
+  drawer.close.addEventListener("click", function () {
+    closeDetails();
+  });
+  drawer.scrim.addEventListener("click", function () {
+    closeDetails();
+  });
+  $("#drawer-copy").addEventListener("click", function () {
+    if (openReportId) {
+      copyTrackingLink(openReportId);
+    }
+  });
+  // Dialogs, menus, and the lightbox handle Escape themselves first.
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape" && drawer.panel.classList.contains("is-open")) {
+      event.preventDefault();
+      closeDetails();
     }
   });
 
@@ -736,7 +1356,7 @@
         "<span>" +
         esc(error.message) +
         (error.duplicateId
-          ? ' <a href="track.html?id=' + encodeURIComponent(error.duplicateId) + '">Follow ' + esc(error.duplicateId) + " instead</a>."
+          ? ' <a href="' + esc(hashFor("track", error.duplicateId)) + '" data-portal-tab="track">Follow ' + esc(error.duplicateId) + " instead</a>."
           : "") +
         "</span>";
       errorBox.hidden = false;
@@ -831,7 +1451,8 @@
       })
       .join("");
     initPicker();
-    setTab(window.location.hash.replace("#", "") || "report");
+    const initial = parseHash(window.location.hash);
+    showView(initial.name, { id: initial.id });
     updateProgress();
   } catch (error) {
     console.error("Could not load the citizen portal.", error);

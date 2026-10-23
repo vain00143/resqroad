@@ -5,16 +5,18 @@
   "use strict";
 
   const paths = {
+    // Workspace navigation icons (dashboard, chart-line, file-search,
+    // hard-hat, map, users, globe) are ResQRoad's own drawings.
     dashboard:
-      '<rect width="7" height="9" x="3" y="3" rx="1.5"/><rect width="7" height="5" x="14" y="3" rx="1.5"/><rect width="7" height="9" x="14" y="12" rx="1.5"/><rect width="7" height="5" x="3" y="16" rx="1.5"/>',
-    "clipboard-check":
-      '<rect width="8" height="4" x="8" y="2" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/>',
+      '<path d="M3.5 15a8.5 8.5 0 0 1 17 0"/><path d="M12 6.5V8"/><path d="m5.99 8.99 1.06 1.06"/><path d="m18.01 8.99-1.06 1.06"/><path d="m12 15 2.75-4.76"/><circle cx="12" cy="15" r="1.6"/><path d="M7.5 19.5h9"/>',
     "clipboard-list":
       '<rect width="8" height="4" x="8" y="2" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/>',
-    map: '<polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" x2="9" y1="3" y2="18"/><line x1="15" x2="15" y1="6" y2="21"/>',
+    "file-search":
+      '<path d="M13.5 21H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8l5 5v4"/><path d="M14 3v5h5"/><path d="M8 9h3"/><path d="M8 13h4"/><circle cx="16.5" cy="17" r="3"/><path d="m18.7 19.2 2.3 2.3"/>',
+    map: '<path d="M12 17.5s-5-4.2-5-8.5a5 5 0 0 1 10 0c0 4.3-5 8.5-5 8.5Z"/><circle cx="12" cy="9" r="1.8"/><path d="M7.6 14.8 3 16.8l9 4.2 9-4.2-4.6-2"/>',
     "map-pin": '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>',
     users:
-      '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+      '<circle cx="12" cy="8" r="3.2"/><path d="M6 20.5V20a6 6 0 0 1 12 0v.5"/><circle cx="5" cy="10" r="2.2"/><path d="M1.8 18.5a3.6 3.6 0 0 1 4-3.4"/><circle cx="19" cy="10" r="2.2"/><path d="M22.2 18.5a3.6 3.6 0 0 0-4-3.4"/>',
     user: '<path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
     "user-check":
       '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><polyline points="16 11 18 13 22 9"/>',
@@ -22,7 +24,7 @@
       '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/>',
     "user-x":
       '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="17" x2="22" y1="8" y2="13"/><line x1="22" x2="17" y1="8" y2="13"/>',
-    "chart-line": '<path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/>',
+    "chart-line": '<rect x="3" y="3.5" width="18" height="17" rx="3"/><path d="m6.5 15 3.5-4 3 2.5 4.5-5.5"/>',
     "chart-bar": '<path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/>',
     search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
     bell: '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
@@ -34,7 +36,6 @@
     "chevron-up": '<path d="m18 15-6-6-6 6"/>',
     "chevron-right": '<path d="m9 18 6-6-6-6"/>',
     "chevron-left": '<path d="m15 18-6-6 6-6"/>',
-    "chevrons-left": '<path d="m11 17-5-5 5-5"/><path d="m18 17-5-5 5-5"/>',
     "chevrons-up-down": '<path d="m7 15 5 5 5-5"/><path d="m7 9 5-5 5 5"/>',
     "arrow-right": '<path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>',
     "arrow-left": '<path d="m12 19-7-7 7-7"/><path d="M19 12H5"/>',
@@ -46,8 +47,9 @@
     clock: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
     wrench:
       '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
+    // A crew member wearing a hard hat.
     "hard-hat":
-      '<path d="M2 18a1 1 0 0 0 1 1h18a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v2z"/><path d="M10 10V5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v5"/><path d="M4 15v-3a6 6 0 0 1 6-6"/><path d="M14 6a6 6 0 0 1 6 6v3"/>',
+      '<path d="M6.5 10.5a5.5 5.5 0 0 1 11 0"/><path d="M5 10.5h14"/><path d="M12 5v2.2"/><path d="M8.5 10.5v1a3.5 3.5 0 0 0 7 0v-1"/><path d="M5 21v-1a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5v1"/>',
     construction:
       '<rect x="2" y="6" width="20" height="8" rx="1"/><path d="M17 14v7"/><path d="M7 14v7"/><path d="M17 3v3"/><path d="M7 3v3"/><path d="M10 14 2.3 6.3"/><path d="m14 6 7.7 7.7"/><path d="m8 6 8 8"/>',
     check: '<path d="M20 6 9 17l-5-5"/>',
@@ -102,8 +104,10 @@
     ban: '<circle cx="12" cy="12" r="10"/><path d="m4.9 4.9 14.2 14.2"/>',
     command:
       '<path d="M15 6v12a3 3 0 1 0 3-3H6a3 3 0 1 0 3 3V6a3 3 0 1 0-3 3h12a3 3 0 1 0-3-3"/>',
-    "panel-left": '<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/>',
+    "panel-left": '<rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9.5 4v16"/>',
     home: '<path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>',
+    globe:
+      '<circle cx="12" cy="12" r="9"/><path d="M3.6 9h16.8"/><path d="M3.6 15h16.8"/><path d="M11.5 3a15 15 0 0 0 0 18"/><path d="M12.5 3a15 15 0 0 1 0 18"/>',
     "file-text":
       '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/>',
     hash: '<line x1="4" x2="20" y1="9" y2="9"/><line x1="4" x2="20" y1="15" y2="15"/><line x1="10" x2="8" y1="3" y2="21"/><line x1="16" x2="14" y1="3" y2="21"/>',

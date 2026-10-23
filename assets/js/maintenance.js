@@ -1,6 +1,7 @@
 /* Maintenance crew workspace: overview, assigned jobs (start a repair, submit
-   notes with before-and-after photos), and a map of repair sites. Repair
-   drafts survive re-renders, so typing is never lost when data refreshes. */
+   notes with after-repair photos), a map of repair sites, and the public
+   site. Repair drafts survive re-renders, so typing is never lost when data
+   refreshes. */
 (async function () {
   "use strict";
 
@@ -14,7 +15,8 @@
     return;
   }
 
-  const maxPhotos = 5;
+  // The server accepts up to ten after-repair photos per repair update.
+  const maxPhotos = 10;
   const severityRank = { High: 3, Medium: 2, Low: 1 };
   const jobSteps = ["assigned", "in_progress", "repair_submitted", "resolved"];
   const jobStepLabels = { assigned: "Assigned", in_progress: "Repairing", repair_submitted: "Submitted", resolved: "Verified" };
@@ -27,6 +29,7 @@
     overview: { crumb: "Overview", title: "Road maintenance workspace", icon: "dashboard" },
     jobs: { crumb: "My assigned jobs", title: "My assigned jobs", icon: "wrench" },
     map: { crumb: "Repair sites", title: "Repair sites", icon: "map" },
+    public: { crumb: "Public site", title: "Public site", icon: "globe" },
   };
 
   const $ = function (selector) {
@@ -79,7 +82,7 @@
 
   function draftFor(reportId) {
     if (!drafts.has(reportId)) {
-      drafts.set(reportId, { notes: "", before: [], after: [] });
+      drafts.set(reportId, { notes: "", after: [] });
     }
     return drafts.get(reportId);
   }
@@ -128,6 +131,7 @@
       window.scrollTo({ top: 0, behavior: "instant" });
     }
     runSafely(renderMaps);
+    runSafely(renderPublicView);
   }
 
   /* ---------- Overview ---------- */
@@ -263,6 +267,10 @@
     });
   }
 
+  function photoCountText(count) {
+    return count ? count + " of " + maxPhotos + " added" : "Up to " + maxPhotos;
+  }
+
   function thumbList(photos, field, reportId) {
     return photos
       .map(function (photo, index) {
@@ -293,8 +301,10 @@
     return (
       '<div class="photo-field"><span class="field-label">' +
       label +
-      ' <span class="optional">Up to ' +
-      maxPhotos +
+      ' <span class="optional" data-photo-count="' +
+      field +
+      '">' +
+      photoCountText(draftFor(reportId)[field].length) +
       '</span></span><label class="dropzone"><input type="file" name="' +
       field +
       '-photos" accept="image/*" multiple data-photo-input="' +
@@ -346,27 +356,27 @@
           icon("wrench") +
           'Submit repair update</h4><label class="field"><span class="field-label">Repair notes</span><textarea name="notes" rows="3" maxlength="1000" placeholder="Describe the inspection and repair work completed">' +
           esc(draft.notes) +
-          '</textarea></label><div class="photo-fields">' +
-          dropzone("before", "Before photos", report.id) +
-          dropzone("after", "After photos", report.id) +
-          '</div><p class="field-hint">Choose at least one image for both fields. Photos are resized and saved with the report so the administrator can compare them.</p><div class="job-actions"><button class="btn btn-primary" type="submit">' +
+          "</textarea></label>" +
+          dropzone("after", "After-repair photos", report.id) +
+          '<p class="field-hint">Add at least one photo of the finished repair. The resident\'s photos of the damage are already on the report, so the administrator can compare them. Photos are resized before they are saved.</p><div class="job-actions"><button class="btn btn-primary" type="submit">' +
           icon("send", "icon-sm") +
           "Submit repair for review</button></div></form>"
         : "";
 
+    const afterPhotos = report.repair ? ui.repairPhotos(report, "after") : [];
     const receipt = report.repair
       ? '<div class="callout callout-tone"><div class="detail-block-head"><h3>' +
-        icon("clipboard-check") +
+        icon("wrench") +
         (report.status === "in_progress" ? "Previous repair update" : "Repair update") +
         '</h3><span class="muted text-sm">' +
         esc(report.repair.submittedAt ? ui.formatDate(report.repair.submittedAt) : "") +
         '</span></div><p class="detail-description">' +
         esc(report.repair.notes) +
-        '</p><div class="before-after"><div><h4>Before</h4>' +
-        ui.photoGallery(ui.repairPhotos(report, "before"), "Before repair photos") +
-        "</div><div><h4>After</h4>" +
-        ui.photoGallery(ui.repairPhotos(report, "after"), "After repair photos") +
-        "</div></div>" +
+        '</p><div class="repair-photos"><h4>After-repair photos <span>' +
+        esc(ui.pluralize(afterPhotos.length, "photo")) +
+        "</span></h4>" +
+        ui.photoGallery(afterPhotos, "After-repair photos", "gallery-grid") +
+        "</div>" +
         (report.status === "repair_submitted"
           ? '<p class="field-hint" style="margin-top: 0.75rem">This repair is waiting for an administrator to verify it.</p>'
           : "") +
@@ -585,6 +595,25 @@
     }
   }
 
+  /* ---------- Public site ---------- */
+
+  // The public site inside the workspace. Only the crew's own jobs open from
+  // it; other reports are shown as the public sees them.
+  function renderPublicView() {
+    if (currentView !== "public" || !state) {
+      return;
+    }
+    window.RoadWatchPublicView.render($("#public-view"), state, {
+      canOpen: function (report) {
+        return report.assignedTo === person.id;
+      },
+      openLabel: "Open job",
+      onOpen: function (reportId) {
+        focusJob(reportId);
+      },
+    });
+  }
+
   /* ---------- Render ---------- */
 
   function render() {
@@ -601,6 +630,7 @@
     renderOverview(jobs);
     renderJobs(jobs);
     renderMaps();
+    renderPublicView();
     shell.refreshNotifications();
   }
 
@@ -608,7 +638,12 @@
 
   function refreshThumbs(form, field) {
     const reportId = form.dataset.reportId;
-    form.querySelector('[data-preview="' + field + '"]').innerHTML = thumbList(draftFor(reportId)[field], field, reportId);
+    const photos = draftFor(reportId)[field];
+    form.querySelector('[data-preview="' + field + '"]').innerHTML = thumbList(photos, field, reportId);
+    const count = form.querySelector('[data-photo-count="' + field + '"]');
+    if (count) {
+      count.textContent = photoCountText(photos.length);
+    }
   }
 
   function addPhotos(input) {
@@ -619,7 +654,7 @@
     input.value = "";
     const room = maxPhotos - draft[field].length;
     if (room <= 0) {
-      ui.showMessage("You can add up to " + maxPhotos + " " + field + " photos.", "error");
+      ui.showMessage("You can add up to " + maxPhotos + " after-repair photos.", "error");
       return;
     }
     if (files.length > room) {
@@ -775,8 +810,8 @@
     const reportId = form.dataset.reportId;
     const draft = draftFor(reportId);
     draft.notes = form.elements.namedItem("notes").value;
-    if (!draft.notes.trim() || draft.before.length === 0 || draft.after.length === 0) {
-      ui.showMessage("Add repair notes and choose at least one before and after photo.", "error");
+    if (!draft.notes.trim() || draft.after.length === 0) {
+      ui.showMessage("Add repair notes and at least one after-repair photo.", "error");
       if (!draft.notes.trim()) {
         form.elements.namedItem("notes").focus();
       }
@@ -800,7 +835,6 @@
       try {
         request = store.submitRepair(reportId, currentUser.userId, {
           notes: draft.notes,
-          beforePhotos: draft.before,
           afterPhotos: draft.after,
         });
       } catch (error) {

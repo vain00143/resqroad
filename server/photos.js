@@ -14,21 +14,38 @@ export const photosDir = path.join(config.storageDir, "photos");
 export const photoUrlPrefix = "/uploads/";
 const inDatabase = config.photoStorage === "database";
 
-// Accepts multipart/form-data with up to five files per field.
+// Accepts multipart/form-data with photo fields given by name (up to five
+// files each) or as { name, maxCount }.
 export function photoUpload(fields) {
-  return multer({
+  const specs = fields.map(function (field) {
+    return typeof field === "string" ? { name: field, maxCount: config.maxPhotosPerSet } : field;
+  });
+  const upload = multer({
     storage: multer.memoryStorage(),
     limits: {
       fileSize: config.maxPhotoBytes,
-      files: fields.length * config.maxPhotosPerSet,
+      files: specs.reduce(function (total, spec) {
+        return total + spec.maxCount;
+      }, 0),
       fields: 20,
       fieldSize: 20000,
     },
-  }).fields(
-    fields.map(function (name) {
-      return { name: name, maxCount: config.maxPhotosPerSet };
-    }),
-  );
+  }).fields(specs);
+  // Too many photos in a field: say how many that field allows.
+  return function (request, response, next) {
+    upload(request, response, function (error) {
+      if (error instanceof multer.MulterError && (error.code === "LIMIT_UNEXPECTED_FILE" || error.code === "LIMIT_FILE_COUNT")) {
+        const spec = specs.find(function (item) {
+          return item.name === error.field;
+        });
+        if (spec) {
+          next(new HttpError(400, "Choose no more than " + spec.maxCount + " photos."));
+          return;
+        }
+      }
+      next(error);
+    });
+  };
 }
 
 // Identifies the image from its first bytes rather than trusting the name.

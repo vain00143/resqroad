@@ -31,6 +31,7 @@
     <script src="assets/js/auth.js" defer></script>
     <script src="assets/js/menus.js" defer></script>
     <script src="assets/js/shell.js" defer></script>
+    <script src="assets/js/public-view.js" defer></script>
     <script src="assets/js/maintenance.js" defer></script>
   </head>
   <body class="app-body" data-required-role="maintenance">
@@ -39,10 +40,12 @@
       <aside class="sidebar" id="sidebar" aria-label="Maintenance navigation">
         <div class="sidebar-head">
           <a class="sidebar-brand" href="maintenance.html" aria-label="ResQRoad maintenance workspace">
-            <img class="sidebar-logo-full" src="assets/images/resqroad-logotype-white.png" alt="ResQRoad" width="748" height="127" />
+            <span class="sidebar-logo-full">
+              <img class="logo-on-light" src="assets/images/resqroad-logotype.png" alt="ResQRoad" width="748" height="127" />
+              <img class="logo-on-dark" src="assets/images/resqroad-logotype-white.png" alt="ResQRoad" width="748" height="127" />
+            </span>
             <img class="sidebar-logo-mark" src="assets/images/resqroad-mark.png" alt="" width="384" height="408" />
           </a>
-          <button class="sidebar-icon-btn sidebar-collapse" type="button" data-sidebar-collapse aria-controls="sidebar"><svg data-icon="chevrons-left"></svg></button>
           <button class="sidebar-icon-btn sidebar-close" type="button" data-sidebar-close aria-label="Close navigation"><svg data-icon="x"></svg></button>
         </div>
         <div class="sidebar-scroll">
@@ -60,7 +63,7 @@
           </nav>
           <p class="sidebar-section">More</p>
           <nav class="sidebar-nav" aria-label="More">
-            <a class="nav-item" href="index.html" data-tip="Public site"><svg data-icon="home"></svg><span class="nav-label">Public site</span></a>
+            <button class="nav-item" type="button" data-crew-view="public" data-tip="Public site"><svg data-icon="globe"></svg><span class="nav-label">Public site</span></button>
           </nav>
         </div>
         <div class="sidebar-foot">
@@ -68,7 +71,7 @@
             <strong><span class="live-dot" aria-hidden="true"></span>Synced with dispatch</strong>
             <span>New assignments appear here automatically.</span>
           </div>
-          <button class="sidebar-user" type="button" data-popover-target="user-menu" data-popover-placement="top-start" aria-haspopup="menu" aria-expanded="false" aria-controls="user-menu" aria-label="Account menu">
+          <button class="sidebar-user" type="button" data-popover-target="user-menu" data-popover-placement="top-start" data-popover-width="trigger" aria-haspopup="menu" aria-expanded="false" aria-controls="user-menu" aria-label="Account menu">
             <span class="avatar" data-user-avatar aria-hidden="true">RM</span>
             <span class="person-copy"><strong data-current-user></strong><span data-current-team>Road maintenance</span></span>
             <svg data-icon="chevrons-up-down"></svg>
@@ -80,6 +83,8 @@
       <div class="main">
         <header class="topbar">
           <button class="btn btn-ghost btn-icon topbar-menu" type="button" data-sidebar-open aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar"><svg data-icon="menu"></svg></button>
+          <button class="btn btn-ghost btn-icon topbar-collapse" type="button" data-sidebar-collapse aria-controls="sidebar"><svg data-icon="panel-left"></svg></button>
+          <span class="topbar-divider" aria-hidden="true"></span>
           <nav class="breadcrumb" aria-label="Breadcrumb">
             <span>Maintenance</span><svg data-icon="chevron-right"></svg><strong id="crumb-current">Overview</strong>
           </nav>
@@ -88,7 +93,6 @@
             <span class="kbd-group" aria-hidden="true"><span class="kbd" data-kbd-mod>Ctrl</span><span class="kbd">K</span></span>
           </button>
           <div class="topbar-actions">
-            <button class="btn btn-ghost btn-icon theme-toggle" type="button" data-theme-toggle><svg data-icon="sun" class="icon-sun"></svg><svg data-icon="moon" class="icon-moon"></svg></button>
             <button class="btn btn-ghost btn-icon" type="button" data-notif-toggle aria-label="Notifications"><svg data-icon="bell"></svg></button>
           </div>
         </header>
@@ -152,7 +156,7 @@
               <div>
                 <p class="eyebrow" id="job-description">Jobs currently assigned to you</p>
                 <h1 class="page-title" id="jobs-title">My assigned jobs</h1>
-                <p class="page-desc">Start repairs, add repair notes with before-and-after photos, and submit them for administrator verification.</p>
+                <p class="page-desc">Start repairs, add repair notes with photos of the finished work, and submit them for administrator verification.</p>
               </div>
               <div class="tabs" role="tablist" aria-label="Job status">
                 <button class="tab" type="button" role="tab" aria-selected="true" data-job-tab="active">Active<span class="count-badge" data-count="active">0</span></button>
@@ -204,6 +208,21 @@
               </aside>
             </div>
           </section>
+
+          <!-- Public site -->
+          <section class="view" data-crew-view-panel="public" aria-labelledby="public-title" hidden>
+            <div class="page-head">
+              <div>
+                <p class="eyebrow">Public site</p>
+                <h1 class="page-title" id="public-title">Public site</h1>
+                <p class="page-desc">What residents see on the public ResQRoad site: live numbers, the report map, and recent repairs.</p>
+              </div>
+              <div class="page-actions">
+                <a class="btn btn-secondary" href="index.html" target="_blank" rel="noopener"><svg data-icon="external-link"></svg>Open public website<span class="visually-hidden"> (opens in a new tab)</span></a>
+              </div>
+            </div>
+            <div id="public-view"></div>
+          </section>
         </main>
 
         <footer class="app-footer">
@@ -215,7 +234,7 @@
 
     <div class="popover" id="user-menu" role="menu" aria-label="Account" hidden>
       <div class="menu-label" data-current-email></div>
-      <a class="menu-item" role="menuitem" href="index.html"><svg data-icon="home"></svg>Public site</a>
+      <button class="menu-item" role="menuitem" type="button" data-switch-view="public"><svg data-icon="globe"></svg>Public site</button>
       <button class="menu-item" role="menuitem" type="button" data-change-password><svg data-icon="lock"></svg>Change password</button>
       <button class="menu-item" role="menuitem" type="button" data-theme-toggle><svg data-icon="moon"></svg>Switch theme</button>
       <div class="menu-sep" role="separator"></div>

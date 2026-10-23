@@ -145,6 +145,9 @@
     const rect = trigger.getBoundingClientRect();
     const placement = trigger.dataset.popoverPlacement || "bottom-end";
     const gap = 8;
+    // data-popover-width="trigger": as wide as the button that opened it
+    // (CSS min-width still applies, e.g. on the collapsed sidebar).
+    popover.style.width = trigger.dataset.popoverWidth === "trigger" ? rect.width + "px" : "";
     const width = popover.offsetWidth;
     const height = popover.offsetHeight;
     let top = placement.startsWith("top") ? rect.top - gap - height : rect.bottom + gap;
@@ -156,9 +159,12 @@
       top = rect.bottom + gap;
     }
     left = Math.max(8, Math.min(left, window.innerWidth - width - 8));
+    const above = top < rect.top;
     popover.style.top = top + "px";
     popover.style.left = left + "px";
-    popover.style.transformOrigin = (placement.startsWith("top") ? "bottom " : "top ") + (placement.endsWith("start") ? "left" : "right");
+    popover.style.transformOrigin = (above ? "bottom " : "top ") + (placement.endsWith("start") ? "left" : "right");
+    // A menu above its button slides up into place; one below slides down.
+    popover.style.setProperty("--menu-shift", above ? "10px" : "-6px");
   }
 
   function closePopover(restoreFocus) {

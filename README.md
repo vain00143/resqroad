@@ -58,10 +58,10 @@ You need [Node.js](https://nodejs.org/) 20.12 or newer and MySQL 8.0 or newer
 | `index.html` | Everyone | Public landing page: live numbers, how it works, a live map of verified reports, recently fixed roads, and a report tracker. |
 | `login.html` | Everyone | One sign-in for residents, administrators, and maintenance crews. The account decides which workspace opens. |
 | `register.html` | Residents | Create a free resident account (signs you in right away). |
-| `citizen.html` | Residents | Report a road problem (title, severity, map pin or GPS, photos) and follow every report you've filed. |
+| `citizen.html` | Residents | Report a road problem (title, severity, map pin or GPS, photos), follow every report you've filed and open its full details, and — without leaving the portal — track a report by ID, browse the live map, and see the public site. |
 | `track.html` | Everyone | Look up any report by ID (e.g. `track.html?id=RPT-1048`) and see its public progress. |
-| `admin.html` | Administrator | Dashboard, Analytics & Reports, Review Reports, Assignment, Map, and User management. |
-| `maintenance.html` | Maintenance crews | Overview, assigned jobs (start repairs, submit notes with before/after photos), and repair sites. |
+| `admin.html` | Administrator | Dashboard, Analytics & Reports, Review Reports, Assignment, Map, User management, and the public site. |
+| `maintenance.html` | Maintenance crews | Overview, assigned jobs (start repairs, submit notes with after-repair photos), repair sites, and the public site. |
 | `admin-login.html`, `maintenance-login.html` | — | Old sign-in addresses; they redirect to `login.html`. |
 
 ## Accounts
@@ -119,8 +119,9 @@ with `Rejected` and `Duplicate` as closing outcomes.
    the resident), or marks it a duplicate.
 3. Verified reports appear under **Assignment**, where the administrator assigns
    or reassigns a crew. The crew workload panel shows open jobs per crew.
-4. The assigned crew starts the repair and submits notes plus before-and-after
-   photos (at least one of each).
+4. The assigned crew starts the repair and submits notes plus one to ten
+   photos of the finished repair. The resident's photos already show the
+   damage, so before photos are optional (the mobile app still sends them).
 5. The administrator checks it under **Review Reports → Repairs to verify**, then
    resolves it or requests more work (the note is shown on the crew's job). A
    resubmitted repair replaces the photos shown; earlier ones are kept on the

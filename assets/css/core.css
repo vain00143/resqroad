@@ -91,6 +91,11 @@
   --sev-high: #d9362b;
   --sev-medium: #e8771a;
   --sev-low: #e3b100;
+  /* Severity labels use deeper shades of the same hues so their white text
+     reads clearly (at least 4.5:1) in both themes and over photos. */
+  --sev-high-label: #c62f25;
+  --sev-medium-label: #b8540c;
+  --sev-low-label: #957000;
 
   /* One tone per workflow status; pills mix it with the surface and text. */
   --st-submitted: #8a817b;
@@ -1185,42 +1190,29 @@ input[type="radio"] {
 .status-rejected { --tone: var(--st-rejected); }
 .status-duplicate { --tone: var(--st-duplicate); }
 
+/* Severity label (High, Medium, Low): one solid design on every page, in
+   tables, cards, maps, and details, with white text on the level's color. */
 .sev {
-  --tone: var(--sev-medium);
+  --tone: var(--sev-medium-label);
   min-height: 1.5rem;
-  padding: 0.12rem 0.55rem;
+  padding: 0.12rem 0.6rem;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 0.35rem;
   border-radius: var(--radius-full);
-  background: color-mix(in srgb, var(--tone) 13%, var(--surface));
-  color: color-mix(in srgb, var(--tone) 58%, var(--text));
+  background: var(--tone);
+  color: #fff;
   font-size: 0.74rem;
   font-weight: 600;
   line-height: 1.3;
+  letter-spacing: 0.01em;
   white-space: nowrap;
 }
 
-.sev-high { --tone: var(--sev-high); }
-.sev-medium { --tone: var(--sev-medium); }
-.sev-low { --tone: var(--sev-low); }
-
-/* Yellow needs more of the text color to stay readable on its tint. */
-.sev-low:not(.sev-solid) {
-  color: color-mix(in srgb, var(--tone) 40%, var(--text));
-}
-
-/* Solid severity badge laid over photos. */
-.sev.sev-solid {
-  background: var(--tone);
-  color: #fff;
-  box-shadow: 0 2px 8px rgb(0 0 0 / 22%);
-}
-
-.sev-medium.sev-solid,
-.sev-low.sev-solid {
-  color: #2b1b02;
-}
+.sev-high { --tone: var(--sev-high-label); }
+.sev-medium { --tone: var(--sev-medium-label); }
+.sev-low { --tone: var(--sev-low-label); }
 
 .chip {
   min-height: 2rem;
@@ -1398,6 +1390,14 @@ input[type="radio"] {
   color: var(--heading);
   font-size: 1rem;
   font-weight: 600;
+}
+
+/* Poppins sits slightly high in its line box, so a centered icon looks a
+   little low next to a heading. Nudge heading icons up to the letters. */
+.card-title > .icon,
+.detail-block-head h3 > .icon,
+.repair-form h4 > .icon {
+  translate: 0 -0.06em;
 }
 
 .card-subtitle {
@@ -1951,12 +1951,12 @@ button.kpi:hover {
 
 .timeline-note {
   margin-top: 0.3rem;
-  padding: 0.55rem 0.7rem;
+  padding: 0.6rem 0.75rem;
   border-radius: var(--radius-sm);
   background: var(--surface-3);
   color: var(--text);
-  font-size: 0.82rem;
-  line-height: 1.5;
+  font-size: 0.875rem;
+  line-height: 1.6;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
@@ -2090,11 +2090,23 @@ button.kpi:hover {
   animation: dialog-out 0.16s ease-in forwards;
 }
 
+/* The icon sits to the left of the kicker and title, centered on them. */
+.dialog-head {
+  margin-bottom: 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.dialog-heading {
+  min-width: 0;
+}
+
 .dialog-icon {
   --tone: var(--accent);
   width: 2.75rem;
   height: 2.75rem;
-  margin-bottom: 1rem;
+  flex: 0 0 auto;
   display: grid;
   place-items: center;
   border-radius: 12px;
@@ -2107,16 +2119,17 @@ button.kpi:hover {
 }
 
 .dialog-kicker {
-  margin-bottom: 0.25rem;
+  margin-bottom: 0.15rem;
   color: var(--text-3);
   font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.08em;
+  line-height: 1.3;
   text-transform: uppercase;
 }
 
 .dialog-title {
-  margin-bottom: 0.4rem;
+  margin: 0;
   font-size: 1.2rem;
 }
 
@@ -2185,9 +2198,14 @@ button.kpi:hover {
     visibility 0.36s;
 }
 
+/* Visible at once when opening (so focus can move into it right away); the
+   base rule keeps it visible while it slides out. */
 .drawer.is-open {
   transform: none;
   visibility: visible;
+  transition:
+    transform 0.36s var(--ease-out),
+    visibility 0s;
 }
 
 .drawer-header {
@@ -2354,6 +2372,18 @@ button.kpi:hover {
   grid-row: span 2;
   grid-column: span 2;
   aspect-ratio: auto;
+}
+
+/* An even grid that adds columns as space allows, for any number of photos
+   (e.g. a crew's after-repair photos). */
+.gallery.gallery-grid {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 8.5rem), 1fr));
+}
+
+.gallery.gallery-grid .gallery-item:first-child:nth-last-child(n + 3) {
+  grid-row: auto;
+  grid-column: auto;
+  aspect-ratio: 4 / 3;
 }
 
 .gallery-item img {
@@ -2951,8 +2981,9 @@ button.kpi:hover {
   from { transform: scaleY(0); }
 }
 
+/* Hovering a chart shows its tooltip; the cursor stays a normal arrow. */
 .chart-hit {
-  cursor: crosshair;
+  cursor: default;
 }
 
 .chart-tooltip {

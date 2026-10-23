@@ -271,6 +271,12 @@ function ready() {
   return readyPromise;
 }
 
+// Reloads everything from the server (e.g. the map's refresh button); live
+// updates normally keep the data current on their own.
+function refresh() {
+  return loadState();
+}
+
 /* ---------- Derived state for pages ---------- */
 
 function citizenName(reporterId) {
@@ -779,6 +785,7 @@ async function changePassword(currentPassword, newPassword) {
 
 window.RoadWatchStore = {
   ready: ready,
+  refresh: refresh,
   getState: getState,
   getReport: getReport,
   statuses: statuses,

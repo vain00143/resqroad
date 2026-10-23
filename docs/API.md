@@ -114,7 +114,7 @@ Statuses: `submitted`, `under_review`, `verified`, `assigned`, `in_progress`,
 | `POST /api/reports/:id/notes` | Admin | `{ note }`: internal note. |
 | `POST /api/reports/:id/assign` | Admin | `{ crewId }`: assign or reassign a verified report. |
 | `POST /api/reports/:id/start` | Assigned crew | Start the repair. |
-| `POST /api/reports/:id/repair` | Assigned crew | Multipart form: `notes`, and one to five `before` and `after` files each. An optional `Idempotency-Key` header (one per repair update) makes retries safe: the same key again returns `200 { report }` instead of "no longer assigned". |
+| `POST /api/reports/:id/repair` | Assigned crew | Multipart form: `notes`, one to ten `after` files (photos of the finished repair), and optionally up to five `before` files. An optional `Idempotency-Key` header (one per repair update) makes retries safe: the same key again returns `200 { report }` instead of "no longer assigned". |
 | `GET /api/crews` | Anyone | `{ crews: [{ id, name, team }] }`. |
 | `GET /api/users` | Admin | `{ users }` (never includes passwords). |
 | `POST /api/users` | Admin | `{ name, email, team, password }`: add a crew account with a temporary password. |

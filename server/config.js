@@ -59,4 +59,7 @@ export const config = {
   sessionDays: 30,
   maxPhotoBytes: 8 * 1024 * 1024,
   maxPhotosPerSet: 5,
+  // A crew's after-repair photos for one repair update (the resident's
+  // photos already show the damage before the repair).
+  maxAfterPhotos: 10,
 };

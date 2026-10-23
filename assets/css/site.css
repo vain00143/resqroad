@@ -79,7 +79,10 @@
   color: var(--heading);
 }
 
-.site-nav a[aria-current="page"] {
+/* The current page, or the section being read on the landing page. */
+.site-nav a[aria-current="page"],
+.site-nav a.is-active {
+  background: var(--selected);
   color: var(--heading);
   font-weight: 600;
 }
@@ -106,6 +109,11 @@
 
 .site-header.on-dark:not(.is-solid) .site-nav a:hover {
   background: rgb(255 255 255 / 8%);
+  color: #fff;
+}
+
+.site-header.on-dark:not(.is-solid) .site-nav a.is-active {
+  background: rgb(255 255 255 / 12%);
   color: #fff;
 }
 
@@ -168,6 +176,12 @@
 
 .mobile-nav a:not(.btn):hover {
   background: var(--hover);
+}
+
+.mobile-nav a.is-active {
+  background: var(--selected);
+  color: var(--heading);
+  font-weight: 600;
 }
 
 .mobile-nav .btn {
@@ -1070,51 +1084,6 @@
   font-weight: 600;
 }
 
-.auth-divider {
-  margin: 1.5rem 0;
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  color: var(--text-3);
-  font-size: 0.75rem;
-}
-
-.auth-divider::before,
-.auth-divider::after {
-  height: 1px;
-  flex: 1;
-  background: var(--border);
-  content: "";
-}
-
-.auth-roles {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.5rem;
-}
-
-.auth-role {
-  padding: 0.65rem 0.5rem;
-  display: grid;
-  justify-items: center;
-  gap: 0.3rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  color: var(--text-3);
-  font-size: 0.72rem;
-  text-align: center;
-}
-
-.auth-role .icon {
-  color: var(--icon);
-}
-
-.auth-role strong {
-  color: var(--text);
-  font-size: 0.78rem;
-  font-weight: 600;
-}
-
 .strength {
   height: 0.3rem;
   display: grid;
@@ -1514,6 +1483,106 @@
   padding: 0 1.25rem 1.25rem;
 }
 
+/* Status and the details button, at the right of each report card. */
+.my-report-side {
+  display: grid;
+  justify-items: end;
+  gap: 0.5rem;
+}
+
+.my-report-desc {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  color: var(--text-2);
+  font-size: 0.88rem;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+/* ---------- Track a report (in the portal) ---------- */
+
+.track-search {
+  margin-bottom: 1.25rem;
+  padding: 1.15rem 1.25rem;
+}
+
+.track-search-form {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.track-search-form .input-icon {
+  flex: 1;
+}
+
+.track-search .portal-recent {
+  margin: 0.85rem 0 0;
+}
+
+.track-picks {
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+  list-style: none;
+}
+
+.track-pick {
+  width: 100%;
+  padding: 0.75rem 0.85rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: inherit;
+  text-align: left;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.track-pick:hover {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+  background: var(--surface-2);
+}
+
+.track-pick-copy {
+  min-width: 0;
+  display: grid;
+  gap: 0.1rem;
+}
+
+.track-pick-copy strong {
+  overflow: hidden;
+  color: var(--heading);
+  font-size: 0.92rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.track-pick-copy > span:last-child {
+  overflow: hidden;
+  color: var(--text-3);
+  font-size: 0.78rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.track-pick-tags {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.4rem;
+}
+
 /* ---------- Tracker ---------- */
 
 .track-hero-form {
@@ -1708,9 +1777,21 @@
     grid-template-columns: 4.25rem minmax(0, 1fr);
   }
 
-  .my-report-head > .pill {
+  .my-report-side {
     grid-column: 1 / -1;
-    justify-self: start;
+    grid-template-columns: auto auto;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .track-pick {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .track-pick-tags {
+    grid-column: 1;
+    grid-row: 2;
+    justify-content: flex-start;
   }
 
   .my-report-thumb {
@@ -1719,17 +1800,12 @@
   }
 
   .track-form,
-  .track-hero-form {
+  .track-hero-form,
+  .track-search-form {
     flex-direction: column;
   }
 
-  .auth-roles {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .auth-role {
-    grid-template-columns: auto minmax(0, 1fr);
-    justify-items: start;
-    text-align: left;
+  .track-search-form .btn {
+    width: 100%;
   }
 }

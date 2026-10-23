@@ -30,7 +30,9 @@
     <script type="module" src="assets/js/data-store.js"></script>
     <script src="assets/js/ui.js" defer></script>
     <script src="assets/js/auth.js" defer></script>
+    <script src="assets/js/menus.js" defer></script>
     <script src="assets/js/shell.js" defer></script>
+    <script src="assets/js/public-view.js" defer></script>
     <script src="assets/js/citizen.js" defer></script>
   </head>
   <body class="app-body" data-required-role="citizen">
@@ -39,10 +41,12 @@
       <aside class="sidebar" id="sidebar" aria-label="Resident navigation">
         <div class="sidebar-head">
           <a class="sidebar-brand" href="citizen.html" aria-label="ResQRoad resident portal">
-            <img class="sidebar-logo-full" src="assets/images/resqroad-logotype-white.png" alt="ResQRoad" width="748" height="127" />
+            <span class="sidebar-logo-full">
+              <img class="logo-on-light" src="assets/images/resqroad-logotype.png" alt="ResQRoad" width="748" height="127" />
+              <img class="logo-on-dark" src="assets/images/resqroad-logotype-white.png" alt="ResQRoad" width="748" height="127" />
+            </span>
             <img class="sidebar-logo-mark" src="assets/images/resqroad-mark.png" alt="" width="384" height="408" />
           </a>
-          <button class="sidebar-icon-btn sidebar-collapse" type="button" data-sidebar-collapse aria-controls="sidebar"><svg data-icon="chevrons-left"></svg></button>
           <button class="sidebar-icon-btn sidebar-close" type="button" data-sidebar-close aria-label="Close navigation"><svg data-icon="x"></svg></button>
         </div>
         <div class="sidebar-scroll">
@@ -57,9 +61,9 @@
           </nav>
           <p class="sidebar-section">Explore</p>
           <nav class="sidebar-nav" aria-label="Explore">
-            <a class="nav-item" href="track.html" data-tip="Track a report"><svg data-icon="search"></svg><span class="nav-label">Track a report</span></a>
-            <a class="nav-item" href="index.html#live-map" data-tip="Live map"><svg data-icon="map"></svg><span class="nav-label">Live map</span></a>
-            <a class="nav-item" href="index.html" data-tip="Public site"><svg data-icon="home"></svg><span class="nav-label">Public site</span></a>
+            <a class="nav-item" href="#track" data-portal-tab="track" data-tip="Track a report"><svg data-icon="search"></svg><span class="nav-label">Track a report</span></a>
+            <a class="nav-item" href="#map" data-portal-tab="map" data-tip="Live map"><svg data-icon="map"></svg><span class="nav-label">Live map</span></a>
+            <a class="nav-item" href="#public" data-portal-tab="public" data-tip="Public site"><svg data-icon="globe"></svg><span class="nav-label">Public site</span></a>
           </nav>
         </div>
         <div class="sidebar-foot">
@@ -67,7 +71,7 @@
             <strong><span class="live-dot" aria-hidden="true"></span>Synced with the road office</strong>
             <span>Status updates from staff appear here right away.</span>
           </div>
-          <button class="sidebar-user" type="button" data-popover-target="citizen-menu" data-popover-placement="top-start" aria-haspopup="menu" aria-expanded="false" aria-controls="citizen-menu" aria-label="Account menu">
+          <button class="sidebar-user" type="button" data-popover-target="citizen-menu" data-popover-placement="top-start" data-popover-width="trigger" aria-haspopup="menu" aria-expanded="false" aria-controls="citizen-menu" aria-label="Account menu">
             <span class="avatar" data-user-avatar aria-hidden="true"></span>
             <span class="person-copy"><strong data-current-user></strong><span>Resident</span></span>
             <svg data-icon="chevrons-up-down"></svg>
@@ -79,13 +83,11 @@
       <div class="main">
         <header class="topbar">
           <button class="btn btn-ghost btn-icon topbar-menu" type="button" data-sidebar-open aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar"><svg data-icon="menu"></svg></button>
+          <button class="btn btn-ghost btn-icon topbar-collapse" type="button" data-sidebar-collapse aria-controls="sidebar"><svg data-icon="panel-left"></svg></button>
+          <span class="topbar-divider" aria-hidden="true"></span>
           <nav class="breadcrumb" aria-label="Breadcrumb">
             <span>Resident</span><svg data-icon="chevron-right"></svg><strong id="crumb-current">Report a problem</strong>
           </nav>
-          <span class="toolbar-spacer"></span>
-          <div class="topbar-actions">
-            <button class="btn btn-ghost btn-icon theme-toggle" type="button" data-theme-toggle><svg data-icon="sun" class="icon-sun"></svg><svg data-icon="moon" class="icon-moon"></svg></button>
-          </div>
         </header>
 
         <main class="content" id="main" tabindex="-1">
@@ -263,7 +265,7 @@
                 <p class="page-desc">Follow each report from review to repair. Updates from the road office appear here right away.</p>
               </div>
               <div class="page-actions">
-                <a class="btn btn-secondary" href="track.html"><svg data-icon="search"></svg>Track by ID</a>
+                <a class="btn btn-secondary" href="#track" data-portal-tab="track"><svg data-icon="search"></svg>Track by ID</a>
                 <button class="btn btn-primary" type="button" data-start-report><svg data-icon="plus"></svg>Report a problem</button>
               </div>
             </div>
@@ -286,6 +288,101 @@
             <div class="recent-ids portal-recent" id="my-recent" hidden></div>
             <div id="my-reports"></div>
           </section>
+
+          <!-- Track a report -->
+          <section class="view" data-portal-panel="track" aria-labelledby="track-title" hidden>
+            <div class="page-head">
+              <div>
+                <p class="eyebrow">Report tracker</p>
+                <h1 class="page-title" id="track-title">Track a report</h1>
+                <p class="page-desc">Enter a report ID to see where it is in the repair process, or pick one of your reports below.</p>
+              </div>
+              <div class="page-actions">
+                <a class="btn btn-secondary" href="#reports" data-portal-tab="reports"><svg data-icon="clipboard-list"></svg>My reports</a>
+                <button class="btn btn-primary" type="button" data-start-report><svg data-icon="plus"></svg>Report a problem</button>
+              </div>
+            </div>
+            <section class="card track-search" aria-label="Find a report">
+              <form class="track-search-form" id="portal-track-form" role="search" novalidate>
+                <label class="input-icon">
+                  <span class="visually-hidden">Report ID</span>
+                  <svg data-icon="hash"></svg>
+                  <input name="id" id="portal-track-input" type="text" placeholder="Report ID, e.g. RPT-1048" autocomplete="off" maxlength="12" />
+                </label>
+                <button class="btn btn-primary" type="submit"><svg data-icon="search"></svg>Track report</button>
+              </form>
+              <div class="recent-ids portal-recent" id="track-recent" hidden></div>
+            </section>
+            <div id="portal-track-result" aria-live="polite"></div>
+          </section>
+
+          <!-- Live map -->
+          <section class="view" data-portal-panel="map" aria-labelledby="live-map-title" hidden>
+            <div class="page-head">
+              <div>
+                <p class="eyebrow">Explore</p>
+                <h1 class="page-title" id="live-map-title">Live map</h1>
+                <p class="page-desc">Verified road damage across Bulacan, color-coded by severity, together with every report you've filed.</p>
+              </div>
+              <div class="page-actions">
+                <button class="btn btn-primary" type="button" data-start-report><svg data-icon="plus"></svg>Report a problem</button>
+              </div>
+            </div>
+            <div class="grid grid-kpi" id="live-map-stats" aria-label="Map summary"></div>
+            <div class="toolbar">
+              <div class="toolbar-group" role="group" aria-label="Filter by severity" id="live-map-severity">
+                <button class="chip" type="button" data-severity="all" aria-pressed="true">All severities</button>
+                <button class="chip" type="button" data-severity="High" aria-pressed="false"><i class="chip-dot" style="background: var(--sev-high)"></i>High</button>
+                <button class="chip" type="button" data-severity="Medium" aria-pressed="false"><i class="chip-dot" style="background: var(--sev-medium)"></i>Medium</button>
+                <button class="chip" type="button" data-severity="Low" aria-pressed="false"><i class="chip-dot" style="background: var(--sev-low)"></i>Low</button>
+              </div>
+              <span class="toolbar-spacer"></span>
+              <select id="live-map-scope" aria-label="Reports to show">
+                <option value="all">Everything on the map</option>
+                <option value="open">Repairs still open</option>
+                <option value="fixed">Fixed roads</option>
+                <option value="mine">My reports only</option>
+              </select>
+            </div>
+            <div class="map-layout">
+              <section class="card map-main" aria-labelledby="live-map-card-title">
+                <div class="card-header">
+                  <div>
+                    <h2 class="card-title" id="live-map-card-title"><svg data-icon="map"></svg>Report map</h2>
+                    <p class="card-subtitle">Select a pin to see the report.</p>
+                  </div>
+                </div>
+                <div class="card-body">
+                  <div class="map" id="live-map"></div>
+                  <div id="live-map-legend"></div>
+                </div>
+              </section>
+              <aside class="card map-side" aria-labelledby="live-map-list-title">
+                <div class="card-header">
+                  <div>
+                    <h2 class="card-title" id="live-map-list-title"><svg data-icon="list"></svg>Reports on the map</h2>
+                    <p class="card-subtitle" id="live-map-count"></p>
+                  </div>
+                </div>
+                <div class="card-body"><ul class="map-list" id="live-map-list"></ul></div>
+              </aside>
+            </div>
+          </section>
+
+          <!-- Public site -->
+          <section class="view" data-portal-panel="public" aria-labelledby="public-title" hidden>
+            <div class="page-head">
+              <div>
+                <p class="eyebrow">Public site</p>
+                <h1 class="page-title" id="public-title">Public site</h1>
+                <p class="page-desc">The public ResQRoad site, right here in your portal: live numbers, the report map, and recent repairs.</p>
+              </div>
+              <div class="page-actions">
+                <a class="btn btn-secondary" href="index.html" target="_blank" rel="noopener"><svg data-icon="external-link"></svg>Open public website<span class="visually-hidden"> (opens in a new tab)</span></a>
+              </div>
+            </div>
+            <div id="public-view"></div>
+          </section>
         </main>
 
         <footer class="app-footer">
@@ -297,12 +394,25 @@
 
     <div class="popover" id="citizen-menu" role="menu" aria-label="Account" hidden>
       <div class="menu-label" data-current-email></div>
-      <a class="menu-item" role="menuitem" href="track.html"><svg data-icon="search"></svg>Track a report</a>
-      <a class="menu-item" role="menuitem" href="index.html"><svg data-icon="home"></svg>Public site</a>
+      <a class="menu-item" role="menuitem" href="#track" data-portal-tab="track"><svg data-icon="search"></svg>Track a report</a>
+      <a class="menu-item" role="menuitem" href="#public" data-portal-tab="public"><svg data-icon="globe"></svg>Public site</a>
       <button class="menu-item" role="menuitem" type="button" data-change-password><svg data-icon="lock"></svg>Change password</button>
       <button class="menu-item" role="menuitem" type="button" data-theme-toggle><svg data-icon="moon"></svg>Switch theme</button>
       <div class="menu-sep" role="separator"></div>
       <button class="menu-item is-danger" role="menuitem" type="button" data-sign-out="index.html"><svg data-icon="log-out"></svg>Log out</button>
     </div>
+
+    <div class="drawer-scrim" id="drawer-scrim"></div>
+    <aside class="drawer" id="report-drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-title" aria-hidden="true">
+      <header class="drawer-header">
+        <div class="drawer-header-meta" id="drawer-meta"></div>
+        <div class="toolbar-group">
+          <button class="btn btn-ghost btn-icon btn-sm" type="button" id="drawer-copy" aria-label="Copy public tracking link" title="Copy public tracking link"><svg data-icon="copy"></svg></button>
+          <button class="btn btn-ghost btn-icon" type="button" id="drawer-close" aria-label="Close report details"><svg data-icon="x"></svg></button>
+        </div>
+      </header>
+      <div class="drawer-body" id="drawer-body"></div>
+      <footer class="drawer-footer" id="drawer-actions"></footer>
+    </aside>
   </body>
 </html>

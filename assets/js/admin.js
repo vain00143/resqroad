@@ -25,10 +25,11 @@
   const viewDetails = {
     dashboard: { crumb: "Dashboard", title: "Admin dashboard", description: "Monitor incoming reports and the repair workflow.", icon: "dashboard" },
     analytics: { crumb: "Analytics & Reports", title: "Analytics and Reports", description: "Explore report trends, totals, and severity breakdowns.", icon: "chart-line" },
-    reports: { crumb: "Review Reports", title: "Review Reports", description: "Review new reports, verify road damage, and record decisions.", icon: "clipboard-check" },
+    reports: { crumb: "Review Reports", title: "Review Reports", description: "Review new reports, verify road damage, and record decisions.", icon: "file-search" },
     assignments: { crumb: "Assignment", title: "Assignment", description: "Open verified reports to assign or change a maintenance team.", icon: "hard-hat" },
     maps: { crumb: "Map", title: "Map", description: "See verified road reports and their severity across Bulacan.", icon: "map" },
     users: { crumb: "User management", title: "User management", description: "Manage maintenance and citizen accounts.", icon: "users" },
+    public: { crumb: "Public site", title: "Public site", description: "See what residents see on the public ResQRoad site.", icon: "globe" },
   };
 
   const $ = function (selector) {
@@ -247,6 +248,9 @@
     }
     if (name === "dashboard") {
       runSafely(renderTrendChart);
+    }
+    if (name === "public") {
+      runSafely(renderPublicView);
     }
   }
 
@@ -621,7 +625,7 @@
       slides +
       "</span>" +
       dots +
-      ui.severityBadge(report.severity, { solid: true, className: "rc-sev" }) +
+      ui.severityBadge(report.severity, { className: "rc-sev" }) +
       (showsRepair ? '<span class="rc-tag">' + icon("wrench") + "Repair photo</span>" : "") +
       '<span class="rc-age">' +
       icon("clock") +
@@ -1065,6 +1069,52 @@
     });
   }
 
+  // Reloads every report from the server, then redraws the map. The button
+  // spins while it works and ignores clicks until the refresh is done.
+  function refreshMap(button) {
+    if (button.getAttribute("aria-busy") === "true") {
+      return;
+    }
+    button.setAttribute("aria-busy", "true");
+    button.disabled = true;
+    button.classList.add("is-spinning");
+    const minimumSpin = new Promise(function (resolve) {
+      window.setTimeout(resolve, 450);
+    });
+    Promise.all([store.refresh(), minimumSpin])
+      .then(function () {
+        loadState();
+        renderMapView();
+        if (adminMap) {
+          adminMap.refresh();
+        }
+        ui.showMessage("Map updated with the latest reports.", "info");
+      })
+      .catch(function (error) {
+        ui.showMessage(error.message, "error");
+      })
+      .finally(function () {
+        button.removeAttribute("aria-busy");
+        button.disabled = false;
+        button.classList.remove("is-spinning");
+      });
+  }
+
+  /* ---------- Public site ---------- */
+
+  function renderPublicView() {
+    if (currentView !== "public" || !state) {
+      return;
+    }
+    window.RoadWatchPublicView.render($("#public-view"), state, {
+      onOpen: function (reportId, opener) {
+        runSafely(function () {
+          openReport(reportId, opener);
+        });
+      },
+    });
+  }
+
   /* ---------- Analytics ---------- */
 
   function renderAnalytics() {
@@ -1421,7 +1471,8 @@
     const hasAssignment = Boolean(report.assignedTo || report.assignedName);
     const canAssign = ["verified", "assigned"].includes(report.status);
 
-    els.drawerMeta.innerHTML = '<span class="id-tag">' + esc(report.id) + "</span>" + ui.severityBadge(report.severity);
+    // Severity is listed under Information, so the header shows the ID only.
+    els.drawerMeta.innerHTML = '<span class="drawer-report-id">' + esc(report.id) + "</span>";
 
     const assignmentSummary = hasAssignment
       ? '<dl class="facts"><div><dt>Assigned personnel</dt><dd>' +
@@ -1464,6 +1515,9 @@
         "</button></div>"
       : "";
 
+    // The resident's photos above show the damage before the repair, so the
+    // submission shows the crew's notes and after-repair photos.
+    const afterPhotos = report.repair ? ui.repairPhotos(report, "after") : [];
     const repair = report.repair
       ? '<section class="detail-block"><div class="detail-block-head"><h3>' +
         icon("wrench") +
@@ -1471,11 +1525,11 @@
         esc(report.repair.submittedAt ? "Submitted " + ui.formatDate(report.repair.submittedAt) : "") +
         '</span></div><div class="callout callout-tone"><p class="detail-description">' +
         esc(report.repair.notes || "No repair notes.") +
-        '</p><div class="before-after"><div><h4>Before</h4>' +
-        ui.photoGallery(ui.repairPhotos(report, "before"), "Before repair photos") +
-        "</div><div><h4>After</h4>" +
-        ui.photoGallery(ui.repairPhotos(report, "after"), "After repair photos") +
-        "</div></div></div></section>"
+        '</p><div class="repair-photos"><h4>After-repair photos <span>' +
+        esc(ui.pluralize(afterPhotos.length, "photo")) +
+        "</span></h4>" +
+        ui.photoGallery(afterPhotos, "After-repair photos", "gallery-grid") +
+        "</div></div></section>"
       : "";
 
     els.drawerBody.innerHTML =
@@ -1495,7 +1549,9 @@
       ui.pluralize(photos.length, "photo") +
       " · select to enlarge</span></div>" +
       ui.photoGallery(photos, "Road damage photos") +
-      '</section><section class="detail-block detail-columns"><dl class="facts"><div><dt>Severity</dt><dd>' +
+      '</section><section class="detail-block detail-columns"><div class="detail-column"><div class="detail-block-head"><h3>' +
+      icon("info") +
+      'Information</h3></div><dl class="facts"><div><dt>Severity</dt><dd>' +
       ui.severityBadge(report.severity) +
       "</dd></div><div><dt>Status</dt><dd>" +
       ui.statusPill(report.status) +
@@ -1509,26 +1565,30 @@
       esc(report.coordinates.lat + ", " + report.coordinates.lng) +
       ' · <a href="' +
       esc(ui.osmUrl(report.coordinates)) +
-      '" target="_blank" rel="noreferrer">Open in OpenStreetMap</a></dd></div></dl><div class="detail-map"><div class="map" id="detail-map"></div></div></section>' +
+      '" target="_blank" rel="noreferrer">Open in OpenStreetMap</a></dd></div></dl></div><div class="detail-column"><div class="detail-block-head"><h3>' +
+      icon("map") +
+      'Map</h3></div><div class="detail-map"><div class="map" id="detail-map"></div></div></div></section>' +
       '<section class="detail-block"><div class="detail-block-head"><h3>' +
       icon("file-text") +
       'Description</h3></div><p class="detail-description">' +
       esc(report.description) +
       "</p></section>" +
-      repair +
       '<section class="detail-block"><div class="detail-block-head"><h3>' +
       icon("hard-hat") +
       'Assign team</h3></div><div class="callout assign-box">' +
       assignmentSummary +
       assignmentControl +
       "</div></section>" +
+      repair +
       '<section class="detail-block"><div class="detail-block-head"><h3>' +
       icon("activity") +
       'Activity &amp; notes</h3><span class="muted text-sm">' +
       ui.pluralize(report.history.length, "entry", "entries") +
       "</span></div>" +
       ui.timeline(report) +
-      '<form class="note-form" data-note-form><label class="field"><span class="field-label">Internal note <span class="optional">Visible to staff only</span></span><textarea name="note" rows="2" maxlength="1000" placeholder="Add context for the team, e.g. site inspection findings"></textarea></label><div class="note-form-actions"><button class="btn btn-secondary btn-sm" type="submit">' +
+      '<form class="note-form" data-note-form><label class="field"><span class="field-label">Internal note <span class="optional">' +
+      icon("lock", "icon-sm") +
+      'Visible to staff only</span></span><textarea name="note" rows="3" maxlength="1000" placeholder="Add context for the team, e.g. site inspection findings"></textarea></label><div class="note-form-actions"><button class="btn btn-secondary" type="submit">' +
       icon("message", "icon-sm") +
       "Add note</button></div></form></section>";
 
@@ -1781,6 +1841,7 @@
     renderUsers();
     renderMapView();
     renderAnalytics();
+    renderPublicView();
     if (openReportId && els.drawer.classList.contains("is-open")) {
       if (findReport(openReportId)) {
         renderDrawer(openReportId);
@@ -1935,15 +1996,8 @@
       adminMap.focus(item.dataset.mapFocus);
     }
   });
-  $("#refresh-map").addEventListener("click", function () {
-    runSafely(function () {
-      loadState();
-      renderMapView();
-      if (adminMap) {
-        adminMap.refresh();
-      }
-      ui.showMessage("Map updated with the latest reports.", "info");
-    });
+  $("#refresh-map").addEventListener("click", function (event) {
+    refreshMap(event.currentTarget);
   });
 
   $("#analytics-range").addEventListener("change", function () {

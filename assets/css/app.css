@@ -7,6 +7,12 @@
   background: var(--bg);
 }
 
+/* Keep the scrollbar's space when a panel locks page scrolling, so the
+   page behind it doesn't widen and reflow (e.g. 3 to 4 report columns). */
+html:has(> body.app-body) {
+  scrollbar-gutter: stable;
+}
+
 .shell {
   min-height: 100vh;
   display: grid;
@@ -20,7 +26,29 @@
 
 /* ---------- Sidebar ---------- */
 
+/* The sidebar follows the theme: light surfaces in light mode, the brand's
+   ink in dark mode. Every color comes from these tokens. */
 .sidebar {
+  --sb-bg: var(--surface);
+  --sb-glow: rgb(207 92 54 / 7%);
+  --sb-glow-2: rgb(207 92 54 / 4%);
+  --sb-border: var(--border);
+  --sb-text: var(--text-2);
+  --sb-strong: var(--heading);
+  --sb-muted: var(--text-3);
+  --sb-icon: #7a716b;
+  --sb-icon-hover: var(--text);
+  --sb-hover: var(--hover);
+  --sb-active-from: rgb(207 92 54 / 14%);
+  --sb-active-to: rgb(207 92 54 / 4%);
+  --sb-active-icon: var(--rr-700);
+  --sb-badge: var(--surface-3);
+  --sb-badge-text: var(--text-2);
+  --sb-panel: var(--surface-2);
+  --sb-panel-border: var(--border);
+  --sb-divider: var(--border);
+  --sb-scrollbar: rgb(43 37 34 / 16%);
+
   position: sticky;
   top: 0;
   z-index: 60;
@@ -29,12 +57,34 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border-right: 1px solid #000;
+  border-right: 1px solid var(--sb-border);
   background:
-    radial-gradient(130% 50% at 0% 0%, rgb(207 92 54 / 18%), transparent 60%),
-    radial-gradient(90% 40% at 100% 100%, rgb(207 92 54 / 8%), transparent 60%),
-    var(--rr-ink);
-  color: #cfc6c0;
+    radial-gradient(130% 50% at 0% 0%, var(--sb-glow), transparent 60%),
+    radial-gradient(90% 40% at 100% 100%, var(--sb-glow-2), transparent 60%),
+    var(--sb-bg);
+  color: var(--sb-text);
+}
+
+:root[data-theme="dark"] .sidebar {
+  --sb-bg: var(--rr-ink);
+  --sb-glow: rgb(207 92 54 / 18%);
+  --sb-glow-2: rgb(207 92 54 / 8%);
+  --sb-border: #000;
+  --sb-text: #cfc6c0;
+  --sb-strong: #fff;
+  --sb-muted: #8f8680;
+  --sb-icon: #847b75;
+  --sb-icon-hover: #d9d1cb;
+  --sb-hover: rgb(255 255 255 / 6%);
+  --sb-active-from: rgb(207 92 54 / 24%);
+  --sb-active-to: rgb(207 92 54 / 7%);
+  --sb-active-icon: var(--rr-300);
+  --sb-badge: rgb(255 255 255 / 9%);
+  --sb-badge-text: #e6ded8;
+  --sb-panel: rgb(255 255 255 / 3%);
+  --sb-panel-border: rgb(255 255 255 / 7%);
+  --sb-divider: rgb(255 255 255 / 6%);
+  --sb-scrollbar: rgb(255 255 255 / 12%);
 }
 
 .sidebar-head {
@@ -53,8 +103,14 @@
   text-decoration: none;
 }
 
+/* The logotype comes in dark ink (light theme) and white (dark theme); the
+   logo-on-light / logo-on-dark classes in core.css pick one. */
 .sidebar-logo-full {
   width: 11.5rem;
+}
+
+.sidebar-logo-full img {
+  width: 100%;
   height: auto;
 }
 
@@ -74,16 +130,15 @@
   border: 0;
   border-radius: 8px;
   background: transparent;
-  color: #8f8680;
+  color: var(--sb-muted);
   transition:
     background-color 0.15s ease,
-    color 0.15s ease,
-    transform 0.3s var(--ease-out);
+    color 0.15s ease;
 }
 
 .sidebar-icon-btn:hover {
-  background: rgb(255 255 255 / 8%);
-  color: #fff;
+  background: var(--sb-hover);
+  color: var(--sb-strong);
 }
 
 .sidebar-close {
@@ -96,12 +151,12 @@
   padding: 0.5rem 0.75rem 1rem;
   overflow-y: auto;
   scrollbar-width: thin;
-  scrollbar-color: rgb(255 255 255 / 12%) transparent;
+  scrollbar-color: var(--sb-scrollbar) transparent;
 }
 
 .sidebar-section {
   margin: 1rem 0.65rem 0.45rem;
-  color: #7d746e;
+  color: var(--sb-muted);
   font-size: 0.68rem;
   font-weight: 600;
   letter-spacing: 0.14em;
@@ -129,7 +184,7 @@
   border: 0;
   border-radius: 10px;
   background: transparent;
-  color: #b9b0aa;
+  color: var(--sb-text);
   font-size: 0.875rem;
   font-weight: 500;
   text-align: left;
@@ -141,22 +196,22 @@
 }
 
 .nav-item .icon {
-  color: #847b75;
+  color: var(--sb-icon);
   transition: color 0.15s ease;
 }
 
 .nav-item:hover {
-  background: rgb(255 255 255 / 6%);
-  color: #fff;
+  background: var(--sb-hover);
+  color: var(--sb-strong);
 }
 
 .nav-item:hover .icon {
-  color: #d9d1cb;
+  color: var(--sb-icon-hover);
 }
 
 .nav-item.is-active {
-  background: linear-gradient(90deg, rgb(207 92 54 / 24%), rgb(207 92 54 / 7%));
-  color: #fff;
+  background: linear-gradient(90deg, var(--sb-active-from), var(--sb-active-to));
+  color: var(--sb-strong);
   font-weight: 600;
 }
 
@@ -173,7 +228,7 @@
 }
 
 .nav-item.is-active .icon {
-  color: var(--rr-300);
+  color: var(--sb-active-icon);
 }
 
 .nav-item:focus-visible {
@@ -195,8 +250,8 @@
   display: inline-grid;
   place-items: center;
   border-radius: var(--radius-full);
-  background: rgb(255 255 255 / 9%);
-  color: #e6ded8;
+  background: var(--sb-badge);
+  color: var(--sb-badge-text);
   font-size: 0.7rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -216,16 +271,16 @@
   padding: 0.75rem;
   display: grid;
   gap: 0.6rem;
-  border-top: 1px solid rgb(255 255 255 / 6%);
+  border-top: 1px solid var(--sb-divider);
 }
 
 .sidebar-status {
   padding: 0.75rem 0.85rem;
   display: grid;
   gap: 0.15rem;
-  border: 1px solid rgb(255 255 255 / 7%);
+  border: 1px solid var(--sb-panel-border);
   border-radius: 12px;
-  background: rgb(255 255 255 / 3%);
+  background: var(--sb-panel);
   font-size: 0.74rem;
   line-height: 1.45;
 }
@@ -234,13 +289,13 @@
   display: flex;
   align-items: center;
   gap: 0.45rem;
-  color: #f1ebe6;
+  color: var(--sb-strong);
   font-size: 0.78rem;
   font-weight: 600;
 }
 
 .sidebar-status span {
-  color: #8f8680;
+  color: var(--sb-muted);
 }
 
 .live-dot {
@@ -268,28 +323,26 @@
 
 .sidebar-user:hover,
 .sidebar-user[aria-expanded="true"] {
-  background: rgb(255 255 255 / 6%);
+  background: var(--sb-hover);
 }
 
 .sidebar-user .person-copy strong {
-  color: #fff;
+  color: var(--sb-strong);
 }
 
 .sidebar-user .person-copy span {
-  color: #8f8680;
+  color: var(--sb-muted);
 }
 
 .sidebar-user > .icon {
   margin-left: auto;
-  color: #847b75;
+  color: var(--sb-icon);
 }
 
 /* Collapsed (desktop): icon rail with tooltips. */
 .shell.is-collapsed .sidebar-head {
   padding: 0;
-  flex-direction: column;
   justify-content: center;
-  gap: 0.25rem;
 }
 
 .shell.is-collapsed .sidebar-logo-full,
@@ -303,11 +356,6 @@
 
 .shell.is-collapsed .sidebar-logo-mark {
   display: block;
-  margin-top: 0.75rem;
-}
-
-.shell.is-collapsed .sidebar-collapse {
-  transform: rotate(180deg);
 }
 
 .shell.is-collapsed .sidebar-scroll {
@@ -392,6 +440,18 @@
 
 .topbar-menu {
   display: none;
+}
+
+/* Collapse control first, then a divider, then the breadcrumb. */
+.topbar-collapse {
+  margin-left: -0.5rem;
+}
+
+.topbar-divider {
+  width: 1px;
+  height: 1.25rem;
+  flex: 0 0 auto;
+  background: var(--border-strong);
 }
 
 .breadcrumb {
@@ -698,22 +758,6 @@
   content: "";
 }
 
-.welcome::after {
-  position: absolute;
-  right: 0;
-  bottom: 1.1rem;
-  left: 0;
-  z-index: -1;
-  height: 3px;
-  background: repeating-linear-gradient(90deg, rgb(239 200 139 / 30%) 0 26px, transparent 26px 52px);
-  content: "";
-  animation: lane-move 2.4s linear infinite;
-}
-
-@keyframes lane-move {
-  to { background-position: 52px 0; }
-}
-
 .welcome .eyebrow {
   color: var(--rr-150);
 }
@@ -749,6 +793,12 @@
   --btn-border: #fff;
   --btn-bg-hover: var(--rr-cream);
   box-shadow: 0 6px 20px rgb(0 0 0 / 25%);
+}
+
+/* The count on the white button gets a brand color so it stays visible. */
+.welcome .btn-primary .btn-count {
+  background: var(--primary);
+  color: #fff;
 }
 
 .attention-list {
@@ -892,9 +942,12 @@ button.crew-row:hover {
 
 /* ---------- Report cards ---------- */
 
+/* Up to three columns: each column is at least a third of the row (or
+   17.5rem when that is wider), so a fourth never fits, even when the page
+   gets a little wider. Narrow rows drop to two columns, then one. */
 .report-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(17.5rem, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(max(17.5rem, calc((100% - 2 * 1.1rem) / 3 - 1px)), 1fr));
   gap: 1.1rem;
 }
 
@@ -1158,6 +1211,16 @@ button.crew-row:hover {
 
 /* ---------- Report detail drawer ---------- */
 
+/* The report ID leads the drawer header. */
+.drawer-report-id {
+  color: var(--heading);
+  font-family: var(--font-mono);
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+}
+
 .detail-title {
   margin: 0 0 0.35rem;
   font-size: clamp(1.25rem, 2.2vw, 1.55rem);
@@ -1232,6 +1295,18 @@ button.crew-row:hover {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 1rem;
+}
+
+/* Information and Map, each under its own heading; the map fills the
+   column's height next to the table. */
+.detail-column {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.detail-column .detail-map {
+  flex: 1;
 }
 
 .facts {
@@ -1319,15 +1394,16 @@ button.crew-row:hover {
   background: color-mix(in srgb, var(--tone) 5%, var(--surface));
 }
 
-.before-after {
+/* A crew's after-repair photos (the resident's photos show the "before"). */
+.repair-photos {
   margin-top: 0.85rem;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.75rem;
 }
 
-.before-after h4 {
-  margin: 0 0 0.45rem;
+.repair-photos h4 {
+  margin: 0 0 0.5rem;
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
   color: var(--text-3);
   font-size: 0.72rem;
   font-weight: 600;
@@ -1335,14 +1411,10 @@ button.crew-row:hover {
   text-transform: uppercase;
 }
 
-.before-after .gallery {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.before-after .gallery-item:first-child:nth-last-child(n + 3) {
-  grid-row: auto;
-  grid-column: auto;
-  aspect-ratio: 4 / 3;
+.repair-photos h4 span {
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 .assign-box {
@@ -1362,13 +1434,29 @@ button.crew-row:hover {
 }
 
 .note-form {
-  margin-top: 1rem;
+  margin-top: 1.25rem;
   display: grid;
   gap: 0.6rem;
 }
 
+/* Internal notes are read and written often, so they use larger type. */
+.note-form .field-label {
+  align-items: center;
+  color: var(--heading);
+  font-size: 1rem;
+}
+
+.note-form .field-label .optional {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.82rem;
+}
+
 .note-form textarea {
-  min-height: 4.5rem;
+  min-height: 5.5rem;
+  font-size: 0.95rem;
+  line-height: 1.6;
 }
 
 .note-form-actions {
@@ -1432,6 +1520,11 @@ button.crew-row:hover {
   flex: 1;
   display: flex;
   flex-direction: column;
+}
+
+/* The map's refresh icon spins while it reloads. */
+.refresh-button.is-spinning .icon {
+  animation: spin 0.8s linear infinite;
 }
 
 .map-main .map {
@@ -1516,6 +1609,179 @@ button.crew-row:hover {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.map-list-tag {
+  flex: 0 0 auto;
+  padding: 0 0.45rem;
+  border-radius: var(--radius-full);
+  background: var(--primary-soft);
+  color: var(--primary-soft-text);
+  font-size: 0.68rem;
+  font-weight: 600;
+}
+
+/* ---------- Public site (inside every workspace) ---------- */
+
+.pv-map {
+  height: 24rem;
+}
+
+.pv-side {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.pv-status {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.pv-status-tile {
+  padding: 0.75rem 0.85rem;
+  display: grid;
+  gap: 0.1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
+.pv-status-tile strong {
+  color: var(--heading);
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.pv-status-tile span {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--text-3);
+  font-size: 0.78rem;
+}
+
+.pv-fixed {
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.25rem;
+  list-style: none;
+}
+
+.pv-fixed-item {
+  width: 100%;
+  padding: 0.55rem 0.6rem;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.7rem;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+button.pv-fixed-item:hover {
+  background: var(--surface-2);
+}
+
+.pv-fixed-check {
+  width: 1.75rem;
+  height: 1.75rem;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--success) 14%, var(--surface));
+  color: var(--success);
+}
+
+.pv-fixed-check .icon {
+  color: inherit;
+  stroke-width: 2.6;
+}
+
+.pv-fixed-copy {
+  min-width: 0;
+  display: grid;
+  line-height: 1.35;
+}
+
+.pv-fixed-copy strong {
+  overflow: hidden;
+  color: var(--heading);
+  font-size: 0.86rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pv-fixed-copy span {
+  overflow: hidden;
+  color: var(--text-3);
+  font-size: 0.76rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pv-how {
+  margin-top: 1.25rem;
+}
+
+.pv-steps {
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+  list-style: none;
+}
+
+.pv-step {
+  padding: 1rem;
+  display: grid;
+  align-content: start;
+  gap: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+}
+
+.pv-step-icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: var(--primary-soft);
+  color: var(--primary-soft-text);
+}
+
+.pv-step-icon .icon {
+  color: inherit;
+}
+
+.pv-step-num {
+  color: var(--accent);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.pv-step h3 {
+  margin: 0.1rem 0 0.25rem;
+  font-size: 0.98rem;
+}
+
+.pv-step p {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 0.82rem;
+  line-height: 1.55;
 }
 
 /* ---------- Analytics ---------- */
@@ -1732,12 +1998,6 @@ button.crew-row:hover {
   color: var(--icon);
 }
 
-.photo-fields {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.9rem;
-}
-
 .photo-field {
   display: grid;
   gap: 0.5rem;
@@ -1895,7 +2155,8 @@ button.crew-row:hover {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .grid-3 {
+  .grid-3,
+  .pv-steps {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -1943,7 +2204,9 @@ button.crew-row:hover {
     visibility: visible;
   }
 
-  .sidebar-collapse {
+  /* On small screens the menu button opens the sidebar instead. */
+  .topbar-collapse,
+  .topbar-divider {
     display: none;
   }
 
@@ -1951,29 +2214,50 @@ button.crew-row:hover {
     display: grid;
   }
 
-  /* The collapsed rail only exists on desktop. */
+  /* The collapsed rail only exists on desktop: the phone menu always shows
+     the full sidebar, with the same layout as when it isn't collapsed. */
   .shell.is-collapsed .sidebar-logo-full,
   .shell.is-collapsed .nav-label,
   .shell.is-collapsed .sidebar-section,
-  .shell.is-collapsed .sidebar-status,
-  .shell.is-collapsed .sidebar-user .person-copy,
   .shell.is-collapsed .sidebar-user > .icon {
-    display: revert;
+    display: block;
+  }
+
+  .shell.is-collapsed .sidebar-status,
+  .shell.is-collapsed .sidebar-user .person-copy {
+    display: grid;
   }
 
   .shell.is-collapsed .sidebar-logo-mark {
     display: none;
   }
 
+  .shell.is-collapsed .sidebar {
+    overflow: hidden;
+  }
+
   .shell.is-collapsed .sidebar-head {
     padding: 0 0.85rem 0 1.25rem;
-    flex-direction: row;
     justify-content: space-between;
+  }
+
+  .shell.is-collapsed .sidebar-scroll {
+    padding-inline: 0.75rem;
+    overflow-y: auto;
   }
 
   .shell.is-collapsed .nav-item {
     justify-content: flex-start;
     padding-inline: 0.75rem;
+  }
+
+  .shell.is-collapsed .nav-item.is-active::before {
+    left: -0.75rem;
+  }
+
+  .shell.is-collapsed .sidebar-user {
+    justify-content: flex-start;
+    padding-inline: 0.55rem;
   }
 
   .shell.is-collapsed .nav-badge {
@@ -2000,8 +2284,13 @@ button.crew-row:hover {
 
 @media (max-width: 720px) {
   .grid-1-1,
-  .grid-3 {
+  .grid-3,
+  .pv-steps {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .pv-map {
+    height: 18rem;
   }
 
   .search-trigger {
@@ -2021,9 +2310,7 @@ button.crew-row:hover {
     display: none;
   }
 
-  .detail-columns,
-  .photo-fields,
-  .before-after {
+  .detail-columns {
     grid-template-columns: minmax(0, 1fr);
   }
 

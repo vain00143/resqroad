@@ -320,7 +320,7 @@ test("6. only the assigned crew can start and submit the repair", async function
     "/api/reports/" + reportId + "/repair",
     photoForm({ notes: "Patched." }, [["before", jpeg, "before.jpg", "image/jpeg"]]),
   );
-  assert.equal(missingAfter.status, 400, "needs before and after photos");
+  assert.equal(missingAfter.status, 400, "needs at least one after photo");
 
   const stranger = await otherCrew.request(
     "POST",
@@ -369,21 +369,35 @@ test("7. the administrator can send the repair back, and the crew resubmits", as
   );
   assert.equal(live.report.history.at(-1).actor, "Ana Admin");
 
+  // The website sends after-repair photos only (up to ten).
+  const afterNames = ["after-3.jpg", "after-4.jpg", "after-5.jpg", "after-6.jpg", "after-7.jpg", "after-8.jpg"];
+  const tooMany = await crew.request(
+    "POST",
+    "/api/reports/" + reportId + "/repair",
+    photoForm(
+      { notes: "Leveled the patch edge with the lane." },
+      Array.from({ length: 11 }, (item, index) => ["after", jpeg, "extra-" + index + ".jpg", "image/jpeg"]),
+    ),
+  );
+  assert.equal(tooMany.status, 400);
+  assert.equal(tooMany.body.error, "Choose no more than 10 photos.");
+
   const resubmit = await crew.request(
     "POST",
     "/api/reports/" + reportId + "/repair",
-    photoForm({ notes: "Leveled the patch edge with the lane." }, [
-      ["before", jpeg, "before-2.jpg", "image/jpeg"],
-      ["after", jpeg, "after-3.jpg", "image/jpeg"],
-    ]),
+    photoForm(
+      { notes: "Leveled the patch edge with the lane." },
+      afterNames.map((name) => ["after", jpeg, name, "image/jpeg"]),
+    ),
   );
-  assert.equal(resubmit.status, 200);
+  assert.equal(resubmit.status, 200, JSON.stringify(resubmit.body));
   assert.equal(resubmit.body.report.repair.notes, "Leveled the patch edge with the lane.");
   assert.deepEqual(
     resubmit.body.report.repair.afterPhotos.map((photo) => photo.name),
-    ["after-3.jpg"],
+    afterNames,
     "only the latest repair photos are shown",
   );
+  assert.deepEqual(resubmit.body.report.repair.beforePhotos, [], "before photos are optional");
   const [{ kept }] = await db.query("SELECT COUNT(*) AS kept FROM photos WHERE report_id = ? AND replaced_at IS NOT NULL", [
     Number(reportId.slice(4)),
   ]);

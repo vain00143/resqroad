@@ -8,6 +8,7 @@
 
 import express from "express";
 import { HttpError, requireRole } from "./auth.js";
+import { config } from "./config.js";
 import { one, query, transaction } from "./db.js";
 import { broadcast } from "./live.js";
 import { checkPhotos, photoUpload, photoUrl, removePhotoFiles, savePhotos, storePhotoData } from "./photos.js";
@@ -437,19 +438,20 @@ reportRoutes.post("/reports/:id/start", requireRole("maintenance"), async functi
   response.json({ report: forViewer(report, request.user) });
 });
 
-// The assigned crew submits the repair (multipart: `notes`, plus `before`
-// and `after` photos, at least one of each).
+// The assigned crew submits the repair (multipart: `notes`, plus one to ten
+// `after` photos). The resident's photos already show the damage, so `before`
+// photos are optional; the mobile app still sends them.
 reportRoutes.post(
   "/reports/:id/repair",
   requireRole("maintenance"),
-  photoUpload(["before", "after"]),
+  photoUpload(["before", { name: "after", maxCount: config.maxAfterPhotos }]),
   async function (request, response) {
     const id = parseReportId(request.params.id);
     const notes = text(request.body && request.body.notes, "Repair notes", 2000, true);
     const before = checkPhotos(request.files && request.files.before);
     const after = checkPhotos(request.files && request.files.after);
-    if (!before.length || !after.length) {
-      throw new HttpError(400, "Add repair notes and choose at least one before and after photo.");
+    if (!after.length) {
+      throw new HttpError(400, "Add repair notes and at least one after-repair photo.");
     }
     const clientKey = idempotencyKey(request);
     // A retry of a repair that already went through: send the report again.

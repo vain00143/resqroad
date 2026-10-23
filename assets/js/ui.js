@@ -140,13 +140,12 @@
     );
   }
 
+  // The one High / Medium / Low label used everywhere (see .sev in core.css).
   function severityBadge(severity, options) {
     const value = String(severity || "Medium");
-    const solid = options && options.solid;
     return (
       '<span class="sev sev-' +
       escapeHtml(value.toLowerCase()) +
-      (solid ? " sev-solid" : "") +
       (options && options.className ? " " + options.className : "") +
       '">' +
       escapeHtml(value) +
@@ -234,12 +233,15 @@
 
   // A grid of photo thumbnails. Each opens the lightbox through the page's
   // click handler, which reads the images in the same [data-gallery-group].
-  function photoGallery(photos, label) {
+  // `className` adds a layout, e.g. "gallery-grid" for an even grid.
+  function photoGallery(photos, label, className) {
     if (!photos.length) {
       return '<p class="muted text-sm">No photos</p>';
     }
     return (
-      '<div class="gallery" data-gallery-group aria-label="' +
+      '<div class="gallery' +
+      (className ? " " + escapeHtml(className) : "") +
+      '" data-gallery-group aria-label="' +
       escapeHtml(label) +
       '">' +
       photos
@@ -569,6 +571,21 @@
 
   let activeDialog = null;
 
+  // The dialog's icon, with the kicker and title beside it.
+  function dialogHead(iconName, kicker, title, titleId) {
+    return (
+      '<div class="dialog-head"><div class="dialog-icon">' +
+      icon(iconName, "icon-lg") +
+      '</div><div class="dialog-heading">' +
+      (kicker ? '<p class="dialog-kicker">' + escapeHtml(kicker) + "</p>" : "") +
+      '<h2 class="dialog-title" id="' +
+      titleId +
+      '">' +
+      escapeHtml(title) +
+      "</h2></div></div>"
+    );
+  }
+
   // options: title, message, confirmLabel, cancelLabel, kicker, danger, icon,
   // opener, and for prompts: input { label, placeholder, required, multiline,
   // maxLength, value, hint }. Resolves true/false, or the text/null for prompts.
@@ -592,15 +609,8 @@
         titleId +
         '"' +
         (options.message ? ' aria-describedby="' + messageId + '"' : "") +
-        '><div class="dialog-icon">' +
-        icon(iconName, "icon-lg") +
-        "</div>" +
-        (options.kicker ? '<p class="dialog-kicker">' + escapeHtml(options.kicker) + "</p>" : "") +
-        '<h2 class="dialog-title" id="' +
-        titleId +
-        '">' +
-        escapeHtml(options.title) +
-        "</h2>" +
+        ">" +
+        dialogHead(iconName, options.kicker, options.title, titleId) +
         (options.message ? '<p class="dialog-message" id="' + messageId + '">' + escapeHtml(options.message) + "</p>" : "") +
         (input
           ? '<label class="field dialog-field"><span class="field-label">' +
@@ -736,15 +746,8 @@
         titleId +
         '"' +
         (options.message ? ' aria-describedby="' + messageId + '"' : "") +
-        '><form novalidate><div class="dialog-icon">' +
-        icon(options.icon || "info", "icon-lg") +
-        "</div>" +
-        (options.kicker ? '<p class="dialog-kicker">' + escapeHtml(options.kicker) + "</p>" : "") +
-        '<h2 class="dialog-title" id="' +
-        titleId +
-        '">' +
-        escapeHtml(options.title) +
-        "</h2>" +
+        "><form novalidate>" +
+        dialogHead(options.icon || "info", options.kicker, options.title, titleId) +
         (options.message ? '<p class="dialog-message" id="' + messageId + '">' + escapeHtml(options.message) + "</p>" : "") +
         options.fields
           .map(function (spec) {
@@ -1198,15 +1201,16 @@
     return report.id + ", " + report.title + ", " + report.severity + " severity, " + statusLabel(report.status);
   }
 
-  // Default popup body for a report marker.
+  // Default popup body for a report marker. `action: false` leaves out the
+  // button.
   function reportPopup(report, options) {
     const photo = reportPhotos(report)[0];
     const actionLabel = (options && options.actionLabel) || "View details";
-    const action = (options && options.action) || "open";
+    const action = options && options.action === false ? null : (options && options.action) || "open";
     return (
       '<div class="map-popup"><div class="map-popup-media">' +
       photoImg(photo) +
-      severityBadge(report.severity, { solid: true }) +
+      severityBadge(report.severity) +
       '</div><div class="map-popup-body"><span class="id-tag">' +
       escapeHtml(report.id) +
       " · " +

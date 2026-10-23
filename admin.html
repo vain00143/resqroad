@@ -32,6 +32,7 @@
     <script src="assets/js/menus.js" defer></script>
     <script src="assets/js/shell.js" defer></script>
     <script src="assets/js/charts.js" defer></script>
+    <script src="assets/js/public-view.js" defer></script>
     <script src="assets/js/admin.js" defer></script>
   </head>
   <body class="app-body" data-required-role="admin">
@@ -40,10 +41,12 @@
       <aside class="sidebar" id="sidebar" aria-label="Admin navigation">
         <div class="sidebar-head">
           <a class="sidebar-brand" href="admin.html" aria-label="ResQRoad admin dashboard">
-            <img class="sidebar-logo-full" src="assets/images/resqroad-logotype-white.png" alt="ResQRoad" width="748" height="127" />
+            <span class="sidebar-logo-full">
+              <img class="logo-on-light" src="assets/images/resqroad-logotype.png" alt="ResQRoad" width="748" height="127" />
+              <img class="logo-on-dark" src="assets/images/resqroad-logotype-white.png" alt="ResQRoad" width="748" height="127" />
+            </span>
             <img class="sidebar-logo-mark" src="assets/images/resqroad-mark.png" alt="" width="384" height="408" />
           </a>
-          <button class="sidebar-icon-btn sidebar-collapse" type="button" data-sidebar-collapse aria-controls="sidebar"><svg data-icon="chevrons-left"></svg></button>
           <button class="sidebar-icon-btn sidebar-close" type="button" data-sidebar-close aria-label="Close navigation"><svg data-icon="x"></svg></button>
         </div>
         <div class="sidebar-scroll">
@@ -59,7 +62,7 @@
           <p class="sidebar-section">Workflow</p>
           <nav class="sidebar-nav" aria-label="Workflow">
             <button class="nav-item" type="button" data-admin-view="reports" data-tip="Review Reports">
-              <svg data-icon="clipboard-check"></svg><span class="nav-label">Review Reports</span><span class="nav-badge is-hot" data-nav-count="reports"></span>
+              <svg data-icon="file-search"></svg><span class="nav-label">Review Reports</span><span class="nav-badge is-hot" data-nav-count="reports"></span>
             </button>
             <button class="nav-item" type="button" data-admin-view="assignments" data-tip="Assignment">
               <svg data-icon="hard-hat"></svg><span class="nav-label">Assignment</span><span class="nav-badge" data-nav-count="assignments"></span>
@@ -73,9 +76,9 @@
             <button class="nav-item" type="button" data-admin-view="users" data-tip="User management">
               <svg data-icon="users"></svg><span class="nav-label">User management</span>
             </button>
-            <a class="nav-item" href="index.html" data-tip="Public site">
-              <svg data-icon="home"></svg><span class="nav-label">Public site</span>
-            </a>
+            <button class="nav-item" type="button" data-admin-view="public" data-tip="Public site">
+              <svg data-icon="globe"></svg><span class="nav-label">Public site</span>
+            </button>
           </nav>
         </div>
         <div class="sidebar-foot">
@@ -83,7 +86,7 @@
             <strong><span class="live-dot" aria-hidden="true"></span>Workspace synced</strong>
             <span>Connected to the ResQRoad server. Updates appear live on every device.</span>
           </div>
-          <button class="sidebar-user" type="button" data-popover-target="user-menu" data-popover-placement="top-start" aria-haspopup="menu" aria-expanded="false" aria-controls="user-menu" aria-label="Account menu">
+          <button class="sidebar-user" type="button" data-popover-target="user-menu" data-popover-placement="top-start" data-popover-width="trigger" aria-haspopup="menu" aria-expanded="false" aria-controls="user-menu" aria-label="Account menu">
             <span class="avatar" data-tone="2" aria-hidden="true">AU</span>
             <span class="person-copy"><strong data-current-user>Admin User</strong><span>Administrator</span></span>
             <svg data-icon="chevrons-up-down"></svg>
@@ -95,6 +98,8 @@
       <div class="main">
         <header class="topbar">
           <button class="btn btn-ghost btn-icon topbar-menu" type="button" data-sidebar-open aria-label="Open navigation" aria-expanded="false" aria-controls="sidebar"><svg data-icon="menu"></svg></button>
+          <button class="btn btn-ghost btn-icon topbar-collapse" type="button" data-sidebar-collapse aria-controls="sidebar"><svg data-icon="panel-left"></svg></button>
+          <span class="topbar-divider" aria-hidden="true"></span>
           <nav class="breadcrumb" aria-label="Breadcrumb">
             <span>Admin</span><svg data-icon="chevron-right"></svg><strong id="crumb-current">Dashboard</strong>
           </nav>
@@ -103,7 +108,6 @@
             <span class="kbd-group" aria-hidden="true"><span class="kbd" data-kbd-mod>Ctrl</span><span class="kbd">K</span></span>
           </button>
           <div class="topbar-actions">
-            <button class="btn btn-ghost btn-icon theme-toggle" type="button" data-theme-toggle><svg data-icon="sun" class="icon-sun"></svg><svg data-icon="moon" class="icon-moon"></svg></button>
             <button class="btn btn-ghost btn-icon" type="button" data-notif-toggle aria-label="Notifications"><svg data-icon="bell"></svg></button>
           </div>
         </header>
@@ -119,7 +123,7 @@
               </div>
               <div class="welcome-actions">
                 <button class="btn btn-light" type="button" data-switch-view="maps"><svg data-icon="map"></svg>Open map</button>
-                <button class="btn btn-primary" type="button" data-open-queue="review"><svg data-icon="clipboard-check"></svg>Review queue<span class="btn-count" data-count="review">0</span></button>
+                <button class="btn btn-primary" type="button" data-open-queue="review"><svg data-icon="file-search"></svg>Review queue<span class="btn-count" data-count="review">0</span></button>
               </div>
             </div>
 
@@ -402,9 +406,6 @@
                 <h1 class="page-title" id="maps-title">Map</h1>
                 <p class="page-desc">See verified road reports and their severity across Bulacan.</p>
               </div>
-              <div class="page-actions">
-                <button class="btn btn-secondary" type="button" id="refresh-map"><svg data-icon="refresh"></svg>Refresh map</button>
-              </div>
             </div>
             <div class="toolbar">
               <div class="toolbar-group" role="group" aria-label="Filter by severity" id="map-severity">
@@ -427,6 +428,7 @@
                     <h2 class="card-title" id="admin-map-title"><svg data-icon="map"></svg>Report map</h2>
                     <p class="card-subtitle">Select a pin to see the report.</p>
                   </div>
+                  <button class="btn btn-secondary btn-icon btn-sm refresh-button" type="button" id="refresh-map" aria-label="Refresh map" title="Refresh map"><svg data-icon="refresh"></svg></button>
                 </div>
                 <div class="card-body">
                   <div id="admin-map" class="map"></div>
@@ -558,6 +560,21 @@
               </section>
             </div>
           </section>
+
+          <!-- Public site -->
+          <section class="view" data-admin-view-panel="public" aria-labelledby="public-title" hidden>
+            <div class="page-head">
+              <div>
+                <p class="eyebrow">Public site</p>
+                <h1 class="page-title" id="public-title">Public site</h1>
+                <p class="page-desc">What residents see on the public ResQRoad site: live numbers, the report map, and recent repairs.</p>
+              </div>
+              <div class="page-actions">
+                <a class="btn btn-secondary" href="index.html" target="_blank" rel="noopener"><svg data-icon="external-link"></svg>Open public website<span class="visually-hidden"> (opens in a new tab)</span></a>
+              </div>
+            </div>
+            <div id="public-view"></div>
+          </section>
         </main>
 
         <footer class="app-footer">
@@ -569,7 +586,7 @@
 
     <div class="popover" id="user-menu" role="menu" aria-label="Account" hidden>
       <div class="menu-label">admin@resqroad.ph</div>
-      <a class="menu-item" role="menuitem" href="index.html"><svg data-icon="home"></svg>Public site</a>
+      <button class="menu-item" role="menuitem" type="button" data-switch-view="public"><svg data-icon="globe"></svg>Public site</button>
       <button class="menu-item" role="menuitem" type="button" data-change-password><svg data-icon="lock"></svg>Change password</button>
       <button class="menu-item" role="menuitem" type="button" data-theme-toggle><svg data-icon="moon"></svg>Switch theme</button>
       <div class="menu-sep" role="separator"></div>
