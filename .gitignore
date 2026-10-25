@@ -3,8 +3,6 @@ student_login_registration/
 
 # Local editor and tooling settings.
 .vscode/
-.claude/
-CLAUDE.md
 
 # Operating system and tooling clutter.
 Thumbs.db

@@ -17,7 +17,6 @@
       "tools/**",
       "student_login_registration/**",
       ".git/**",
-      ".claude/**",
       ".vscode/**",
       "**/.*",
       "**/.*/**",
