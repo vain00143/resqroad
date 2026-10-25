@@ -409,8 +409,12 @@ resident account**, and **Track a report by ID**.
   percentage sent. Each form carries an `Idempotency-Key` header; when the
   server doesn't answer, or answers 502–504 while restarting, the app tries
   twice more (after 3 and 8 seconds) with the same key, so a retry returns the
-  report or repair already filed instead of making a second one. A report
-  close to an open one is refused with a button to open that report.
+  report or repair already filed instead of making a second one.
+- **Possible duplicates**: when the server finds an open report nearby that
+  looks like the same road problem, the review lists it (with how far away
+  it is and **View**), and **Submit report** then asks "Submit your report
+  anyway?". Submitting anyway sends `confirmDuplicate=true`, as the website
+  does; an **Edit** clears the list so the server checks again.
 - **Drafts**: an unsent report (its fields, photos, and the step it was on)
   and each job's unsent repair update are saved on the phone as they're filled
   in (AsyncStorage, per account), so they survive the app closing, and are

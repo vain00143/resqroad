@@ -33,7 +33,9 @@ export function ReportTimeline({ history, byViewer = false }: { history: History
           <AppText variant="caption" tone="text2">
             {own ? "You submitted this report. Track its status in My reports." : entry.description}
           </AppText>
-          {entry.note ? (
+          {/* A note on the submitted step lists the possible duplicates the
+              resident was shown; like the website, that's for administrators. */}
+          {entry.note && entry.status !== "submitted" ? (
             <View style={[styles.note, { backgroundColor: colors.surface2, borderColor: colors.border }]}>
               <AppText variant="caption" tone="text">
                 “{entry.note}”

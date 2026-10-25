@@ -15,6 +15,7 @@ import {
 import { AppText } from "@/components/AppText";
 import { Button } from "@/components/Button";
 import { Section } from "@/components/Card";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { Icon } from "@/components/Icon";
 import { KeyboardAware } from "@/components/KeyboardAware";
 import { MapView } from "@/components/map/MapView";
@@ -24,6 +25,7 @@ import { PhotoGallery } from "@/components/PhotoGallery";
 import { PhotoPicker } from "@/components/PhotoPicker";
 import { SeverityBadge } from "@/components/SeverityBadge";
 import { SeverityPicker } from "@/components/SeverityPicker";
+import { StatusPill } from "@/components/StatusPill";
 import { TextField } from "@/components/TextField";
 import {
   ApiError,
@@ -36,7 +38,7 @@ import {
   withRetries,
 } from "@/lib/api";
 import { appendPhoto, photoLimits, takePendingPhotos, type LocalPhoto } from "@/lib/photos";
-import { inBulacan, isOpen, type Report, type Severity } from "@/lib/reports";
+import { inBulacan, isOpen, reportStatuses, type Report, type ReportStatus, type Severity } from "@/lib/reports";
 import { clearReportDraft, loadReportDraft, saveReportDraft } from "@/lib/reportDraft";
 import { useSession } from "@/lib/session";
 import { brand, fonts, mix, radius, severityColors, useTheme } from "@/theme";
@@ -72,6 +74,28 @@ const reviewStep = steps.length - 1;
 
 type Field = "title" | "severity" | "description" | "point" | "road" | "location" | "photos";
 type Problem = { field: Field; message: string };
+
+// An open report nearby that the server thinks may be the same road problem
+// (409 with `possibleDuplicates`). The resident can look at it, or file
+// theirs anyway as a different problem (`confirmDuplicate`), as on the website.
+type PossibleDuplicate = { id: string; title?: string; status?: ReportStatus; distance?: number };
+
+function possibleDuplicates(data: Record<string, unknown>): PossibleDuplicate[] {
+  const list = Array.isArray(data.possibleDuplicates) ? data.possibleDuplicates : [];
+  const found: PossibleDuplicate[] = list
+    .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item.id === "string")
+    .map((item) => ({
+      id: item.id as string,
+      title: typeof item.title === "string" ? item.title : undefined,
+      status: reportStatuses.includes(item.status as ReportStatus) ? (item.status as ReportStatus) : undefined,
+      distance: typeof item.distance === "number" ? item.distance : undefined,
+    }));
+  // An older server sends only the one report it found.
+  if (!found.length && typeof data.duplicateId === "string") {
+    found.push({ id: data.duplicateId });
+  }
+  return found;
+}
 
 // GPS can take a while indoors; fall back to the last known position.
 async function currentPosition(): Promise<MapPoint> {
@@ -115,7 +139,8 @@ export default function ReportProblem() {
   // A field that needs fixing before the next page, shown beside that field.
   const [invalid, setInvalid] = useState<Problem | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [duplicateId, setDuplicateId] = useState<string | null>(null);
+  const [duplicates, setDuplicates] = useState<PossibleDuplicate[]>([]);
+  const [confirmingDuplicate, setConfirmingDuplicate] = useState(false);
   const [sending, setSending] = useState(false);
   // What the submit button is waiting for (waking the server, upload progress).
   const [progress, setProgress] = useState<string | null>(null);
@@ -327,11 +352,14 @@ export default function ReportProblem() {
 
   function editPart(page: number) {
     setReturnToReview(true);
+    // The server checks the changed report again on the next submit.
+    setDuplicates([]);
     goTo(page);
   }
 
-  async function submit() {
-    setDuplicateId(null);
+  // `confirmed`: the resident looked at the possible duplicates and is filing
+  // theirs as a different problem.
+  async function submit(confirmed = false) {
     for (let page = 0; page < reviewStep; page++) {
       const found = problemOn(page);
       if (found) {
@@ -340,6 +368,10 @@ export default function ReportProblem() {
         setInvalid(found);
         return;
       }
+    }
+    if (duplicates.length && !confirmed) {
+      setConfirmingDuplicate(true);
+      return;
     }
     setSending(true);
     setError(null);
@@ -352,6 +384,9 @@ export default function ReportProblem() {
       form.append("location", location.trim());
       form.append("latitude", String(point?.lat));
       form.append("longitude", String(point?.lng));
+      if (confirmed) {
+        form.append("confirmDuplicate", "true");
+      }
       for (const photo of photos) {
         await appendPhoto(form, "photos", photo);
       }
@@ -383,15 +418,20 @@ export default function ReportProblem() {
         void clearReportDraft(userId);
       }
       setRestored(false);
+      setDuplicates([]);
       upsertReport(report);
       setSubmitted(report);
     } catch (caught) {
-      setError(errorMessage(caught));
-      if (caught instanceof ApiError && typeof caught.data.duplicateId === "string") {
-        setDuplicateId(caught.data.duplicateId);
+      const found = caught instanceof ApiError && caught.status === 409 ? possibleDuplicates(caught.data) : [];
+      if (found.length) {
+        // Shown at the top of the review, in place of the error.
+        setDuplicates(found);
+        setTimeout(() => scroll.current?.scrollTo({ y: 0, animated: true }), 60);
+      } else {
+        setError(errorMessage(caught));
+        // The message is under the review, which may be scrolled past.
+        setTimeout(() => scroll.current?.scrollToEnd({ animated: true }), 60);
       }
-      // The message is under the review, which may be scrolled past.
-      setTimeout(() => scroll.current?.scrollToEnd({ animated: true }), 60);
     } finally {
       setProgress(null);
       setUploaded(null);
@@ -409,7 +449,7 @@ export default function ReportProblem() {
     setPhotos([]);
     setError(null);
     setInvalid(null);
-    setDuplicateId(null);
+    setDuplicates([]);
     setSubmitted(null);
     setRestored(false);
     setReturnToReview(false);
@@ -573,6 +613,13 @@ export default function ReportProblem() {
           </>
         ) : null}
 
+        {step === reviewStep && duplicates.length ? (
+          <DuplicatePanel
+            duplicates={duplicates}
+            onOpen={(id) => router.push({ pathname: "/reports/[id]", params: { id } })}
+          />
+        ) : null}
+
         {step === reviewStep ? (
           <View style={[styles.review, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Section first title="Details" aside={<EditLink part="details" onPress={() => editPart(0)} />}>
@@ -619,13 +666,6 @@ export default function ReportProblem() {
         ) : null}
         {step === reviewStep && waking && !sending ? <Notice tone="info" message={wakingMessage} /> : null}
         {error ? <Notice tone="error" message={error} /> : null}
-        {duplicateId ? (
-          <Button
-            label={"Open " + duplicateId}
-            variant="secondary"
-            onPress={() => router.push({ pathname: "/reports/[id]", params: { id: duplicateId } })}
-          />
-        ) : null}
       </ScrollView>
 
       <View style={[styles.footer, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
@@ -649,7 +689,7 @@ export default function ReportProblem() {
           <Button
             label="Submit report"
             loading={sending}
-            onPress={submit}
+            onPress={() => submit()}
             icon={<Icon name="send" size={16} color="#FFFFFF" />}
             style={styles.flex}
           />
@@ -662,7 +702,77 @@ export default function ReportProblem() {
           />
         )}
       </View>
+
+      <ConfirmDialog
+        visible={confirmingDuplicate}
+        icon="copy"
+        kicker="Possible duplicate"
+        title="Submit your report anyway?"
+        message={
+          (duplicates[0]?.id ?? "A report nearby") +
+          (duplicates.length > 1
+            ? " and " + (duplicates.length - 1) + (duplicates.length === 2 ? " other report" : " other reports")
+            : "") +
+          " may already be about this road problem. Submit yours only if it's about a different problem."
+        }
+        confirmLabel="Submit anyway"
+        cancelLabel="Go back"
+        onCancel={() => setConfirmingDuplicate(false)}
+        onConfirm={() => {
+          setConfirmingDuplicate(false);
+          void submit(true);
+        }}
+      />
     </KeyboardAware>
+  );
+}
+
+// The website's possible-duplicate panel: the open reports nearby that may be
+// about the same road problem, each with a way to look at it.
+function DuplicatePanel({ duplicates, onOpen }: { duplicates: PossibleDuplicate[]; onOpen: (id: string) => void }) {
+  const { colors } = useTheme();
+  return (
+    <View
+      accessibilityRole="alert"
+      style={[
+        styles.duplicates,
+        { backgroundColor: mix(colors.warning, colors.surface, 0.1), borderColor: mix(colors.warning, colors.surface, 0.35) },
+      ]}
+    >
+      <View style={styles.duplicateHead}>
+        <Icon name="alert-triangle" size={16} color={colors.warning} />
+        <View style={styles.flex}>
+          <AppText variant="bodyStrong" tone="heading">
+            Possible duplicate report
+          </AppText>
+          <AppText variant="caption" tone="text2">
+            A report that looks like the same road problem is already with the Road Maintenance Office. Check it
+            before you send yours. If yours is about a different problem, you can still submit it.
+          </AppText>
+        </View>
+      </View>
+      {duplicates.map((duplicate) => (
+        <View key={duplicate.id} style={[styles.duplicateItem, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <View style={styles.duplicateText}>
+            <View style={styles.duplicateTags}>
+              <AppText variant="eyebrow">{duplicate.id}</AppText>
+              {duplicate.status ? <StatusPill status={duplicate.status} /> : null}
+            </View>
+            {duplicate.title ? (
+              <AppText variant="label" tone="heading" numberOfLines={2}>
+                {duplicate.title}
+              </AppText>
+            ) : null}
+            {duplicate.distance !== undefined ? (
+              <AppText variant="caption">
+                {duplicate.distance < 5 ? "At the same spot" : "About " + duplicate.distance + " m away"}
+              </AppText>
+            ) : null}
+          </View>
+          <Button label="View" variant="secondary" size="sm" onPress={() => onOpen(duplicate.id)} />
+        </View>
+      ))}
+    </View>
   );
 }
 
@@ -718,6 +828,11 @@ const styles = StyleSheet.create({
   review: { paddingHorizontal: 14, borderWidth: 1, borderRadius: radius.lg },
   meta: { flexDirection: "row", alignItems: "center", gap: 6 },
   privacy: { flexDirection: "row", gap: 8 },
+  duplicates: { gap: 10, padding: 12, borderWidth: 1, borderRadius: radius.lg },
+  duplicateHead: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
+  duplicateItem: { flexDirection: "row", alignItems: "center", gap: 10, padding: 10, borderWidth: 1, borderRadius: radius.md },
+  duplicateText: { flex: 1, gap: 3 },
+  duplicateTags: { flexDirection: "row", alignItems: "center", gap: 8 },
   footer: {
     flexDirection: "row",
     flexWrap: "wrap",

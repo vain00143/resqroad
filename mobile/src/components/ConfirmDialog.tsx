@@ -12,13 +12,24 @@ type Props = {
   title: string;
   message: string;
   confirmLabel: string;
+  cancelLabel?: string;
   onConfirm: () => void;
   onCancel: () => void;
 };
 
 // The website's confirm dialog, as a bottom sheet: the icon beside the text,
 // and the buttons underneath.
-export function ConfirmDialog({ visible, icon, kicker, title, message, confirmLabel, onConfirm, onCancel }: Props) {
+export function ConfirmDialog({
+  visible,
+  icon,
+  kicker,
+  title,
+  message,
+  confirmLabel,
+  cancelLabel = "Cancel",
+  onConfirm,
+  onCancel,
+}: Props) {
   const { colors } = useTheme();
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
@@ -37,7 +48,7 @@ export function ConfirmDialog({ visible, icon, kicker, title, message, confirmLa
           </View>
         </View>
         <View style={styles.actions}>
-          <Button label="Cancel" variant="secondary" onPress={onCancel} style={styles.action} />
+          <Button label={cancelLabel} variant="secondary" onPress={onCancel} style={styles.action} />
           <Button label={confirmLabel} onPress={onConfirm} style={styles.action} />
         </View>
       </View>
