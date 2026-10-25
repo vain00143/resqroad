@@ -30,11 +30,11 @@ const styles = StyleSheet.create({
   badge: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 10,
-    minHeight: 26,
+    gap: 5,
+    paddingHorizontal: 8,
+    minHeight: 24,
     borderWidth: 1,
     borderRadius: radius.full,
   },
-  dot: { width: 8, height: 8, borderRadius: 4 },
+  dot: { width: 7, height: 7, borderRadius: 4 },
 });

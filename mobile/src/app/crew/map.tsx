@@ -1,4 +1,4 @@
-import { router } from "expo-router";
+import { useRouter } from "expo-router";
 import { useMemo, useState } from "react";
 import { Linking, ScrollView, StyleSheet, useWindowDimensions, View } from "react-native";
 
@@ -15,13 +15,15 @@ import { severities, type Report } from "@/lib/reports";
 import { useSession } from "@/lib/session";
 import { brand, severityColors, useTheme } from "@/theme";
 
-function openJob(report: Report) {
-  router.push({ pathname: "/jobs/[id]", params: { id: report.id } });
-}
-
 // Every job on one map: active jobs as pins in their severity color, and
 // submitted or completed ones as grey dots.
 export default function RepairSites() {
+  const router = useRouter();
+
+  function openJob(report: Report) {
+    router.push({ pathname: "/jobs/[id]", params: { id: report.id } });
+  }
+
   const { colors } = useTheme();
   const { height } = useWindowDimensions();
   const { user, reports, loaded, connection } = useSession();

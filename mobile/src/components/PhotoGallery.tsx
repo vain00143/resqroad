@@ -1,85 +1,223 @@
 import { useState } from "react";
-import { Image, Modal, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import {
+  FlatList,
+  Image,
+  Modal,
+  Pressable,
+  StyleSheet,
+  useWindowDimensions,
+  View,
+  type ViewStyle,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppText } from "@/components/AppText";
 import { Icon } from "@/components/Icon";
-import { photoUri } from "@/lib/photos";
+import { photoUri, type LocalPhoto } from "@/lib/photos";
 import type { Photo } from "@/lib/reports";
-import { radius, useTheme } from "@/theme";
+import { fonts, radius, useTheme } from "@/theme";
 
-// A row of report photos; tapping one opens it full screen.
-export function PhotoGallery({ photos, label }: { photos: Photo[]; label: string }) {
+type Item = { key: string; uri: string | null; name: string };
+
+// Uploaded photos, photos still on the phone, or sample file names (which
+// have no image to show).
+function toItems(photos: (Photo | LocalPhoto)[]): Item[] {
+  return photos.map((photo, index) => {
+    if (typeof photo === "string") {
+      return { key: photo + index, uri: null, name: photo };
+    }
+    const uri = "uri" in photo ? photo.uri : photoUri(photo);
+    return { key: (uri ?? photo.name) + index, uri, name: photo.name };
+  });
+}
+
+// Photos in one tidy frame whatever their number or orientation, like the
+// website's gallery: every photo is cropped to fill its tile. One photo fills
+// the width, two sit side by side, three are one large and two stacked, and
+// four or more make a grid with "+N" on the last tile. Tapping a tile opens
+// the whole photo, uncropped, and the viewer swipes between them.
+export function PhotoGallery({ photos, label }: { photos: (Photo | LocalPhoto)[]; label?: string }) {
   const { colors } = useTheme();
-  const insets = useSafeAreaInsets();
-  const [open, setOpen] = useState<string | null>(null);
+  const items = toItems(photos);
+  const [open, setOpen] = useState<number | null>(null);
+
+  if (!items.length) {
+    return null;
+  }
+
+  function tile(index: number, style: ViewStyle, more = 0) {
+    const item = items[index];
+    return (
+      <Pressable
+        key={item.key}
+        accessibilityRole="imagebutton"
+        accessibilityLabel={
+          item.uri ? "Open photo " + (index + 1) + " of " + items.length : "Sample photo " + item.name
+        }
+        disabled={!item.uri}
+        onPress={() => setOpen(index)}
+        style={[styles.tile, { backgroundColor: colors.surface3 }, style]}
+      >
+        {item.uri ? (
+          <Image source={{ uri: item.uri }} style={styles.image} resizeMode="cover" />
+        ) : (
+          <View style={styles.placeholder}>
+            <Icon name="image" size={22} />
+            <AppText variant="caption" numberOfLines={1}>
+              Sample photo
+            </AppText>
+          </View>
+        )}
+        {more > 0 ? (
+          <View style={styles.more}>
+            <AppText style={styles.moreText} color="#FFFFFF">
+              +{more}
+            </AppText>
+          </View>
+        ) : null}
+      </Pressable>
+    );
+  }
+
+  const count = items.length;
+  let layout;
+  if (count === 1) {
+    layout = <View style={styles.single}>{tile(0, styles.fill)}</View>;
+  } else if (count === 2) {
+    layout = (
+      <View style={styles.pair}>
+        {tile(0, styles.fill)}
+        {tile(1, styles.fill)}
+      </View>
+    );
+  } else if (count === 3) {
+    layout = (
+      <View style={styles.trio}>
+        {tile(0, styles.large)}
+        <View style={styles.column}>
+          {tile(1, styles.fill)}
+          {tile(2, styles.fill)}
+        </View>
+      </View>
+    );
+  } else {
+    layout = (
+      <View style={styles.grid}>
+        <View style={styles.row}>
+          {tile(0, styles.fill)}
+          {tile(1, styles.fill)}
+        </View>
+        <View style={styles.row}>
+          {tile(2, styles.fill)}
+          {tile(3, styles.fill, count - 4)}
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.root}>
-      <AppText variant="label" tone="heading">
-        {label}
-      </AppText>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
-        {photos.map((photo, index) => {
-          const uri = photoUri(photo);
-          const name = typeof photo === "string" ? photo : photo.name;
-          return uri ? (
-            <Pressable
-              key={uri}
-              accessibilityRole="imagebutton"
-              accessibilityLabel={"Open photo " + (index + 1) + " of " + photos.length}
-              onPress={() => setOpen(uri)}
-            >
-              <Image source={{ uri }} style={[styles.thumb, { backgroundColor: colors.surfaceSunken }]} />
-            </Pressable>
-          ) : (
-            <View
-              key={name + index}
-              accessibilityLabel={"Sample photo " + name}
-              style={[styles.thumb, styles.placeholder, { backgroundColor: colors.surfaceSunken }]}
-            >
-              <Icon name="image" size={24} />
-              <AppText variant="caption" numberOfLines={1} style={styles.placeholderText}>
-                Sample photo
-              </AppText>
-            </View>
-          );
-        })}
-      </ScrollView>
-
-      <Modal visible={open !== null} transparent animationType="fade" onRequestClose={() => setOpen(null)}>
-        <View style={styles.viewer}>
-          {open ? <Image source={{ uri: open }} style={styles.full} resizeMode="contain" /> : null}
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Close photo"
-            onPress={() => setOpen(null)}
-            style={[styles.close, { top: insets.top + 12 }]}
-          >
-            <Icon name="x" size={22} color="#FFFFFF" />
-          </Pressable>
+      {label ? (
+        <View style={styles.head}>
+          <AppText variant="label" tone="heading">
+            {label}
+          </AppText>
+          <AppText variant="caption">
+            {count} {count === 1 ? "photo" : "photos"} · tap to enlarge
+          </AppText>
         </View>
-      </Modal>
+      ) : null}
+      {layout}
+      <PhotoViewer items={items} index={open} onClose={() => setOpen(null)} />
     </View>
   );
 }
 
+// The photos full screen, uncropped; swipe sideways for the others.
+function PhotoViewer({ items, index, onClose }: { items: Item[]; index: number | null; onClose: () => void }) {
+  const { width, height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const shown = items.filter((item) => item.uri);
+  const [current, setCurrent] = useState(0);
+  const start = index === null ? 0 : Math.max(0, shown.indexOf(items[index]));
+
+  return (
+    <Modal
+      visible={index !== null}
+      animationType="fade"
+      onRequestClose={onClose}
+      onShow={() => setCurrent(start)}
+      statusBarTranslucent
+      navigationBarTranslucent
+    >
+      <View style={styles.viewer}>
+        <FlatList
+          data={shown}
+          keyExtractor={(item) => item.key}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          initialScrollIndex={start}
+          getItemLayout={(_, itemIndex) => ({ length: width, offset: width * itemIndex, index: itemIndex })}
+          onMomentumScrollEnd={(event) => setCurrent(Math.round(event.nativeEvent.contentOffset.x / width))}
+          renderItem={({ item, index: itemIndex }) => (
+            <Image
+              source={{ uri: item.uri ?? undefined }}
+              style={{ width, height }}
+              resizeMode="contain"
+              accessibilityLabel={"Photo " + (itemIndex + 1) + " of " + shown.length}
+            />
+          )}
+        />
+        {shown.length > 1 ? (
+          <View style={[styles.counter, { top: insets.top + 22 }]} pointerEvents="none">
+            <AppText variant="label" color="#FFFFFF">
+              {current + 1} / {shown.length}
+            </AppText>
+          </View>
+        ) : null}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Close photo"
+          onPress={onClose}
+          style={[styles.close, { top: insets.top + 12 }]}
+        >
+          <Icon name="x" size={20} color="#FFFFFF" />
+        </Pressable>
+      </View>
+    </Modal>
+  );
+}
+
+const gap = 4;
+
 const styles = StyleSheet.create({
   root: { gap: 8 },
-  row: { gap: 8 },
-  thumb: { width: 120, height: 96, borderRadius: radius.md },
-  placeholder: { alignItems: "center", justifyContent: "center", gap: 4, padding: 8 },
-  placeholderText: { textAlign: "center" },
-  viewer: { flex: 1, backgroundColor: "rgba(0, 0, 0, 0.92)", justifyContent: "center" },
-  full: { width: "100%", height: "80%" },
+  head: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", gap: 8 },
+  // The frames: a fixed shape for each number of photos.
+  single: { aspectRatio: 16 / 10 },
+  pair: { flexDirection: "row", gap, aspectRatio: 2 },
+  trio: { flexDirection: "row", gap, aspectRatio: 3 / 2 },
+  grid: { gap, aspectRatio: 4 / 3 },
+  row: { flex: 1, flexDirection: "row", gap },
+  column: { flex: 1, gap },
+  tile: { overflow: "hidden", borderRadius: radius.sm },
+  fill: { flex: 1 },
+  large: { flex: 2 },
+  image: { width: "100%", height: "100%" },
+  placeholder: { flex: 1, alignItems: "center", justifyContent: "center", gap: 4, padding: 8 },
+  more: { ...StyleSheet.absoluteFill, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0, 0, 0, 0.5)" },
+  moreText: { fontFamily: fonts.semibold, fontSize: 20, lineHeight: 26 },
+  viewer: { flex: 1, backgroundColor: "#000000" },
+  counter: { position: "absolute", alignSelf: "center" },
   close: {
     position: "absolute",
-    right: 16,
-    width: 44,
-    height: 44,
+    right: 12,
+    width: 40,
+    height: 40,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 22,
+    borderRadius: 20,
     backgroundColor: "rgba(255, 255, 255, 0.16)",
   },
 });

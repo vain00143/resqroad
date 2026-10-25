@@ -2,39 +2,31 @@ import { StyleSheet, View } from "react-native";
 
 import { AppText } from "@/components/AppText";
 import { statusLabels, type ReportStatus } from "@/lib/reports";
-import { fonts, mix, radius, useTheme, withAlpha } from "@/theme";
+import { fonts, labelColor, radius, useTheme } from "@/theme";
 
-// A report's workflow status, tinted the same way as the website's `.pill`.
+// A report's workflow status as a solid label, like the website's severity
+// labels: white text on the status color.
 export function StatusPill({ status }: { status: ReportStatus }) {
-  const { colors, statusColors } = useTheme();
-  const tone = statusColors[status];
+  const { statusColors } = useTheme();
   return (
-    <View
-      style={[
-        styles.pill,
-        { backgroundColor: mix(tone, colors.surface, 0.12), borderColor: withAlpha(tone, 0.22) },
-      ]}
-    >
-      <View style={[styles.dot, { backgroundColor: tone }]} />
-      <AppText variant="caption" style={styles.label} color={mix(tone, colors.text, 0.55)}>
+    <View style={[styles.label, { backgroundColor: labelColor(statusColors[status]) }]}>
+      <AppText variant="caption" style={styles.text} color="#FFFFFF" numberOfLines={1}>
         {statusLabels[status]}
       </AppText>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  pill: {
+export const labelStyles = StyleSheet.create({
+  label: {
     alignSelf: "flex-start",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    minHeight: 24,
-    paddingLeft: 8,
-    paddingRight: 10,
-    borderWidth: 1,
-    borderRadius: radius.full,
+    justifyContent: "center",
+    minHeight: 20,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: radius.xs,
   },
-  dot: { width: 7, height: 7, borderRadius: 4 },
-  label: { fontFamily: fonts.semibold, fontSize: 12 },
+  text: { fontFamily: fonts.semibold, fontSize: 11, lineHeight: 14, letterSpacing: 0.1 },
 });
+
+const styles = labelStyles;

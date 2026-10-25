@@ -1,4 +1,4 @@
-import { router } from "expo-router";
+import { useRouter } from "expo-router";
 import { useRef, useState } from "react";
 import { StyleSheet, View, type TextInputInstance } from "react-native";
 
@@ -29,6 +29,7 @@ function problem(current: string, next: string, confirm: string): string | null 
 // Changes the signed-in person's password. This phone stays signed in; the
 // server signs out their other devices.
 export default function ChangePassword() {
+  const router = useRouter();
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
   const [confirm, setConfirm] = useState("");

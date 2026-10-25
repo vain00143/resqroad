@@ -16,19 +16,26 @@ type Props = {
   onCancel: () => void;
 };
 
-// The website's confirm dialog, as a bottom sheet.
+// The website's confirm dialog, as a bottom sheet: the icon beside the text,
+// and the buttons underneath.
 export function ConfirmDialog({ visible, icon, kicker, title, message, confirmLabel, onConfirm, onCancel }: Props) {
   const { colors } = useTheme();
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
       <Pressable accessibilityLabel="Close" style={[styles.backdrop, { backgroundColor: colors.overlay }]} onPress={onCancel} />
       <View style={[styles.sheet, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        <View style={[styles.icon, { backgroundColor: colors.primarySoft }]}>
-          <Icon name={icon} size={22} color={colors.primarySoftText} />
+        <View style={styles.row}>
+          <View style={[styles.icon, { backgroundColor: colors.primarySoft }]}>
+            <Icon name={icon} size={20} color={colors.primarySoftText} />
+          </View>
+          <View style={styles.text}>
+            <AppText variant="eyebrow">{kicker}</AppText>
+            <AppText variant="heading">{title}</AppText>
+            <AppText variant="label" tone="text2">
+              {message}
+            </AppText>
+          </View>
         </View>
-        <AppText variant="eyebrow">{kicker}</AppText>
-        <AppText variant="heading">{title}</AppText>
-        <AppText tone="text2">{message}</AppText>
         <View style={styles.actions}>
           <Button label="Cancel" variant="secondary" onPress={onCancel} style={styles.action} />
           <Button label={confirmLabel} onPress={onConfirm} style={styles.action} />
@@ -45,19 +52,14 @@ const styles = StyleSheet.create({
     left: 12,
     right: 12,
     bottom: 24,
-    gap: 6,
-    padding: 20,
+    gap: 16,
+    padding: 16,
     borderWidth: 1,
     borderRadius: radius.xl,
   },
-  icon: {
-    width: 44,
-    height: 44,
-    marginBottom: 8,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: radius.md,
-  },
-  actions: { flexDirection: "row", gap: 10, marginTop: 14 },
+  row: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
+  icon: { width: 40, height: 40, alignItems: "center", justifyContent: "center", borderRadius: radius.md },
+  text: { flex: 1, gap: 2 },
+  actions: { flexDirection: "row", gap: 10 },
   action: { flex: 1 },
 });

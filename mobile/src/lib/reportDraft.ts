@@ -6,7 +6,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
 
 import type { MapPoint } from "@/components/map/mapHtml";
-import { keepExistingPhotos, type LocalPhoto } from "@/lib/photos";
+import { keepExistingPhotos, photoLimits, type LocalPhoto } from "@/lib/photos";
 import type { Severity } from "@/lib/reports";
 
 export type ReportDraft = {
@@ -17,6 +17,8 @@ export type ReportDraft = {
   road: string;
   location: string;
   photos: LocalPhoto[];
+  // The form's page (0–3) when it was saved, so it reopens there.
+  step?: number;
 };
 
 function storageKey(userId: string) {
@@ -42,7 +44,7 @@ export async function loadReportDraft(userId: string): Promise<ReportDraft | nul
       return null;
     }
     const draft = JSON.parse(saved) as ReportDraft;
-    return { ...draft, photos: await keepExistingPhotos(draft.photos) };
+    return { ...draft, photos: (await keepExistingPhotos(draft.photos ?? [])).slice(0, photoLimits.report) };
   } catch {
     return null;
   }

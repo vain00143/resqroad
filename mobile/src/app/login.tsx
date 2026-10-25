@@ -13,6 +13,7 @@ import { TextField } from "@/components/TextField";
 import { WakingNotice } from "@/components/WakingNotice";
 import { errorMessage, NetworkError } from "@/lib/api";
 import { useSession } from "@/lib/session";
+import { fonts } from "@/theme";
 
 export default function Login() {
   const { signIn, notice } = useSession();
@@ -45,7 +46,9 @@ export default function Login() {
       <View style={styles.intro}>
         <AppText variant="eyebrow">Welcome back</AppText>
         <AppText variant="title">Log in to ResQRoad</AppText>
-        <AppText tone="text2">For residents and maintenance crews. Use the same account as the website.</AppText>
+        <AppText variant="label" tone="text2">
+          For residents and maintenance crews. Use the same account as the website.
+        </AppText>
       </View>
 
       {notice ? <Notice message={notice} /> : null}
@@ -85,25 +88,29 @@ export default function Login() {
         size="lg"
         loading={busy}
         onPress={submit}
-        icon={<Icon name="arrow-right" size={18} color="#FFFFFF" />}
+        icon={<Icon name="arrow-right" size={16} color="#FFFFFF" />}
       />
 
       <View style={styles.switch}>
-        <AppText tone="text2">New to ResQRoad? </AppText>
+        <AppText variant="label" tone="text2">
+          New to ResQRoad?{" "}
+        </AppText>
         <Link href="/register" replace>
-          <AppText variant="bodyStrong" tone="link">
+          <AppText variant="label" tone="link" style={styles.strong}>
             Create a resident account
           </AppText>
         </Link>
       </View>
 
-      <ServerSettings unreachable={unreachable} />
+      {/* Only development builds can point the app at another server. */}
+      {__DEV__ ? <ServerSettings unreachable={unreachable} /> : null}
       <BuildInfo />
     </FormScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  intro: { gap: 6, marginBottom: 4 },
+  intro: { gap: 4, marginBottom: 2 },
   switch: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center" },
+  strong: { fontFamily: fonts.semibold },
 });

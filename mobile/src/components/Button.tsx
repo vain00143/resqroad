@@ -9,7 +9,7 @@ type Variant = "primary" | "secondary" | "ghost" | "onDark";
 export type ButtonProps = Omit<PressableProps, "children" | "style"> & {
   label: string;
   variant?: Variant;
-  size?: "md" | "lg";
+  size?: "sm" | "md" | "lg";
   loading?: boolean;
   icon?: ReactNode;
   style?: ViewStyle;
@@ -47,19 +47,20 @@ export function Button({
       accessibilityRole="button"
       accessibilityState={{ disabled: inactive, busy: loading }}
       disabled={inactive}
+      hitSlop={size === "sm" ? 4 : undefined}
       style={({ pressed }) => [
         styles.base,
-        size === "lg" ? styles.lg : styles.md,
+        styles[size],
         { backgroundColor: pressed ? pressedBg : bg, borderColor: border, opacity: inactive && !loading ? 0.55 : 1 },
         style,
       ]}
       {...props}
     >
       {loading ? (
-        <ActivityIndicator color={fg} />
+        <ActivityIndicator size="small" color={fg} />
       ) : (
         <View style={styles.content}>
-          <AppText variant="bodyStrong" color={fg}>
+          <AppText variant={size === "sm" ? "label" : "bodyStrong"} color={fg} numberOfLines={1}>
             {label}
           </AppText>
           {icon}
@@ -75,9 +76,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderWidth: 1,
     borderRadius: radius.md,
-    paddingHorizontal: 18,
+    paddingHorizontal: 14,
   },
-  md: { minHeight: 44 },
-  lg: { minHeight: 52 },
-  content: { flexDirection: "row", alignItems: "center", gap: 8 },
+  sm: { minHeight: 34, paddingHorizontal: 12, borderRadius: radius.sm },
+  md: { minHeight: 40 },
+  lg: { minHeight: 44 },
+  content: { flexDirection: "row", alignItems: "center", gap: 6 },
 });

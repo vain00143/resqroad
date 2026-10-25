@@ -4,24 +4,23 @@ import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, View } from 
 
 import { AppText } from "@/components/AppText";
 import { Button } from "@/components/Button";
-import { Card } from "@/components/Card";
-import { Icon } from "@/components/Icon";
+import { Section } from "@/components/Card";
 import { MapView } from "@/components/map/MapView";
 import type { MapMarker } from "@/components/map/mapHtml";
 import { Notice } from "@/components/Notice";
 import { PhotoGallery } from "@/components/PhotoGallery";
+import { MetaLine, ReportHeading } from "@/components/ReportHeading";
 import { ReportProgress } from "@/components/ReportProgress";
 import { ReportTimeline } from "@/components/ReportTimeline";
-import { SeverityBadge } from "@/components/SeverityBadge";
-import { StatusPill } from "@/components/StatusPill";
 import { api, ApiError, errorMessage } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import { normalizeReportId, type Report } from "@/lib/reports";
 import { useSession } from "@/lib/session";
 import { severityColors, useTheme } from "@/theme";
 
-// One report's public progress. Signed-in people see live changes from the
-// shared store; others (tracking by ID) load it from the server.
+// One report's public progress, as one page: the title, photos, progress,
+// description, location, and activity. Signed-in people see live changes
+// from the shared store; others (tracking by ID) load it from the server.
 export default function ReportDetail() {
   const { colors } = useTheme();
   const params = useLocalSearchParams<{ id: string }>();
@@ -94,87 +93,86 @@ export default function ReportDetail() {
     .reverse()
     .find((entry) => (entry.status === "rejected" || entry.status === "duplicate") && entry.note)?.note;
   const isMine = Boolean(user && report.reporterId === user.id);
+  const photoCount = report.evidencePhotos.length;
 
   return (
     <ScrollView
+      style={{ backgroundColor: colors.surface }}
       contentContainerStyle={styles.content}
       refreshControl={<RefreshControl refreshing={loading} onRefresh={pullToRefresh} tintColor={colors.accent} />}
     >
       <Stack.Screen options={{ title: report.id }} />
 
-      <Card>
-        <AppText variant="eyebrow">{report.id}</AppText>
-        <AppText variant="title">{report.title}</AppText>
-        <View style={styles.tags}>
-          <StatusPill status={report.status} />
-          <SeverityBadge severity={report.severity} />
-        </View>
-        <View style={styles.meta}>
-          <Icon name="map-pin" size={16} />
-          <AppText variant="caption" tone="text2" style={styles.flex}>
-            {report.road} · {report.location}
-          </AppText>
-        </View>
-        <View style={styles.meta}>
-          <Icon name="calendar" size={16} />
-          <AppText variant="caption" tone="text2" style={styles.flex}>
-            Reported {formatDate(report.reportedAt)}
-            {isMine ? " by you" : ""}
-          </AppText>
-        </View>
-        {report.assignedName ? (
-          <View style={styles.meta}>
-            <Icon name="hard-hat" size={16} />
-            <AppText variant="caption" tone="text2" style={styles.flex}>
-              Assigned to {report.assignedName}
-            </AppText>
-          </View>
-        ) : null}
-      </Card>
+      <ReportHeading report={report}>
+        <MetaLine icon="calendar">
+          Reported {formatDate(report.reportedAt)}
+          {isMine ? " by you" : ""}
+        </MetaLine>
+        {report.assignedName ? <MetaLine icon="hard-hat">Assigned to {report.assignedName}</MetaLine> : null}
+      </ReportHeading>
 
       {report.status === "rejected" ? (
-        <Notice tone="error" message={"This report was rejected." + (closingNote ? " Reason: " + closingNote : "")} />
+        <View style={styles.notice}>
+          <Notice tone="error" message={"This report was rejected." + (closingNote ? " Reason: " + closingNote : "")} />
+        </View>
       ) : null}
       {report.status === "duplicate" ? (
-        <Notice message={"This report was marked as a duplicate of another report nearby." + (closingNote ? " " + closingNote : "")} />
+        <View style={styles.notice}>
+          <Notice
+            message={"This report was marked as a duplicate of another report nearby." + (closingNote ? " " + closingNote : "")}
+          />
+        </View>
       ) : null}
 
-      <Card title="Progress">
+      {photoCount ? (
+        <Section
+          title="Photos"
+          aside={
+            <AppText variant="caption">
+              {photoCount} {photoCount === 1 ? "photo" : "photos"} · tap to enlarge
+            </AppText>
+          }
+        >
+          <PhotoGallery photos={report.evidencePhotos} />
+        </Section>
+      ) : null}
+
+      <Section title="Progress">
         <ReportProgress report={report} />
-      </Card>
+      </Section>
 
-      <Card title="Details">
+      <Section title="Description">
         <AppText>{report.description}</AppText>
-        {report.evidencePhotos.length ? <PhotoGallery photos={report.evidencePhotos} label="Photos" /> : null}
-      </Card>
+      </Section>
 
-      <Card title="Location">
-        <MapView height={200} zoom={15} center={report.coordinates} markers={markers} fitMarkers />
+      <Section title="Location">
+        <MapView height={180} zoom={15} center={report.coordinates} markers={markers} fitMarkers />
+        <MetaLine icon="map-pin">
+          {report.road} · {report.location}
+        </MetaLine>
         <AppText variant="caption">
           {report.coordinates.lat.toFixed(5)}, {report.coordinates.lng.toFixed(5)}
         </AppText>
-      </Card>
+      </Section>
 
       {report.repair ? (
-        <Card title="Repair">
+        <Section title="Repair">
           <AppText variant="caption">Submitted {formatDate(report.repair.submittedAt)}</AppText>
           {report.repair.notes ? <AppText>{report.repair.notes}</AppText> : null}
-          {report.repair.beforePhotos.length ? <PhotoGallery photos={report.repair.beforePhotos} label="Before" /> : null}
           {report.repair.afterPhotos.length ? <PhotoGallery photos={report.repair.afterPhotos} label="After" /> : null}
-        </Card>
+          {report.repair.beforePhotos.length ? <PhotoGallery photos={report.repair.beforePhotos} label="Before" /> : null}
+        </Section>
       ) : null}
 
-      <Card title="Activity">
-        <ReportTimeline history={report.history} />
-      </Card>
+      <Section title="Activity">
+        <ReportTimeline history={report.history} byViewer={isMine} />
+      </Section>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  content: { padding: 16, paddingBottom: 40, gap: 16 },
+  content: { paddingHorizontal: 16, paddingBottom: 32 },
+  notice: { paddingBottom: 14 },
   center: { flex: 1, gap: 12, padding: 20, justifyContent: "center" },
-  tags: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
-  meta: { flexDirection: "row", alignItems: "center", gap: 8 },
-  flex: { flex: 1 },
 });

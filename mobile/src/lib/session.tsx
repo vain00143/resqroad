@@ -124,7 +124,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         setStatus("signedOut");
         return;
       }
-      const server = savedServer || defaultServer;
+      // Server settings exist only in development builds; an installed APK
+      // always uses its built-in address.
+      const server = (__DEV__ && savedServer) || defaultServer;
       setServerUrlState(server);
       configureApi({ baseUrl: server });
 

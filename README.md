@@ -172,7 +172,7 @@ safe to run again). All times are stored in UTC.
 | --- | --- |
 | `users` | Every account: `name`, `email` (unique), `password_hash` (bcrypt), `role` (`admin` \| `maintenance` \| `citizen`), `team` (crews), `active`, `created_at`, `deleted_at` (deleted crew accounts). |
 | `sessions` | Signed-in devices: a SHA-256 hash of each session token (never the token itself), `user_id`, `client` (`web` \| `mobile`), `expires_at`. |
-| `reports` | Reports. The public ID is `RPT-` + `id` (new reports continue from the highest number). `title`, `road`, `location`, `latitude`, `longitude`, `severity`, `description`, `status`, `reporter_id` → `users`, `assigned_to` → `users`, `assigned_name`, `repair_notes`, `repair_submitted_at`, `reported_at`, `updated_at`. |
+| `reports` | Reports. The public ID is `RPT-` + `id` (new reports continue from the highest number). `title`, `road`, `location`, `latitude`, `longitude`, `severity`, `description`, `status`, `reporter_id` → `users`, `client_key` (the app's `Idempotency-Key` for the report, unique together with `reporter_id`, so a retried upload returns the report already filed), `assigned_to` → `users`, `assigned_name`, `repair_notes`, `repair_client_key` (the key of the latest repair upload), `repair_submitted_at`, `reported_at`, `updated_at`. `server/db.js` adds `client_key` and `repair_client_key` to databases set up before they existed when the server starts. |
 | `report_history` | Each workflow step: `report_id`, `status`, `description`, `actor` (name), `actor_id`, `note` (reason shown to the resident or crew), `created_at`. |
 | `report_notes` | Internal staff notes (administrators only): `report_id`, `note`, `actor`, `created_at`. |
 | `report_feedback` | The resident's rating of a finished repair, one per report: `report_id` (unique), `user_id`, `rating` (1–5), `comment`, `created_at`. Seen only by administrators and that resident. |
@@ -184,8 +184,9 @@ tracker need them), but the reporter's identity is only shown to
 administrators and to the reporter, internal notes only to administrators, and
 account details only to administrators and the account's owner.
 
-**Photos** are checked on the server (JPEG, PNG, or WebP, up to 8 MB and five
-per set), saved as `storage/photos/YYYY/MM/<random name>`, and served from
+**Photos** are checked on the server (JPEG, PNG, or WebP, up to 8 MB each;
+up to five with a report and five "before" photos with a repair, and one to
+ten "after" photos), saved as `storage/photos/YYYY/MM/<random name>`, and served from
 `/uploads/...`. Back up the `storage/` folder together with the database. With
 `PHOTO_STORAGE=database` (the hosted setup below), photos are kept in the
 `photo_data` table instead, served from the same `/uploads/...` addresses, so a
@@ -305,7 +306,7 @@ encrypted connections, and `TRUST_PROXY=1` behind the host's proxy.
 The Android app for residents and maintenance crews lives in `mobile/`. It's
 built with [Expo](https://expo.dev/) (React Native) and uses the same server,
 accounts, and live updates as the website. Administrators keep using the
-website.
+website. The current version is **1.2.0**.
 
 ```powershell
 cd mobile
@@ -316,23 +317,30 @@ npx expo start
 Scan the QR code with **Expo Go** on an Android phone on the same Wi-Fi, or
 press `w` to open it in a browser.
 
-**Server address.** The APK connects to the hosted copy,
+**Server address.** The APK always connects to the hosted copy,
 `https://resqroad.onrender.com`, so it works on any network, Wi-Fi or mobile
 data. While developing, `npx expo start` uses the server started with
 `npm start` on this computer, so test data stays off the live site: copy
 `mobile/.env.example` to `mobile/.env` and set `EXPO_PUBLIC_API_URL` to the
 address the server prints for other devices (for example
 `http://192.168.1.15:8000`). That address changes when the laptop joins
-another network, so it can also be changed in the app under **Server
-settings** on the sign-in screen ("Save and test connection" checks it). The
-phone must be on the same Wi-Fi, and Node.js must be allowed through Windows
-Firewall. For the browser preview, use `http://localhost:8000` and add
-`http://localhost:8081` to `CORS_ORIGINS` in the server's `.env`.
+another network, so development builds (`npx expo start`) also have **Server
+settings** on the sign-in and registration screens to change it ("Save and
+test connection" checks it). The APK has no Server settings and ignores any
+address saved by an older version. The phone must be on the same Wi-Fi, and
+Node.js must be allowed through Windows Firewall. For the browser preview, use
+`http://localhost:8000` and add `http://localhost:8081` to `CORS_ORIGINS` in
+the server's `.env`.
 
 **If the app says it can't reach the server**, the message names the address
-it tried, and Server settings opens by itself. With the hosted address, check
-the phone's internet connection; requests wait up to a minute in case the free
-server is waking up. With a laptop's address, check, in order:
+it tried (in development, Server settings also opens by itself). With the
+hosted address, check the phone's internet connection. The free server sleeps
+when nobody uses it, so requests to it wait up to 90 seconds, and after a few
+seconds the app shows "Waking up the ResQRoad server…" so people know why the
+wait. When the phone has no connection at all, the app says so ("This phone
+isn't connected to the internet…") instead of waiting, and screens that have
+already loaded keep their data under a "Can't reach the server. Showing the
+last update." banner with **Retry**. With a laptop's address, check, in order:
 
 1. The server is running (`npm start` in the project folder; leave it open).
 2. The address is the one `npm start` prints for **the network the phone is
@@ -346,27 +354,74 @@ server is waking up. With a laptop's address, check, in order:
 In the Android emulator, `http://10.0.2.2:8000` also reaches the laptop.
 
 Residents and maintenance crews sign in with their website accounts, and new
-residents can register in the app. Administrators are pointed to the website.
+residents can register in the app (typing the password twice). Administrators
+are pointed to the website. The welcome screen has **Log in**, **Create a
+resident account**, and **Track a report by ID**.
 
-- **Residents** have four tabs: **Home** (their numbers and latest reports),
-  **Report** (the same three-part form as the website: title, severity, and
-  description; a map pin or "Use my location"; up to five photos from the
-  camera or gallery, shrunk to 1600 px before upload), **My reports** (with
-  Open, Resolved, and Closed filters), and **Track** (any report by ID, also
-  available signed out from the welcome screen). Each report's page shows its
-  progress, photos, location, any repair, and every decision with its note.
-- **Maintenance crews** have three tabs: **Home** (their numbers and what's
-  up next), **My jobs** (Active, Awaiting review, Completed, and All, in the
-  website's order: repairs underway first, then by severity), and **Map**
-  (every job, with active ones as pins; tap one for directions). A job's page
-  has **Directions** (Google Maps), **Start repair**, and the repair form:
-  notes plus before and after photos (at least one of each), with a
-  confirmation before sending. When an administrator asks for more work, the
-  note appears at the top and the previous repair stays visible. Unsent notes
-  and photos are kept while the crew looks at other screens.
-- **Account**: the bottom of Home has **Change password** (the current
-  password, then the new one twice; other devices are signed out) and
-  **Log out**.
+- **Home** (residents and crews) has the ResQRoad logo, a Live badge for the
+  live connection, and the person's initials top right. Tapping the initials
+  opens a small menu: **Change password** (the current password, then the new
+  one twice; other devices are signed out), **Theme** (System, Light, or Dark;
+  saved on the phone and applied to the whole app, status bar included), and
+  **Log out** (after a confirmation). Below the greeting are three numbers and
+  then the latest reports (residents) or the next jobs (crews).
+- **Report cards** (Home, My reports, My jobs, and the crew map) follow the
+  website's: the first photo cropped to a fixed frame (a plain placeholder
+  when there's none) with the severity and how long ago it was reported over
+  it, then the ID, title, road and place, and a footer with the status and
+  date. Crews see the same cards; the API doesn't send them reporters' names.
+- **Residents** have four tabs on a floating bar: **Home**, **Report**, **My
+  reports** (with Open, Resolved, and Closed filters), and **Track** (the round
+  button at the end: any report by ID, also available signed out from the
+  welcome screen).
+- **Report** is a form in four steps, one page each, with a step indicator and
+  Back and Next: (1) title, severity, and description; (2) the location, with
+  a map pin or "Use my location", the road or street, and the barangay and
+  municipality; (3) photos from the camera or gallery, at least one and up to
+  five; (4) a review of everything, including the photos and a map of the pin,
+  with **Edit** beside each part. **Submit report** appears only on the review,
+  and each step is checked before Next. Photos are resized to 1280 px on the
+  longest side and saved as JPEG at quality 0.7 before upload
+  (`mobile/src/lib/photos.ts`), about 150–300 KB each. (On the website, and for
+  the server, photos stay optional.)
+- **A report's page** reads top to bottom: the ID, title, status, and
+  severity; the photos; the progress through each workflow step; the
+  description; the map and place; any repair (after photos first); and the
+  activity, where the resident's own first entry reads "You submitted this
+  report." (crews and anyone tracking the report never see who filed it).
+  Photos sit in one frame whatever their number or orientation: one
+  fills the width, two sit side by side, three are one large and two stacked,
+  and four or more make a grid with "+N" on the last tile. Tapping one opens
+  them full screen, uncropped, to swipe through. Repair photos work the same
+  way.
+- **Maintenance crews** have three tabs: **Home**, **My jobs** (Active,
+  Awaiting review, Completed, and All, in the website's order: repairs
+  underway first, then by severity), and **Map** (every job, with active ones
+  as pins; tap one for directions). A job's page is laid out like a report's
+  page, with **Directions** (Google Maps) and **Start repair** (or **Repair
+  update**, which jumps to the form) under the title. The repair form
+  takes notes, one to ten after-repair photos, and up to five optional before
+  photos (the resident's photos already show the damage), with a confirmation
+  before sending. When an administrator asks for more work, the note appears
+  at the top and the previous repair stays visible.
+- **Sending photos**: reports and repairs are uploaded with `XMLHttpRequest`
+  (Expo's `fetch` can't send photo files) and show a progress bar with the
+  percentage sent. Each form carries an `Idempotency-Key` header; when the
+  server doesn't answer, or answers 502–504 while restarting, the app tries
+  twice more (after 3 and 8 seconds) with the same key, so a retry returns the
+  report or repair already filed instead of making a second one. A report
+  close to an open one is refused with a button to open that report.
+- **Drafts**: an unsent report (its fields, photos, and the step it was on)
+  and each job's unsent repair update are saved on the phone as they're filled
+  in (AsyncStorage, per account), so they survive the app closing, and are
+  cleared once sent. If Android closes the app while the camera is open
+  (common on phones short of memory), the photo is added back to the form that
+  opened the camera when it opens again.
+- **Version line**: the bottom of Home and of the sign-in screen shows, for
+  example, "Version 1.2.0 (build 9) · commit 1a2b3c4": the version from
+  `mobile/app.json`, the build number EAS gives each build, and the git commit
+  it was built from (`mobile/app.config.js`), so anyone can tell which build
+  is installed.
 - **Status alerts**: when one of a resident's reports changes status, or a
   crew member gets a new job, loses one to reassignment, has a repair sent
   back, or has a repair verified, the app shows a banner (while it's open) or
@@ -382,11 +437,11 @@ The sign-in token is kept in the phone's secure storage; live updates arrive
 over the same WebSocket as the website, and the app reconnects and catches up
 after losing the connection.
 
-The app follows the brand in
-`assets/css/core.css` (tokens in `mobile/src/theme/tokens.ts`), and its icons
-and splash screen are made from the Q mark. Headlines use the static
-Archivo Expanded ExtraBold file in `mobile/assets/fonts/` (SIL Open Font
-License).
+The app follows the website's look in a compact phone layout: the brand in
+`assets/css/core.css` (tokens in `mobile/src/theme/tokens.ts`), the website's
+icons, and its solid status and severity labels. Its icons and splash screen
+are made from the Q mark. Headlines use the static Archivo Expanded ExtraBold
+file in `mobile/assets/fonts/` (SIL Open Font License).
 
 ### Build the APK
 
@@ -407,13 +462,20 @@ app). The build takes about 10–20 minutes and ends with a link and QR code.
 Open it on the phone, download the APK, allow **Install unknown apps** for
 the browser when Android asks, and install it.
 
-The `preview` profile in `mobile/eas.json` builds an APK with the hosted
-address `https://resqroad.onrender.com` built in (`EXPO_PUBLIC_API_URL`).
-When a new build's address differs from the one an installed app was using,
-the app switches to it and asks people to sign in again. The address can
-always be changed in the app under **Server settings**. Plain `http://` is
-still allowed in this build (`usesCleartextTraffic`), so it can also be
-pointed at a laptop on the local network for testing.
+The `preview` profile in `mobile/eas.json` builds an APK of about 72 MB with
+the hosted address `https://resqroad.onrender.com` built in
+(`EXPO_PUBLIC_API_URL`) and native code for `armeabi-v7a`, `arm64-v8a`, and
+`x86_64` (`ORG_GRADLE_PROJECT_reactNativeArchitectures`: 32- and 64-bit ARM
+phones, and the 64-bit Android emulator). The version is `version` in
+`mobile/app.json`; EAS counts the build number itself (`appVersionSource:
+remote` with `autoIncrement`). When a new build's address differs from the
+one an installed app was using, the app switches to it and asks people to sign
+in again. Plain `http://` is still allowed (`usesCleartextTraffic`) so
+development builds can use a laptop on the local network.
+
+The EAS download link expires 14 days after the build, but installed apps keep
+working. Keep the APK file itself (for example `ResQRoad-v1.2.0.apk`) and share
+that instead of the link.
 
 ## Brand and design
 
@@ -486,6 +548,9 @@ mobile/                       The Android app (Expo): screens in mobile/src/app/
   [React Native](https://reactnative.dev/): [Expo Router](https://docs.expo.dev/router/introduction/),
   Expo's Secure Store, Image Picker, Image Manipulator, Location,
   Notifications, and Splash Screen modules,
+  [AsyncStorage](https://github.com/react-native-async-storage/async-storage)
+  (drafts and the theme choice), [NetInfo](https://github.com/react-native-netinfo/react-native-netinfo)
+  (the offline message),
   [react-native-svg](https://github.com/software-mansion/react-native-svg),
   [react-native-webview](https://github.com/react-native-webview/react-native-webview),
   [react-native-screens](https://github.com/software-mansion/react-native-screens),

@@ -1,6 +1,7 @@
 import { Tabs } from "expo-router/js-tabs";
 import type { ColorValue } from "react-native";
 
+import { FloatingTabBar } from "@/components/FloatingTabBar";
 import { Icon, type IconName } from "@/components/Icon";
 import { inTab, myJobs } from "@/lib/jobs";
 import { useSession } from "@/lib/session";
@@ -8,7 +9,7 @@ import { fonts, useTheme } from "@/theme";
 
 function tabIcon(name: IconName) {
   return function TabIcon({ color }: { color: ColorValue }) {
-    return <Icon name={name} size={22} color={String(color)} />;
+    return <Icon name={name} size={21} color={String(color)} />;
   };
 }
 
@@ -19,13 +20,9 @@ export default function CrewLayout() {
 
   return (
     <Tabs
+      tabBar={(props) => <FloatingTabBar {...props} />}
       screenOptions={{
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.text3,
-        tabBarLabelStyle: { fontFamily: fonts.medium, fontSize: 11 },
-        tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border },
-        tabBarBadgeStyle: { backgroundColor: colors.primary, fontFamily: fonts.semibold, fontSize: 10 },
-        headerTitleStyle: { fontFamily: fonts.semibold },
+        headerTitleStyle: { fontFamily: fonts.semibold, fontSize: 16 },
         headerShadowVisible: false,
         sceneStyle: { backgroundColor: colors.bg },
       }}

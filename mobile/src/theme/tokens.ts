@@ -104,6 +104,14 @@ export const severityColors: Record<Severity, string> = {
   Low: "#E3B100",
 };
 
+// The website's solid severity labels (`.sev`): white text on a darker shade
+// of each hue.
+export const severityLabelColors: Record<Severity, string> = {
+  High: "#C62F25",
+  Medium: "#B8540C",
+  Low: "#957000",
+};
+
 const lightStatus: Record<ReportStatus, string> = {
   submitted: "#8A817B",
   under_review: "#D9961E",
@@ -153,4 +161,22 @@ export function mix(a: string, b: string, weight: number): string {
 // Adds an alpha channel to a #RRGGBB color.
 export function withAlpha(hex: string, alpha: number): string {
   return hex + Math.round(alpha * 255).toString(16).padStart(2, "0");
+}
+
+function luminance(hex: string) {
+  const [r, g, b] = [0, 1, 2].map((index) => {
+    const value = parseInt(hex.slice(1 + index * 2, 3 + index * 2), 16) / 255;
+    return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+// The color darkened just enough for white label text to meet WCAG AA
+// (4.5:1), the way the website darkens its severity labels.
+export function labelColor(hex: string): string {
+  let color = hex;
+  for (let weight = 1; weight > 0.4 && 1.05 / (luminance(color) + 0.05) < 4.5; weight -= 0.04) {
+    color = mix(hex, "#000000", weight);
+  }
+  return color;
 }

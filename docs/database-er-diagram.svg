@@ -46,9 +46,9 @@ text { font-family: Poppins, 'Segoe UI', Arial, sans-serif; }
 <path d="M990 421.5 H1090 V162.5 H1180" class="rel" marker-start="url(#many)" marker-end="url(#one)"/>
 <path d="M990 617.5 H1090 V162.5 H1180" class="rel" marker-start="url(#many)" marker-end="url(#one)"/>
 <path d="M1180 351.5 H1150 V845 H450 V162.5 H420" class="rel" marker-start="url(#many)" marker-end="url(#one)"/>
-<path d="M1180 372.5 H1130 V862 H470 V162.5 H420" class="rel" marker-start="url(#many)" marker-end="url(#one)"/>
-<path d="M1180 586.5 H1110 V596.5 H990" class="rel" marker-start="url(#one-start)" marker-end="url(#one)"/>
-<text x="800" y="889" class="rlabel" text-anchor="middle">reports.reporter_id → the resident who filed it    ·    reports.assigned_to → the assigned maintenance crew    ·    photo_data → a photo's file, when photos are kept in MySQL</text>
+<path d="M1180 393.5 H1130 V862 H470 V162.5 H420" class="rel" marker-start="url(#many)" marker-end="url(#one)"/>
+<path d="M1180 628.5 H1110 V596.5 H990" class="rel" marker-start="url(#one-start)" marker-end="url(#one)"/>
+<text x="800" y="889" class="rlabel" text-anchor="middle">reports.reporter_id → the resident who filed it    ·    reports.assigned_to → the assigned maintenance crew    ·    reports.client_key → unique for each resident    ·    photo_data → a photo's file, when photos are kept in MySQL</text>
 <g>
 <rect x="60" y="104" width="360" height="268" rx="10" fill="#ffffff" stroke="#dcd3cb"/>
 <path d="M60 148 V114 a10 10 0 0 1 10 -10 H410 a10 10 0 0 1 10 10 V148 Z" fill="#b34f2f"/>
@@ -210,7 +210,7 @@ text { font-family: Poppins, 'Segoe UI', Arial, sans-serif; }
 <text x="976" y="811" class="type" text-anchor="end">DATETIME(3)</text>
 </g>
 <g>
-<rect x="1180" y="104" width="380" height="394" rx="10" fill="#ffffff" stroke="#dcd3cb"/>
+<rect x="1180" y="104" width="380" height="436" rx="10" fill="#ffffff" stroke="#dcd3cb"/>
 <path d="M1180 148 V114 a10 10 0 0 1 10 -10 H1550 a10 10 0 0 1 10 10 V148 Z" fill="#b34f2f"/>
 <text x="1196" y="132" class="tname">reports</text>
 <text x="1544" y="132" class="tnote" text-anchor="end">road damage reports</text>
@@ -243,44 +243,51 @@ text { font-family: Poppins, 'Segoe UI', Arial, sans-serif; }
 <text x="1206" y="355.5" class="badge" fill="#7b3621" text-anchor="middle">FK</text>
 <text x="1230" y="356" class="col">reporter_id</text>
 <text x="1546" y="356" class="type" text-anchor="end">INT</text>
-<rect x="1192" y="364.5" width="28" height="16" rx="4" fill="#efc88b"/>
-<text x="1206" y="376.5" class="badge" fill="#7b3621" text-anchor="middle">FK</text>
-<text x="1230" y="377" class="col">assigned_to</text>
-<text x="1546" y="377" class="type" text-anchor="end">INT</text>
+<rect x="1192" y="364.5" width="28" height="16" rx="4" fill="#ffffff" stroke="#b34f2f"/>
+<text x="1206" y="376.5" class="badge" fill="#b34f2f" text-anchor="middle">UQ</text>
+<text x="1230" y="377" class="col">client_key</text>
+<text x="1546" y="377" class="type" text-anchor="end">VARCHAR(64)</text>
 <rect x="1181" y="383" width="378" height="21" fill="#fbf9f7"/>
-<text x="1230" y="398" class="col">assigned_name</text>
-<text x="1546" y="398" class="type" text-anchor="end">VARCHAR(80)</text>
-<text x="1230" y="419" class="col">repair_notes</text>
-<text x="1546" y="419" class="type" text-anchor="end">TEXT</text>
+<rect x="1192" y="385.5" width="28" height="16" rx="4" fill="#efc88b"/>
+<text x="1206" y="397.5" class="badge" fill="#7b3621" text-anchor="middle">FK</text>
+<text x="1230" y="398" class="col">assigned_to</text>
+<text x="1546" y="398" class="type" text-anchor="end">INT</text>
+<text x="1230" y="419" class="col">assigned_name</text>
+<text x="1546" y="419" class="type" text-anchor="end">VARCHAR(80)</text>
 <rect x="1181" y="425" width="378" height="21" fill="#fbf9f7"/>
-<text x="1230" y="440" class="col">repair_submitted_at</text>
-<text x="1546" y="440" class="type" text-anchor="end">DATETIME(3)</text>
-<text x="1230" y="461" class="col">reported_at</text>
-<text x="1546" y="461" class="type" text-anchor="end">DATETIME(3)</text>
+<text x="1230" y="440" class="col">repair_notes</text>
+<text x="1546" y="440" class="type" text-anchor="end">TEXT</text>
+<text x="1230" y="461" class="col">repair_client_key</text>
+<text x="1546" y="461" class="type" text-anchor="end">VARCHAR(64)</text>
 <rect x="1181" y="467" width="378" height="21" fill="#fbf9f7"/>
-<text x="1230" y="482" class="col">updated_at</text>
+<text x="1230" y="482" class="col">repair_submitted_at</text>
 <text x="1546" y="482" class="type" text-anchor="end">DATETIME(3)</text>
+<text x="1230" y="503" class="col">reported_at</text>
+<text x="1546" y="503" class="type" text-anchor="end">DATETIME(3)</text>
+<rect x="1181" y="509" width="378" height="21" fill="#fbf9f7"/>
+<text x="1230" y="524" class="col">updated_at</text>
+<text x="1546" y="524" class="type" text-anchor="end">DATETIME(3)</text>
 </g>
 <g>
-<rect x="1180" y="528" width="380" height="142" rx="10" fill="#ffffff" stroke="#dcd3cb"/>
-<path d="M1180 572 V538 a10 10 0 0 1 10 -10 H1550 a10 10 0 0 1 10 10 V572 Z" fill="#b34f2f"/>
-<text x="1196" y="556" class="tname">photo_data</text>
-<text x="1544" y="556" class="tnote" text-anchor="end">photo files kept in MySQL</text>
-<rect x="1192" y="578.5" width="28" height="16" rx="4" fill="#b34f2f"/>
-<text x="1206" y="590.5" class="badge" fill="#ffffff" text-anchor="middle">PK</text>
-<rect x="1224" y="578.5" width="28" height="16" rx="4" fill="#efc88b"/>
-<text x="1238" y="590.5" class="badge" fill="#7b3621" text-anchor="middle">FK</text>
-<text x="1262" y="591" class="col pk">photo_id</text>
-<text x="1546" y="591" class="type" text-anchor="end">INT</text>
-<rect x="1181" y="597" width="378" height="21" fill="#fbf9f7"/>
-<rect x="1192" y="599.5" width="28" height="16" rx="4" fill="#ffffff" stroke="#b34f2f"/>
-<text x="1206" y="611.5" class="badge" fill="#b34f2f" text-anchor="middle">UQ</text>
-<text x="1230" y="612" class="col">file_path</text>
-<text x="1546" y="612" class="type" text-anchor="end">VARCHAR(255)</text>
-<text x="1230" y="633" class="col">mime_type</text>
-<text x="1546" y="633" class="type" text-anchor="end">VARCHAR(40)</text>
+<rect x="1180" y="570" width="380" height="142" rx="10" fill="#ffffff" stroke="#dcd3cb"/>
+<path d="M1180 614 V580 a10 10 0 0 1 10 -10 H1550 a10 10 0 0 1 10 10 V614 Z" fill="#b34f2f"/>
+<text x="1196" y="598" class="tname">photo_data</text>
+<text x="1544" y="598" class="tnote" text-anchor="end">photo files kept in MySQL</text>
+<rect x="1192" y="620.5" width="28" height="16" rx="4" fill="#b34f2f"/>
+<text x="1206" y="632.5" class="badge" fill="#ffffff" text-anchor="middle">PK</text>
+<rect x="1224" y="620.5" width="28" height="16" rx="4" fill="#efc88b"/>
+<text x="1238" y="632.5" class="badge" fill="#7b3621" text-anchor="middle">FK</text>
+<text x="1262" y="633" class="col pk">photo_id</text>
+<text x="1546" y="633" class="type" text-anchor="end">INT</text>
 <rect x="1181" y="639" width="378" height="21" fill="#fbf9f7"/>
-<text x="1230" y="654" class="col">data</text>
-<text x="1546" y="654" class="type" text-anchor="end">MEDIUMBLOB</text>
+<rect x="1192" y="641.5" width="28" height="16" rx="4" fill="#ffffff" stroke="#b34f2f"/>
+<text x="1206" y="653.5" class="badge" fill="#b34f2f" text-anchor="middle">UQ</text>
+<text x="1230" y="654" class="col">file_path</text>
+<text x="1546" y="654" class="type" text-anchor="end">VARCHAR(255)</text>
+<text x="1230" y="675" class="col">mime_type</text>
+<text x="1546" y="675" class="type" text-anchor="end">VARCHAR(40)</text>
+<rect x="1181" y="681" width="378" height="21" fill="#fbf9f7"/>
+<text x="1230" y="696" class="col">data</text>
+<text x="1546" y="696" class="type" text-anchor="end">MEDIUMBLOB</text>
 </g>
 </svg>

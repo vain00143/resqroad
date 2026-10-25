@@ -9,7 +9,10 @@ import { Image, Platform } from "react-native";
 import { serverAsset } from "@/lib/api";
 import type { Photo } from "@/lib/reports";
 
-export const maxPhotos = 5;
+// How many photos the server takes: up to five with a report (the app asks
+// for at least one), and with a repair up to five "before" photos and one to
+// ten "after" photos.
+export const photoLimits = { report: 5, before: 5, after: 10 } as const;
 // About 150–300 KB per photo: still sharp enough to judge road damage.
 const longestSide = 1280;
 

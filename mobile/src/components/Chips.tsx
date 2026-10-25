@@ -44,6 +44,6 @@ export function Chips<Key extends string>({
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  chip: { paddingHorizontal: 14, minHeight: 36, justifyContent: "center", borderWidth: 1, borderRadius: radius.full },
+  row: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  chip: { paddingHorizontal: 12, minHeight: 32, justifyContent: "center", borderWidth: 1, borderRadius: radius.full },
 });

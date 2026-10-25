@@ -11,6 +11,9 @@ import { TextField } from "@/components/TextField";
 import { WakingNotice } from "@/components/WakingNotice";
 import { errorMessage, NetworkError } from "@/lib/api";
 import { useSession } from "@/lib/session";
+import { fonts } from "@/theme";
+
+const mismatch = "Passwords don't match.";
 
 // Quick checks before sending; the server applies the same rules.
 function problem(name: string, email: string, password: string): string | null {
@@ -34,16 +37,29 @@ export default function Register() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  // The mismatch shows once the confirm box has been left or the form sent,
+  // not while the password is still being typed again.
+  const [checkConfirm, setCheckConfirm] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [unreachable, setUnreachable] = useState(false);
   const emailRef = useRef<TextInputInstance>(null);
   const passwordRef = useRef<TextInputInstance>(null);
+  const confirmRef = useRef<TextInputInstance>(null);
+
+  const confirmError = checkConfirm && confirm !== password ? mismatch : null;
 
   async function submit() {
     const found = problem(name, email, password);
     if (found) {
       setError(found);
+      return;
+    }
+    setCheckConfirm(true);
+    if (confirm !== password) {
+      setError(null);
+      confirmRef.current?.focus();
       return;
     }
     setBusy(true);
@@ -62,7 +78,7 @@ export default function Register() {
       <View style={styles.intro}>
         <AppText variant="eyebrow">Free resident account</AppText>
         <AppText variant="title">Create your account</AppText>
-        <AppText tone="text2">
+        <AppText variant="label" tone="text2">
           Report road damage and follow every repair. The same account works on the website.
         </AppText>
       </View>
@@ -108,27 +124,47 @@ export default function Register() {
         autoCapitalize="none"
         autoComplete="new-password"
         textContentType="newPassword"
+        returnKeyType="next"
+        onSubmitEditing={() => confirmRef.current?.focus()}
+        hint="At least 8 characters with a letter and a number."
+      />
+      <TextField
+        ref={confirmRef}
+        label="Confirm password"
+        icon="lock"
+        password
+        value={confirm}
+        onChangeText={setConfirm}
+        onBlur={() => confirm && setCheckConfirm(true)}
+        placeholder="Type the password again"
+        autoCapitalize="none"
+        autoComplete="new-password"
+        textContentType="newPassword"
         returnKeyType="go"
         onSubmitEditing={submit}
-        hint="At least 8 characters with a letter and a number."
+        error={confirmError}
       />
       <Button label="Create account" size="lg" loading={busy} onPress={submit} />
 
       <View style={styles.switch}>
-        <AppText tone="text2">Already have an account? </AppText>
+        <AppText variant="label" tone="text2">
+          Already have an account?{" "}
+        </AppText>
         <Link href="/login" replace>
-          <AppText variant="bodyStrong" tone="link">
+          <AppText variant="label" tone="link" style={styles.strong}>
             Log in
           </AppText>
         </Link>
       </View>
 
-      <ServerSettings unreachable={unreachable} />
+      {/* Only development builds can point the app at another server. */}
+      {__DEV__ ? <ServerSettings unreachable={unreachable} /> : null}
     </FormScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  intro: { gap: 6, marginBottom: 4 },
+  intro: { gap: 4, marginBottom: 2 },
   switch: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center" },
+  strong: { fontFamily: fonts.semibold },
 });

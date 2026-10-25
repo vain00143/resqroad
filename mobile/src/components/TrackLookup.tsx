@@ -1,4 +1,4 @@
-import { router } from "expo-router";
+import { useRouter } from "expo-router";
 import { useState } from "react";
 import { StyleSheet, View } from "react-native";
 
@@ -14,6 +14,7 @@ import { normalizeReportId, type Report } from "@/lib/reports";
 // Look up any report by its ID, like the website's track page. Works signed
 // in or out.
 export function TrackLookup() {
+  const router = useRouter();
   const [value, setValue] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -45,7 +46,7 @@ export function TrackLookup() {
       <View style={styles.intro}>
         <AppText variant="eyebrow">Track a report</AppText>
         <AppText variant="title">Where's my repair?</AppText>
-        <AppText tone="text2">
+        <AppText variant="label" tone="text2">
           Enter the report ID you got after reporting (for example RPT-1048) to see its progress.
         </AppText>
       </View>
@@ -66,12 +67,12 @@ export function TrackLookup() {
         size="lg"
         loading={busy}
         onPress={track}
-        icon={<Icon name="search" size={18} color="#FFFFFF" />}
+        icon={<Icon name="search" size={16} color="#FFFFFF" />}
       />
     </FormScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  intro: { gap: 6, marginBottom: 4 },
+  intro: { gap: 4, marginBottom: 2 },
 });

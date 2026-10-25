@@ -1,5 +1,5 @@
 import { useFonts } from "expo-font";
-import { DarkTheme, DefaultTheme, router, Stack, ThemeProvider, type Href } from "expo-router";
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider, useRouter, type Href } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import * as SystemUI from "expo-system-ui";
@@ -8,10 +8,11 @@ import { useEffect } from "react";
 import { UpdateBanner } from "@/components/UpdateBanner";
 import { SessionProvider, useSession } from "@/lib/session";
 import { onNotificationTap, setUpNotifications } from "@/lib/updates";
-import { fonts, useTheme } from "@/theme";
+import { fonts, ThemeChoiceProvider, useTheme } from "@/theme";
 import { fontFiles } from "@/theme/fonts";
 
-// Keep the splash screen up until the fonts and the saved sign-in are ready.
+// Keep the splash screen up until the fonts, the theme choice, and the saved
+// sign-in are ready.
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
@@ -20,13 +21,16 @@ export default function RootLayout() {
     return null;
   }
   return (
-    <SessionProvider>
-      <RootNavigator />
-    </SessionProvider>
+    <ThemeChoiceProvider>
+      <SessionProvider>
+        <RootNavigator />
+      </SessionProvider>
+    </ThemeChoiceProvider>
   );
 }
 
 function RootNavigator() {
+  const router = useRouter();
   const { scheme, colors } = useTheme();
   const { status, user } = useSession();
 
@@ -47,7 +51,7 @@ function RootNavigator() {
       setUpNotifications().catch(() => {});
     }
   }, [status]);
-  useEffect(() => onNotificationTap((path) => router.push(path as Href)), []);
+  useEffect(() => onNotificationTap((path) => router.push(path as Href)), [router]);
 
   if (status === "loading") {
     return null;
@@ -78,15 +82,22 @@ function RootNavigator() {
       <Stack
         screenOptions={{
           headerShadowVisible: false,
-          headerTitleStyle: { fontFamily: fonts.semibold },
+          headerTitleStyle: { fontFamily: fonts.semibold, fontSize: 16 },
           contentStyle: { backgroundColor: colors.bg },
         }}
       >
         {/* The welcome screen sends signed-in people to their own home. */}
         <Stack.Screen name="index" options={{ headerShown: false }} />
+        {/* The page's own heading names these, so the bar only has the back arrow. */}
         <Stack.Protected guard={status === "signedOut"}>
-          <Stack.Screen name="login" options={{ title: "Log in" }} />
-          <Stack.Screen name="register" options={{ title: "Create an account" }} />
+          <Stack.Screen
+            name="login"
+            options={{ title: "Log in", headerTitle: "", headerStyle: { backgroundColor: colors.bg } }}
+          />
+          <Stack.Screen
+            name="register"
+            options={{ title: "Create an account", headerTitle: "", headerStyle: { backgroundColor: colors.bg } }}
+          />
         </Stack.Protected>
         <Stack.Protected guard={user?.role === "citizen"}>
           <Stack.Screen name="resident" options={{ headerShown: false }} />
@@ -103,7 +114,7 @@ function RootNavigator() {
         <Stack.Screen name="brand" options={{ title: "Brand check" }} />
       </Stack>
       <UpdateBanner />
-      <StatusBar style="auto" />
+      <StatusBar style={scheme === "dark" ? "light" : "dark"} />
     </ThemeProvider>
   );
 }

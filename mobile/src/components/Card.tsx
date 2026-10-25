@@ -14,6 +14,35 @@ export function Card({ title, children, style }: { title?: string; children: Rea
   );
 }
 
+// A titled part of a long page, divided from the one above by a thin line
+// instead of sitting in its own box.
+export function Section({
+  title,
+  aside,
+  children,
+  first = false,
+}: {
+  title?: string;
+  aside?: ReactNode;
+  children: ReactNode;
+  first?: boolean;
+}) {
+  const { colors } = useTheme();
+  return (
+    <View style={[styles.section, !first && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }]}>
+      {title ? (
+        <View style={styles.sectionHead}>
+          <AppText variant="eyebrow">{title}</AppText>
+          {aside}
+        </View>
+      ) : null}
+      {children}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  card: { gap: 12, padding: 16, borderWidth: 1, borderRadius: radius.lg },
+  card: { gap: 10, padding: 14, borderWidth: 1, borderRadius: radius.lg },
+  section: { gap: 10, paddingVertical: 16 },
+  sectionHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8, minHeight: 18 },
 });

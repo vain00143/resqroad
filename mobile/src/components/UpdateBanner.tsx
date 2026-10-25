@@ -1,4 +1,4 @@
-import { router, type Href } from "expo-router";
+import { useRouter, type Href } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Animated, Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -13,6 +13,7 @@ const visibleMs = 6000;
 // The in-app version of a status notification: slides in at the top, opens
 // the report or job when tapped, and hides itself after a few seconds.
 export function UpdateBanner() {
+  const router = useRouter();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const [update, setUpdate] = useState<Update | null>(null);

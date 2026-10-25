@@ -1,4 +1,4 @@
-import { router } from "expo-router";
+import { useRouter } from "expo-router";
 import { useMemo, useState } from "react";
 import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
 
@@ -20,6 +20,7 @@ const emptyText: Record<JobTab, { title: string; text: string }> = {
 };
 
 export default function MyJobs() {
+  const router = useRouter();
   const { colors } = useTheme();
   const { user, reports, loaded, connection, refresh } = useSession();
   const [tab, setTab] = useState<JobTab>("active");
@@ -61,7 +62,7 @@ export default function MyJobs() {
       ListEmptyComponent={
         loaded ? (
           <View style={[styles.empty, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Icon name="inbox" size={28} />
+            <Icon name="inbox" size={24} />
             <AppText variant="heading">{empty.title}</AppText>
             <AppText tone="text2" style={styles.centerText}>
               {empty.text}
@@ -74,8 +75,8 @@ export default function MyJobs() {
 }
 
 const styles = StyleSheet.create({
-  content: { padding: 16, paddingBottom: 40, gap: 10 },
+  content: { padding: 16, paddingBottom: 24, gap: 12 },
   header: { gap: 12, marginBottom: 4 },
-  empty: { alignItems: "center", gap: 8, padding: 24, borderWidth: 1, borderRadius: radius.lg },
+  empty: { alignItems: "center", gap: 6, padding: 20, borderWidth: 1, borderRadius: radius.lg },
   centerText: { textAlign: "center" },
 });

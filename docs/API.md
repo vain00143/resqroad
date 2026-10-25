@@ -145,6 +145,14 @@ Send it with `XMLHttpRequest`, not `fetch`: from Expo SDK 58 the global
 `fetch` is `expo/fetch`, which throws "Unsupported FormDataPart
 implementation" for `{ uri, name, type }` parts before sending anything.
 Don't set `Content-Type` yourself; the multipart boundary is added for you.
+`xhr.upload.onprogress` reports how much has been sent (the app's progress
+bar).
+
+Use one `Idempotency-Key` per form and send the same key with every attempt.
+The app (`upload` and `withRetries` in `mobile/src/lib/api.ts`) tries twice
+more, after 3 and 8 seconds, only when the server didn't answer or answered
+502, 503, or 504; never after an answer about the form itself (a 4xx). A
+repeat with the same key gets `200 { report }`, so nothing is filed twice.
 
 Photos must be JPEG, PNG, or WebP (checked from the file contents) and under
 8 MB each. Resize large camera photos first (for example with

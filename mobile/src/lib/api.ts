@@ -3,6 +3,7 @@
 // shown to people as-is.
 
 import NetInfo from "@react-native-community/netinfo";
+import { Platform } from "react-native";
 
 export class ApiError extends Error {
   status: number;
@@ -278,7 +279,11 @@ export async function upload<T>(path: string, form: FormData, options: UploadOpt
     xhr.timeout = options.timeoutMs ?? uploadTimeout(baseUrl);
     xhr.upload.onprogress = (event) => {
       if (event.lengthComputable && event.total > 0) {
-        options.onProgress?.(event.loaded / event.total);
+        // React Native's Android upload counter (ProgressRequestBody) counts
+        // every byte twice: its write(bytes) passes them one at a time to its
+        // own counting write(byte), then adds the length again.
+        const sent = Platform.OS === "android" ? event.loaded / 2 : event.loaded;
+        options.onProgress?.(Math.min(1, sent / event.total));
       }
     };
     xhr.onload = () => resolve({ status: xhr.status, text: xhr.responseText });

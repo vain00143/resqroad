@@ -5,7 +5,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Platform } from "react-native";
 
-import { keepExistingPhotos, type LocalPhoto } from "@/lib/photos";
+import { keepExistingPhotos, photoLimits, type LocalPhoto } from "@/lib/photos";
 
 export type RepairDraft = { notes: string; before: LocalPhoto[]; after: LocalPhoto[] };
 
@@ -22,8 +22,8 @@ export async function loadRepairDraft(userId: string, reportId: string): Promise
     const draft = JSON.parse(saved) as Partial<RepairDraft>;
     return {
       notes: draft.notes ?? "",
-      before: await keepExistingPhotos(draft.before ?? []),
-      after: await keepExistingPhotos(draft.after ?? []),
+      before: (await keepExistingPhotos(draft.before ?? [])).slice(0, photoLimits.before),
+      after: (await keepExistingPhotos(draft.after ?? [])).slice(0, photoLimits.after),
     };
   } catch {
     return null;

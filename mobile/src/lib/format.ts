@@ -16,6 +16,21 @@ export function formatDate(iso: string | null | undefined) {
   return Number.isNaN(date.getTime()) ? "" : dateFormat.format(date);
 }
 
+const dayFormat = new Intl.DateTimeFormat("en-PH", { month: "short", day: "numeric" });
+const dayYearFormat = new Intl.DateTimeFormat("en-PH", { month: "short", day: "numeric", year: "numeric" });
+
+// "Oct 23", with the year when it isn't this year (the website's short day).
+export function formatShortDay(iso: string | null | undefined) {
+  if (!iso) {
+    return "";
+  }
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+  return (date.getFullYear() === new Date().getFullYear() ? dayFormat : dayYearFormat).format(date);
+}
+
 export function timeAgo(iso: string | null | undefined) {
   if (!iso) {
     return "";
