@@ -41,6 +41,9 @@
 
   const jobList = $("#job-list");
   const drafts = new Map();
+  // Completed jobs show only their summary until opened ("View more
+  // details"); these are the ones opened.
+  const expandedJobs = new Set();
   let state = null;
   let person = null;
   let currentView = "overview";
@@ -105,15 +108,7 @@
     }
     currentView = name;
     $$("[data-crew-view-panel]").forEach(function (panel) {
-      const active = panel.dataset.crewViewPanel === name;
-      if (active && panel.hidden) {
-        panel.hidden = false;
-        panel.style.animation = "none";
-        panel.getBoundingClientRect();
-        panel.style.animation = "";
-      } else if (!active) {
-        panel.hidden = true;
-      }
+      panel.hidden = panel.dataset.crewViewPanel !== name;
     });
     $$("[data-crew-view]").forEach(function (button) {
       const active = button.dataset.crewView === name;
@@ -163,7 +158,7 @@
 
     $("#job-summary").innerHTML = [
       { label: "Open assigned jobs", value: open.length, icon: "clipboard-list", tone: "var(--accent)", foot: ui.pluralize(notStarted, "job") + " waiting to start", tab: "active" },
-      { label: "In progress", value: inProgress, icon: "construction", tone: "var(--info)", foot: "Repairs underway", tab: "active" },
+      { label: "In progress", value: inProgress, icon: "construction", tone: "var(--st-in_progress)", foot: "Repairs underway", tab: "active" },
       { label: "Awaiting admin review", value: awaiting, icon: "clock", tone: "var(--st-repair_submitted)", foot: "Submitted for verification", tab: "review" },
       { label: "Completed", value: completed, icon: "check-circle", tone: "var(--success)", foot: "Verified by the administrator", tab: "done" },
     ]
@@ -197,20 +192,30 @@
         icon("check-circle") +
         "</span><h3>You're all caught up</h3><p>When an administrator assigns a verified report, it will appear here.</p></div>";
     } else {
+      // The job fills the card: photo on the left, then what, where, the
+      // progress, and the actions.
       const photo = ui.reportPhotos(next)[0];
+      const assigned = lastEvent(next, "assigned");
       $("#next-job").innerHTML =
         '<div class="next-job"><div class="next-job-media">' +
         ui.photoImg(photo) +
-        '</div><div><div class="toolbar-group"><span class="id-tag">' +
+        '</div><div class="next-job-body"><div><div class="toolbar-group"><span class="id-tag">' +
         esc(next.id) +
         "</span>" +
         ui.severityBadge(next.severity) +
+        ui.statusPill(next.status) +
         "</div><h3>" +
         esc(next.title) +
-        '</h3><p class="job-meta"><span>' +
+        '</h3><p class="job-meta" style="margin: 0"><span>' +
         icon("map-pin") +
         esc(next.road + " · " + next.location) +
-        '</span></p><div class="job-actions">' +
+        "</span>" +
+        (assigned ? "<span>" + icon("calendar") + "Assigned " + esc(ui.formatDay(assigned.at)) + "</span>" : "") +
+        '</p></div><p class="detail-description">' +
+        esc(next.description) +
+        '</p><div class="job-progress">' +
+        ui.journey(next, { steps: jobSteps, labels: jobStepLabels }) +
+        '</div><div class="job-actions">' +
         (next.status === "assigned"
           ? '<button class="btn btn-primary btn-sm" type="button" data-action="start" data-report-id="' + esc(next.id) + '">' + icon("play", "icon-sm") + "Start repair</button>"
           : '<button class="btn btn-primary btn-sm" type="button" data-open-job="' + esc(next.id) + '">' + icon("wrench", "icon-sm") + "Continue repair</button>") +
@@ -324,7 +329,7 @@
     );
   }
 
-  function renderJobCard(report, index) {
+  function renderJobCard(report) {
     const photos = ui.reportPhotos(report);
     const assigned = lastEvent(report, "assigned");
     const sentBack = report.status === "in_progress" && report.repair ? lastEvent(report, "in_progress") : null;
@@ -383,13 +388,32 @@
         "</div>"
       : "";
 
+    // A completed job is a short summary until "View more details".
+    const collapsible = report.status === "resolved";
+    const collapsed = collapsible && !expandedJobs.has(report.id);
+    const toggle = collapsible
+      ? '<button class="job-toggle" type="button" data-toggle-job="' +
+        esc(report.id) +
+        '" aria-expanded="' +
+        String(!collapsed) +
+        '" aria-controls="job-body-' +
+        esc(report.id) +
+        '">' +
+        (collapsed ? "View more details" : "Hide details") +
+        '<span class="visually-hidden"> of ' +
+        esc(report.id) +
+        "</span>" +
+        icon("chevron-down", "icon-sm") +
+        "</button>"
+      : "";
+
     return (
-      '<article class="card job-card" tabindex="-1" id="job-' +
+      '<article class="card job-card' +
+      (collapsed ? " is-collapsed" : "") +
+      '" tabindex="-1" id="job-' +
       esc(report.id) +
       '" data-job-card="' +
       esc(report.id) +
-      '" style="--i:' +
-      Math.min(index, 10) +
       '"><div class="job-head"><button class="job-thumb" type="button" data-job-photos="' +
       esc(report.id) +
       '" aria-label="View ' +
@@ -411,7 +435,11 @@
       (assigned ? "<span>" + icon("calendar") + "Assigned " + esc(ui.formatDay(assigned.at)) + "</span>" : "") +
       "</div></div>" +
       ui.statusPill(report.status) +
-      '</div><div class="job-body"><div class="job-progress">' +
+      '</div><div class="job-body" id="job-body-' +
+      esc(report.id) +
+      '"' +
+      (collapsed ? " hidden" : "") +
+      '><div class="job-progress">' +
       ui.journey(report, { steps: jobSteps, labels: jobStepLabels }) +
       "</div>" +
       feedback +
@@ -433,7 +461,9 @@
       "</span></div>" +
       repairForm +
       receipt +
-      "</div></article>"
+      "</div>" +
+      toggle +
+      "</article>"
     );
   }
 
@@ -574,6 +604,8 @@
       ui.showMessage("This job is no longer assigned to you.", "error");
       return;
     }
+    // A completed job opens with all its details.
+    expandedJobs.add(reportId);
     $("#job-search").value = "";
     const tab =
       Object.keys(tabStatuses).find(function (key) {
@@ -733,6 +765,20 @@
     }, 120),
   );
 
+  // Both maps' refresh buttons reload every job from the server.
+  $$("[data-refresh-map]").forEach(function (button) {
+    button.addEventListener("click", function () {
+      ui.refreshMap(button, function () {
+        runSafely(render);
+        [overviewMap, crewMap].forEach(function (map) {
+          if (map) {
+            map.refresh();
+          }
+        });
+      });
+    });
+  });
+
   $("#crew-map-list").addEventListener("click", function (event) {
     const item = event.target.closest("[data-map-focus]");
     if (item && crewMap) {
@@ -744,6 +790,21 @@
   });
 
   jobList.addEventListener("click", function (event) {
+    const toggle = event.target.closest("[data-toggle-job]");
+    if (toggle) {
+      const reportId = toggle.dataset.toggleJob;
+      if (expandedJobs.has(reportId)) {
+        expandedJobs.delete(reportId);
+      } else {
+        expandedJobs.add(reportId);
+      }
+      runSafely(render);
+      const again = jobList.querySelector('[data-toggle-job="' + CSS.escape(reportId) + '"]');
+      if (again) {
+        again.focus({ preventScroll: true });
+      }
+      return;
+    }
     const photos = event.target.closest("[data-job-photos]");
     if (photos) {
       const report = myJobs().find(function (item) {

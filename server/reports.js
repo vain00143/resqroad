@@ -12,6 +12,7 @@ import { config } from "./config.js";
 import { one, query, transaction } from "./db.js";
 import { broadcast } from "./live.js";
 import { checkPhotos, photoUpload, photoUrl, removePhotoFiles, savePhotos, storePhotoData } from "./photos.js";
+import { findSimilarReports } from "../assets/js/duplicates.js";
 
 export const statuses = [
   "submitted",
@@ -40,9 +41,10 @@ const statusLabels = {
 };
 
 // Administrator decisions: the new status and the statuses it can come from.
+// A report is verified only after it has been marked under review.
 const adminTransitions = {
   under_review: ["submitted"],
-  verified: ["submitted", "under_review"],
+  verified: ["under_review"],
   rejected: ["submitted", "under_review"],
   duplicate: ["submitted", "under_review"],
   resolved: ["repair_submitted"],
@@ -92,16 +94,20 @@ async function hydrate(rows) {
   const ids = rows.map(function (row) {
     return row.id;
   });
-  const [history, photos, notes] = await Promise.all([
+  const [history, photos, notes, feedback] = await Promise.all([
     query("SELECT * FROM report_history WHERE report_id IN (?) ORDER BY created_at, id", [ids]),
     query("SELECT * FROM photos WHERE report_id IN (?) AND replaced_at IS NULL ORDER BY sort_order, id", [ids]),
     query("SELECT * FROM report_notes WHERE report_id IN (?) ORDER BY created_at, id", [ids]),
+    query("SELECT * FROM report_feedback WHERE report_id IN (?)", [ids]),
   ]);
   const byReport = new Map(
     rows.map(function (row) {
-      return [row.id, { history: [], evidence: [], before: [], after: [], notes: [] }];
+      return [row.id, { history: [], evidence: [], before: [], after: [], notes: [], feedback: null }];
     }),
   );
+  feedback.forEach(function (row) {
+    byReport.get(row.report_id).feedback = { rating: row.rating, comment: row.comment || "", at: iso(row.created_at) };
+  });
   history.forEach(function (row) {
     const entry = { status: row.status, description: row.description, actor: row.actor, at: iso(row.created_at) };
     if (row.note) {
@@ -143,6 +149,7 @@ async function hydrate(rows) {
         : null,
       history: extra.history,
       notes: extra.notes,
+      feedback: extra.feedback,
       updatedAt: iso(row.updated_at),
     };
   });
@@ -159,8 +166,8 @@ export async function loadReport(id) {
 }
 
 // What a given viewer may see of a report. Reports are public, but reporter
-// details are only for administrators and the reporter, and internal notes
-// only for administrators.
+// details and the resident's feedback are only for administrators and the
+// reporter, and internal notes only for administrators.
 export function forViewer(report, viewer) {
   const isAdmin = Boolean(viewer && viewer.role === "admin");
   const isReporter = Boolean(viewer && report.reporterId && viewer.id === report.reporterId);
@@ -168,9 +175,11 @@ export function forViewer(report, viewer) {
   delete shaped.notes;
   delete shaped.reporterName;
   delete shaped.reporterId;
+  delete shaped.feedback;
   if (isAdmin || isReporter) {
     shaped.reporterId = report.reporterId;
     shaped.reporter = report.reporterName || "Resident";
+    shaped.feedback = report.feedback || null;
   }
   if (isAdmin) {
     shaped.notes = report.notes;
@@ -272,10 +281,22 @@ reportRoutes.get("/reports/:id", async function (request, response) {
   response.json({ report: forViewer(report, request.user) });
 });
 
+// Open reports within the duplicate radius are looked up in a box this many
+// degrees wide on each side (about 160 m in Bulacan).
+const nearbySpan = 0.0015;
+
+function duplicateSummary(match) {
+  return { id: match.report.id, title: match.report.title, status: match.report.status, distance: match.distance };
+}
+
 // A resident files a report (multipart form: fields plus up to five `photos`).
+// A report that looks like a possible duplicate of an open report nearby is
+// refused with 409 and `possibleDuplicates`, unless the resident looked at
+// them and sent the form again with `confirmDuplicate=true`.
 reportRoutes.post("/reports", requireRole("citizen"), photoUpload(["photos"]), async function (request, response) {
   const body = request.body || {};
   const user = request.user;
+  const confirmedDifferent = String(body.confirmDuplicate || "") === "true";
   const title = text(body.title, "Title", 120, true);
   const road = text(body.road, "Road", 120, true);
   const location = text(body.location, "Location", 160, true);
@@ -315,20 +336,36 @@ reportRoutes.post("/reports", requireRole("citizen"), photoUpload(["photos"]), a
     reportId = await transaction(async function (connection) {
       // A pothole can come back after a repair, so only open reports count.
       const [nearby] = await connection.query(
-        "SELECT id, reporter_id, client_key FROM reports WHERE status IN (?) AND ABS(latitude - ?) < 0.001 AND ABS(longitude - ?) < 0.001 LIMIT 1 FOR UPDATE",
-        [openStatuses, latitude, longitude],
+        "SELECT id, title, description, severity, status, latitude, longitude, reporter_id, client_key FROM reports " +
+          "WHERE status IN (?) AND latitude BETWEEN ? AND ? AND longitude BETWEEN ? AND ? FOR UPDATE",
+        [openStatuses, latitude - nearbySpan, latitude + nearbySpan, longitude - nearbySpan, longitude + nearbySpan],
       );
       // The same upload arriving twice at once: the first copy filed it.
-      if (nearby[0] && clientKey && nearby[0].client_key === clientKey && String(nearby[0].reporter_id) === user.id) {
+      const twin = clientKey
+        ? nearby.find(function (row) {
+            return row.client_key === clientKey && String(row.reporter_id) === user.id;
+          })
+        : null;
+      if (twin) {
         repeated = true;
-        return nearby[0].id;
+        return twin.id;
       }
-      if (nearby[0]) {
-        const duplicateId = reportCode(nearby[0].id);
+      const matches = findSimilarReports(
+        { title: title, description: description, severity: severity, latitude: latitude, longitude: longitude },
+        nearby.map(function (row) {
+          return Object.assign({}, row, { id: reportCode(row.id) });
+        }),
+      );
+      if (matches.length && !confirmedDifferent) {
+        const first = matches[0];
         throw new HttpError(
           409,
-          "A report already exists very close to this location (" + duplicateId + "). Check the map before adding another report.",
-          { duplicateId: duplicateId },
+          "A possible duplicate report already exists near this location (" +
+            first.report.id +
+            ", about " +
+            first.distance +
+            " m away). Check it before adding another report.",
+          { duplicateId: first.report.id, possibleDuplicates: matches.map(duplicateSummary) },
         );
       }
       const [result] = await connection.query(
@@ -336,7 +373,17 @@ reportRoutes.post("/reports", requireRole("citizen"), photoUpload(["photos"]), a
           "VALUES (?, ?, ?, ?, ?, ?, ?, 'submitted', ?, ?, UTC_TIMESTAMP(3), UTC_TIMESTAMP(3))",
         [title, road, location, latitude, longitude, severity, description, user.id, clientKey],
       );
-      await addHistory(connection, result.insertId, "submitted", "Report received from a citizen.", user);
+      // The administrator sees which reports the resident was shown.
+      const duplicateNote = matches.length
+        ? "Possible duplicate of " +
+          matches
+            .map(function (match) {
+              return match.report.id + " (about " + match.distance + " m away)";
+            })
+            .join(", ") +
+          ". The resident checked and submitted this report as a different problem."
+        : null;
+      await addHistory(connection, result.insertId, "submitted", "Report received from a citizen.", user, duplicateNote);
       await insertPhotos(connection, result.insertId, "evidence", saved, user);
       return result.insertId;
     });
@@ -370,6 +417,9 @@ reportRoutes.post("/reports/:id/status", requireRole("admin"), async function (r
     if (report.status === status && status === "under_review") {
       return;
     }
+    if (status === "verified" && report.status === "submitted") {
+      throw new HttpError(409, "Mark " + reportCode(report.id) + " under review before verifying it.");
+    }
     if (!adminTransitions[status].includes(report.status)) {
       throw stale(report);
     }
@@ -394,6 +444,37 @@ reportRoutes.post("/reports/:id/notes", requireRole("admin"), async function (re
   );
   const updated = await publishReport(id);
   response.status(201).json({ report: forViewer(updated, request.user) });
+});
+
+// The resident who filed a report rates its repair once it is resolved.
+// Body: { rating (1 to 5), comment? }. One rating per report.
+reportRoutes.post("/reports/:id/feedback", requireRole("citizen"), async function (request, response) {
+  const id = parseReportId(request.params.id);
+  const body = request.body || {};
+  const rating = Number(body.rating);
+  if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+    throw new HttpError(400, "Choose a rating from 1 to 5 stars.");
+  }
+  const comment = text(body.comment, "Comment", 500, false);
+  await transaction(async function (connection) {
+    const report = await lockReport(connection, id);
+    if (String(report.reporter_id) !== request.user.id) {
+      throw new HttpError(403, "Only the resident who filed this report can rate its repair.");
+    }
+    if (report.status !== "resolved") {
+      throw new HttpError(409, "You can rate the repair once the report is resolved.");
+    }
+    const [existing] = await connection.query("SELECT id FROM report_feedback WHERE report_id = ?", [id]);
+    if (existing.length) {
+      throw new HttpError(409, "You already sent feedback for this repair. Thank you!");
+    }
+    await connection.query(
+      "INSERT INTO report_feedback (report_id, user_id, rating, comment, created_at) VALUES (?, ?, ?, ?, UTC_TIMESTAMP(3))",
+      [id, request.user.id, rating, comment || null],
+    );
+  });
+  const report = await publishReport(id);
+  response.status(201).json({ report: forViewer(report, request.user) });
 });
 
 // Assign or reassign a verified report to a crew. Body: { crewId }.

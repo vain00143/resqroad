@@ -24,10 +24,10 @@
 
   const viewDetails = {
     dashboard: { crumb: "Dashboard", title: "Admin dashboard", description: "Monitor incoming reports and the repair workflow.", icon: "dashboard" },
-    analytics: { crumb: "Analytics & Reports", title: "Analytics and Reports", description: "Explore report trends, totals, and severity breakdowns.", icon: "chart-line" },
+    analytics: { crumb: "Insights & Statistics", title: "Insights and Statistics", description: "Explore report trends, totals, and severity breakdowns.", icon: "chart-line" },
     reports: { crumb: "Review Reports", title: "Review Reports", description: "Review new reports, verify road damage, and record decisions.", icon: "file-search" },
-    assignments: { crumb: "Assignment", title: "Assignment", description: "Open verified reports to assign or change a maintenance team.", icon: "hard-hat" },
-    maps: { crumb: "Map", title: "Map", description: "See verified road reports and their severity across Bulacan.", icon: "map" },
+    assignments: { crumb: "Task Dispatch", title: "Task Dispatch", description: "Dispatch verified reports to a maintenance team.", icon: "hard-hat" },
+    maps: { crumb: "Live Map", title: "Live Map", description: "See verified road reports and their severity across Bulacan.", icon: "map" },
     users: { crumb: "User management", title: "User management", description: "Manage maintenance and citizen accounts.", icon: "users" },
     public: { crumb: "Public site", title: "Public site", description: "See what residents see on the public ResQRoad site.", icon: "globe" },
   };
@@ -166,7 +166,8 @@
       buckets.push({
         start: date,
         end: end,
-        label: date.toLocaleDateString(undefined, { month: "short" }),
+        // A year apart, the same month name needs its year.
+        label: date.toLocaleDateString(undefined, count > 12 ? { month: "short", year: "2-digit" } : { month: "short" }),
         longLabel: date.toLocaleDateString(undefined, { month: "long", year: "numeric" }),
       });
     }
@@ -193,14 +194,9 @@
       : null;
   }
 
+  // Durations are shown in whole days (hours when under a day).
   function formatDays(value) {
-    if (value == null) {
-      return "—";
-    }
-    if (value < 1) {
-      return Math.max(1, Math.round(value * 24)) + "<small>hrs</small>";
-    }
-    return ui.formatNumber(value, 1) + "<small>days</small>";
+    return ui.durationHtml(value);
   }
 
   /* ---------- Views ---------- */
@@ -212,16 +208,7 @@
     }
     currentView = name;
     $$("[data-admin-view-panel]").forEach(function (panel) {
-      const active = panel.dataset.adminViewPanel === name;
-      if (active && panel.hidden) {
-        panel.hidden = false;
-        // Restart the entrance animation.
-        panel.style.animation = "none";
-        panel.getBoundingClientRect();
-        panel.style.animation = "";
-      } else if (!active) {
-        panel.hidden = true;
-      }
+      panel.hidden = panel.dataset.adminViewPanel !== name;
     });
     $$("[data-admin-view]").forEach(function (button) {
       const isActive = button.dataset.adminView === name;
@@ -416,7 +403,7 @@
         label: "Repair in Progress",
         value: total.inProgress,
         icon: "construction",
-        tone: "var(--info)",
+        tone: "var(--st-in_progress)",
         foot: ui.pluralize(total.assigned, "job") + " assigned, not started",
       }),
       kpiCard({
@@ -430,11 +417,13 @@
       }),
     ].join("");
 
+    // Most important first: open high-severity damage, then new reports to
+    // review, repairs waiting for verification, and reports to dispatch.
     $("#queue-summary").innerHTML = [
+      { queue: "high", label: "High-severity open", hint: "Prioritize these first", count: total.highOpen, icon: "alert-triangle", tone: "var(--sev-high)" },
       { queue: "review", label: "Reports to review", hint: "Submitted or under review", count: total.review, icon: "inbox", tone: "var(--warning)" },
       { queue: "repairs", label: "Repairs to verify", hint: "Crews finished the work", count: total.repairs, icon: "wrench", tone: "var(--st-repair_submitted)" },
-      { queue: "assign", label: "Ready to assign", hint: "Verified, no crew yet", count: total.verified, icon: "hard-hat", tone: "var(--accent)" },
-      { queue: "high", label: "High-severity open", hint: "Prioritize these first", count: total.highOpen, icon: "alert-triangle", tone: "var(--sev-high)" },
+      { queue: "assign", label: "Ready to dispatch", hint: "Verified, no crew yet", count: total.verified, icon: "hard-hat", tone: "var(--accent)" },
     ]
       .map(function (item) {
         return (
@@ -572,9 +561,23 @@
 
   /* ---------- Report cards ---------- */
 
+  // Other reports that may be about the same road problem (see
+  // duplicates.js), for reports that are still being reviewed.
+  function possibleDuplicates(report) {
+    if (!reviewStatuses.includes(report.status)) {
+      return [];
+    }
+    return store.findSimilarReports(report, { includeResolved: true, limit: 3 });
+  }
+
   function renderReportCard(report, index, mode) {
     // Once a crew has submitted a repair, the card previews its after photos.
     const showsRepair = Boolean(report.repair) && ["repair_submitted", "resolved"].includes(report.status);
+    const flagged =
+      mode === "review" &&
+      possibleDuplicates(report).some(function (match) {
+        return match.active;
+      });
     const photos = showsRepair ? ui.repairPhotos(report, "after") : ui.reportPhotos(report);
     const slides = photos
       .map(function (photo) {
@@ -627,6 +630,7 @@
       dots +
       ui.severityBadge(report.severity, { className: "rc-sev" }) +
       (showsRepair ? '<span class="rc-tag">' + icon("wrench") + "Repair photo</span>" : "") +
+      (flagged ? '<span class="rc-tag">' + icon("copy") + "Possible duplicate</span>" : "") +
       '<span class="rc-age">' +
       icon("clock") +
       esc(ui.relativeTime(report.reportedAt)) +
@@ -911,11 +915,11 @@
         matchesQuery(report, query, crewText)
       );
     });
-    // Newly verified reports first, as before.
+    // Highest severity first; within a severity, newly verified reports first.
     reports.sort(function (first, second) {
       const a = Date.parse(firstEventAt(first, "verified") || 0) || 0;
       const b = Date.parse(firstEventAt(second, "verified") || 0) || 0;
-      return b - a;
+      return severityRank[second.severity] - severityRank[first.severity] || b - a;
     });
 
     els.assignmentGrid.innerHTML = reports
@@ -944,7 +948,7 @@
     $("#assign-summary").innerHTML = [
       { label: "Awaiting assignment", value: total.verified, icon: "alert-circle", tone: "var(--warning)" },
       { label: "Assigned, not started", value: total.assigned, icon: "hard-hat", tone: "var(--accent)" },
-      { label: "Repairs in progress", value: total.inProgress, icon: "construction", tone: "var(--info)" },
+      { label: "Repairs in progress", value: total.inProgress, icon: "construction", tone: "var(--st-in_progress)" },
     ]
       .map(function (item) {
         return (
@@ -1069,35 +1073,15 @@
     });
   }
 
-  // Reloads every report from the server, then redraws the map. The button
-  // spins while it works and ignores clicks until the refresh is done.
+  // Reloads every report from the server, then redraws the map.
   function refreshMap(button) {
-    if (button.getAttribute("aria-busy") === "true") {
-      return;
-    }
-    button.setAttribute("aria-busy", "true");
-    button.disabled = true;
-    button.classList.add("is-spinning");
-    const minimumSpin = new Promise(function (resolve) {
-      window.setTimeout(resolve, 450);
+    ui.refreshMap(button, function () {
+      loadState();
+      renderMapView();
+      if (adminMap) {
+        adminMap.refresh();
+      }
     });
-    Promise.all([store.refresh(), minimumSpin])
-      .then(function () {
-        loadState();
-        renderMapView();
-        if (adminMap) {
-          adminMap.refresh();
-        }
-        ui.showMessage("Map updated with the latest reports.", "info");
-      })
-      .catch(function (error) {
-        ui.showMessage(error.message, "error");
-      })
-      .finally(function () {
-        button.removeAttribute("aria-busy");
-        button.disabled = false;
-        button.classList.remove("is-spinning");
-      });
   }
 
   /* ---------- Public site ---------- */
@@ -1117,13 +1101,30 @@
 
   /* ---------- Analytics ---------- */
 
-  function renderAnalytics() {
-    if (currentView !== "analytics" || !state) {
-      return;
+  // How many months "All months" covers: from the month of the first report
+  // to this month.
+  function monthsSinceFirstReport() {
+    const times = state.reports
+      .map(function (report) {
+        return Date.parse(report.reportedAt);
+      })
+      .filter(Number.isFinite);
+    if (!times.length) {
+      return 1;
     }
-    const range = Number($("#analytics-range").value) || 8;
+    const first = new Date(Math.min.apply(null, times));
+    const now = new Date();
+    return Math.max(1, (now.getFullYear() - first.getFullYear()) * 12 + now.getMonth() - first.getMonth() + 1);
+  }
+
+  // Everything Insights & Statistics shows for the chosen time range, for the
+  // page and for its printed report.
+  function analyticsData() {
+    const rangeValue = $("#analytics-range").value;
+    const allMonths = rangeValue === "all";
+    const range = allMonths ? monthsSinceFirstReport() : Number(rangeValue) || 8;
     const buckets = monthBuckets(range);
-    const since = buckets[0].start.getTime();
+    const since = allMonths ? -Infinity : buckets[0].start.getTime();
     const reports = state.reports.filter(function (report) {
       return Date.parse(report.reportedAt) >= since;
     });
@@ -1133,26 +1134,105 @@
     const valid = reports.filter(function (report) {
       return report.status !== "rejected" && report.status !== "duplicate";
     });
-    const verifyDays = average(
-      reports.map(function (report) {
-        const verified = firstEventAt(report, "verified");
-        return verified ? ui.daysBetween(report.reportedAt, verified) : NaN;
+    const byPlace = {};
+    reports.forEach(function (report) {
+      const place = municipality(report.location);
+      byPlace[place] = (byPlace[place] || 0) + 1;
+    });
+    return {
+      allMonths: allMonths,
+      range: range,
+      buckets: buckets,
+      period:
+        (allMonths ? "All months" : "Last " + range + " months") +
+        " (" +
+        buckets[0].longLabel +
+        (range > 1 ? " – " + buckets[buckets.length - 1].longLabel : "") +
+        ")",
+      reports: reports,
+      resolved: resolved,
+      valid: valid,
+      verifyDays: average(
+        reports.map(function (report) {
+          const verified = firstEventAt(report, "verified");
+          return verified ? ui.daysBetween(report.reportedAt, verified) : NaN;
+        }),
+      ),
+      resolveDays: average(
+        resolved.map(function (report) {
+          return ui.daysBetween(report.reportedAt, eventAt(report, "resolved"));
+        }),
+      ),
+      highOpen: reports.filter(function (report) {
+        return report.severity === "High" && store.openStatuses.includes(report.status);
+      }).length,
+      rate: valid.length ? Math.round((resolved.length / valid.length) * 100) : 0,
+      submittedSeries: countInBuckets(
+        buckets,
+        reports.map(function (report) {
+          return report.reportedAt;
+        }),
+      ),
+      resolvedSeries: countInBuckets(
+        buckets,
+        state.reports
+          .map(function (report) {
+            return report.status === "resolved" ? eventAt(report, "resolved") : null;
+          })
+          .filter(Boolean),
+      ),
+      severities: ["High", "Medium", "Low"].map(function (severity) {
+        return {
+          label: severity,
+          color: severityColors[severity],
+          value: reports.filter(function (report) {
+            return report.severity === severity;
+          }).length,
+        };
       }),
-    );
-    const resolveDays = average(
-      resolved.map(function (report) {
-        return ui.daysBetween(report.reportedAt, eventAt(report, "resolved"));
-      }),
-    );
-    const highOpen = reports.filter(function (report) {
-      return report.severity === "High" && store.openStatuses.includes(report.status);
-    }).length;
-    const rate = valid.length ? Math.round((resolved.length / valid.length) * 100) : 0;
+      statuses: Object.keys(store.statuses)
+        .map(function (status) {
+          return {
+            status: status,
+            label: store.statuses[status],
+            value: reports.filter(function (report) {
+              return report.status === status;
+            }).length,
+            tone: "var(--st-" + status + ")",
+          };
+        })
+        .filter(function (item) {
+          return item.value > 0;
+        }),
+      places: Object.keys(byPlace)
+        .map(function (place) {
+          return { label: place, value: byPlace[place] };
+        })
+        .sort(function (first, second) {
+          return second.value - first.value;
+        })
+        .slice(0, 6),
+    };
+  }
+
+  function renderAnalytics() {
+    if (currentView !== "analytics" || !state) {
+      return;
+    }
+    const data = analyticsData();
+    const range = data.range;
+    const buckets = data.buckets;
+    const resolved = data.resolved;
+    const valid = data.valid;
+    const verifyDays = data.verifyDays;
+    const resolveDays = data.resolveDays;
+    const highOpen = data.highOpen;
+    const rate = data.rate;
 
     $("#analytics-kpis").innerHTML = [
       { label: "Resolution rate", value: rate + "<small>%</small>", icon: "target", tone: "var(--success)", foot: resolved.length + " of " + valid.length + " valid reports resolved" },
       { label: "Avg. time to verify", value: formatDays(verifyDays), icon: "shield-check", tone: "var(--accent)", foot: "From report to admin verification" },
-      { label: "Avg. time to resolve", value: formatDays(resolveDays), icon: "timer", tone: "var(--info)", foot: "From report to verified repair" },
+      { label: "Avg. time to resolve", value: formatDays(resolveDays), icon: "timer", tone: "var(--st-in_progress)", foot: "From report to verified repair" },
       { label: "Open high severity", value: String(highOpen), icon: "alert-triangle", tone: "var(--sev-high)", foot: highOpen ? "Prioritize these repairs" : "Nothing urgent right now" },
     ]
       .map(function (item) {
@@ -1173,30 +1253,11 @@
       .join("");
 
     const series = [
-      {
-        name: "Submitted",
-        color: brand.rust,
-        values: countInBuckets(
-          buckets,
-          reports.map(function (report) {
-            return report.reportedAt;
-          }),
-        ),
-      },
-      {
-        name: "Resolved",
-        color: brand.green,
-        values: countInBuckets(
-          buckets,
-          state.reports
-            .map(function (report) {
-              return report.status === "resolved" ? eventAt(report, "resolved") : null;
-            })
-            .filter(Boolean),
-        ),
-      },
+      { name: "Submitted", color: brand.rust, values: data.submittedSeries },
+      { name: "Resolved", color: brand.green, values: data.resolvedSeries },
     ];
-    $("#monthly-subtitle").textContent = "Report submissions and resolved repairs over the last " + range + " months.";
+    const rangeText = data.allMonths ? "across all " + ui.pluralize(range, "month") : "over the last " + range + " months";
+    $("#monthly-subtitle").textContent = "Report submissions and resolved repairs " + rangeText + ".";
     $("#monthly-legend").innerHTML = charts.legendHtml(series);
     charts.columns($("#monthly-report-chart"), {
       labels: buckets.map(function (bucket) {
@@ -1206,58 +1267,14 @@
         return bucket.longLabel;
       }),
       series: series,
-      ariaLabel: "Monthly report submissions and resolutions for the last " + range + " months",
+      ariaLabel: "Monthly report submissions and resolutions " + rangeText,
     });
 
-    charts.donut(
-      $("#severity-chart"),
-      ["High", "Medium", "Low"].map(function (severity) {
-        return {
-          label: severity,
-          color: severityColors[severity],
-          value: reports.filter(function (report) {
-            return report.severity === severity;
-          }).length,
-        };
-      }),
-      { centerLabel: "Reports", ariaLabel: "Report severity distribution" },
-    );
+    charts.donut($("#severity-chart"), data.severities, { centerLabel: "Reports", ariaLabel: "Report severity distribution" });
 
-    charts.barList(
-      $("#status-chart"),
-      Object.keys(store.statuses)
-        .map(function (status) {
-          return {
-            label: store.statuses[status],
-            value: reports.filter(function (report) {
-              return report.status === status;
-            }).length,
-            tone: "var(--st-" + status + ")",
-          };
-        })
-        .filter(function (item) {
-          return item.value > 0;
-        }),
-      { empty: "No reports in this period." },
-    );
+    charts.barList($("#status-chart"), data.statuses, { empty: "No reports in this period." });
 
-    const byPlace = {};
-    reports.forEach(function (report) {
-      const place = municipality(report.location);
-      byPlace[place] = (byPlace[place] || 0) + 1;
-    });
-    charts.barList(
-      $("#location-chart"),
-      Object.keys(byPlace)
-        .map(function (place) {
-          return { label: place, value: byPlace[place] };
-        })
-        .sort(function (first, second) {
-          return second.value - first.value;
-        })
-        .slice(0, 6),
-      { empty: "No reports in this period." },
-    );
+    charts.barList($("#location-chart"), data.places, { empty: "No reports in this period." });
 
     $("#crew-performance-rows").innerHTML = state.personnel.length
       ? state.personnel
@@ -1277,7 +1294,7 @@
               '</td><td class="num">' +
               stats.resolved +
               '</td><td class="num">' +
-              (stats.repairDays == null ? "—" : ui.formatNumber(stats.repairDays, 1) + " days") +
+              ui.durationText(stats.repairDays) +
               "</td></tr>"
             );
           })
@@ -1285,9 +1302,165 @@
       : '<tr><td colspan="5" class="muted">No maintenance crews yet.</td></tr>';
   }
 
+  /* ---------- Printable report ---------- */
+
+  function printTable(headings, rows, className) {
+    return (
+      '<table class="print-table' +
+      (className ? " " + className : "") +
+      '"><thead><tr>' +
+      headings
+        .map(function (heading) {
+          return "<th>" + esc(heading) + "</th>";
+        })
+        .join("") +
+      "</tr></thead><tbody>" +
+      (rows.length
+        ? rows
+            .map(function (row) {
+              return "<tr>" + row.map(function (cell) {
+                return "<td>" + cell + "</td>";
+              }).join("") + "</tr>";
+            })
+            .join("")
+        : '<tr><td colspan="' + headings.length + '">None in this period.</td></tr>') +
+      "</tbody></table>"
+    );
+  }
+
+  // The printed Insights & Statistics: a plain report made to be read at a
+  // glance (summary figures first, then tables), not a copy of the screen.
+  function renderPrintSheet() {
+    const data = analyticsData();
+    const total = data.reports.length;
+    const share = function (value) {
+      return total ? Math.round((value / total) * 100) + "%" : "0%";
+    };
+    const figures = [
+      ["Reports in this period", String(total)],
+      ["Resolved", data.resolved.length + " (" + data.rate + "% of " + data.valid.length + " valid reports)"],
+      ["Open high severity", String(data.highOpen)],
+      ["Avg. time to verify", ui.durationText(data.verifyDays)],
+      ["Avg. time to resolve", ui.durationText(data.resolveDays)],
+      ["Maintenance crews", String(state.personnel.length)],
+    ];
+    const listed = data.reports.slice().sort(function (first, second) {
+      return severityRank[second.severity] - severityRank[first.severity] || byNewest(first, second);
+    });
+    $("#print-sheet").innerHTML =
+      '<header class="print-head"><img src="assets/images/resqroad-logotype.png" alt="ResQRoad" width="748" height="127" /><div><h1>Insights &amp; Statistics</h1><p>Road Maintenance Office · ' +
+      esc(data.period) +
+      " · Printed " +
+      esc(ui.formatDate(new Date())) +
+      "</p></div></header>" +
+      '<section><h2>Summary</h2><dl class="print-figures">' +
+      figures
+        .map(function (figure) {
+          return "<div><dt>" + esc(figure[0]) + "</dt><dd>" + esc(figure[1]) + "</dd></div>";
+        })
+        .join("") +
+      "</dl></section>" +
+      '<div class="print-columns"><section><h2>Reports by severity</h2>' +
+      printTable(
+        ["Severity", "Reports", "Share"],
+        data.severities.map(function (item) {
+          return [esc(item.label), String(item.value), share(item.value)];
+        }),
+      ) +
+      "</section><section><h2>Where reports are in the workflow</h2>" +
+      printTable(
+        ["Status", "Reports"],
+        data.statuses.map(function (item) {
+          return [esc(item.label), String(item.value)];
+        }),
+      ) +
+      "</section></div>" +
+      '<div class="print-columns"><section><h2>Reports by month</h2>' +
+      printTable(
+        ["Month", "Submitted", "Resolved"],
+        data.buckets.map(function (bucket, index) {
+          return [esc(bucket.longLabel), String(data.submittedSeries[index]), String(data.resolvedSeries[index])];
+        }),
+      ) +
+      "</section><section><h2>Top locations</h2>" +
+      printTable(
+        ["Municipality", "Reports"],
+        data.places.map(function (item) {
+          return [esc(item.label), String(item.value)];
+        }),
+      ) +
+      "</section></div>" +
+      "<section><h2>Crew performance</h2>" +
+      printTable(
+        ["Crew", "Assigned", "Open", "Resolved", "Avg. repair time"],
+        state.personnel.map(function (person) {
+          const stats = crewStats(person);
+          return [
+            esc(person.team + " · " + person.name),
+            String(stats.total),
+            String(stats.open),
+            String(stats.resolved),
+            esc(ui.durationText(stats.repairDays)),
+          ];
+        }),
+      ) +
+      "</section>" +
+      "<section><h2>Reports in this period</h2><p class=\"print-note\">Highest severity first.</p>" +
+      printTable(
+        ["Report", "Location", "Severity", "Status", "Reported", "Resolution"],
+        listed.map(function (report) {
+          const person = findPerson(report.assignedTo);
+          const crew = person ? person.team : report.assignedName || "";
+          const resolvedOn = report.status === "resolved" ? eventAt(report, "resolved") : null;
+          return [
+            "<strong>" + esc(report.id + " · " + report.title) + "</strong><span>" + esc(report.description) + "</span>",
+            esc(report.road + " · " + report.location),
+            esc(report.severity),
+            esc(ui.statusLabel(report.status)),
+            esc(ui.formatDay(report.reportedAt)),
+            esc(
+              resolvedOn
+                ? "Fixed " + ui.formatDay(resolvedOn) + (crew ? " by " + crew : "")
+                : crew
+                  ? "Crew: " + crew
+                  : "—",
+            ),
+          ];
+        }),
+        "print-reports",
+      ) +
+      "</section>";
+  }
+
+  // Printing from Insights & Statistics prints only that report.
+  window.addEventListener("beforeprint", function () {
+    if (currentView === "analytics" && state) {
+      renderPrintSheet();
+      document.body.classList.add("is-printing-report");
+    }
+  });
+  window.addEventListener("afterprint", function () {
+    document.body.classList.remove("is-printing-report");
+  });
+
   function exportCsv() {
     const rows = [
-      ["Report ID", "Title", "Road", "Location", "Latitude", "Longitude", "Severity", "Status", "Reporter", "Reported at", "Assigned crew", "Resolved at"],
+      [
+        "Report ID",
+        "Title",
+        "Road",
+        "Location",
+        "Latitude",
+        "Longitude",
+        "Severity",
+        "Status",
+        "Reporter",
+        "Reported at",
+        "Assigned crew",
+        "Resolved at",
+        "Resident rating",
+        "Resident feedback",
+      ],
     ];
     state.reports
       .slice()
@@ -1307,6 +1480,8 @@
           new Date(report.reportedAt).toISOString(),
           person ? person.team + " (" + person.name + ")" : report.assignedName || "",
           report.status === "resolved" ? eventAt(report, "resolved") || "" : "",
+          report.feedback ? report.feedback.rating + " of 5" : "",
+          report.feedback ? report.feedback.comment : "",
         ]);
       });
     ui.downloadCsv("resqroad-reports-" + new Date().toISOString().slice(0, 10) + ".csv", rows);
@@ -1433,7 +1608,14 @@
     if (report.status === "submitted" || report.status === "under_review") {
       decisions.push({ status: "duplicate", label: "Mark duplicate", style: "btn-secondary", icon: "copy" });
       decisions.push({ status: "rejected", label: "Reject report", style: "btn-danger-outline", icon: "ban" });
-      decisions.push({ status: "verified", label: "Verify report", style: "btn-primary", icon: "shield-check" });
+      // A report is verified only after it has been marked under review.
+      decisions.push({
+        status: "verified",
+        label: "Verify report",
+        style: "btn-primary",
+        icon: "shield-check",
+        disabled: report.status === "submitted",
+      });
     }
     if (report.status === "repair_submitted") {
       decisions.push({ status: "in_progress", label: "Request more work", style: "btn-secondary", icon: "reset" });
@@ -1532,6 +1714,68 @@
         "</div></div></section>"
       : "";
 
+    // Reports that may be about the same road problem, to compare before
+    // deciding (and to mark this one as a duplicate if it is).
+    const duplicates = possibleDuplicates(report);
+    const duplicateBlock = duplicates.length
+      ? '<section class="detail-block"><div class="detail-block-head"><h3>' +
+        icon("copy") +
+        'Possible duplicates</h3><span class="muted text-sm">' +
+        esc(ui.pluralize(duplicates.length, "similar report")) +
+        '</span></div><div class="duplicate-panel' +
+        (duplicates.some(function (match) {
+          return match.active;
+        })
+          ? ""
+          : " is-info") +
+        '"><p class="muted text-sm" style="margin: 0">Close by and about the same kind of problem. Open one to compare; if they are the same damage, mark this report as a duplicate.</p><ul class="duplicate-list">' +
+        duplicates
+          .map(function (match) {
+            return (
+              '<li class="duplicate-item"><div class="duplicate-copy"><div class="toolbar-group"><span class="id-tag">' +
+              esc(match.report.id) +
+              "</span>" +
+              ui.statusPill(match.report.status) +
+              ui.severityBadge(match.report.severity) +
+              "</div><strong>" +
+              esc(match.report.title) +
+              "</strong><span>" +
+              esc(match.report.road + " · " + match.report.location) +
+              '</span><span class="duplicate-reasons">' +
+              esc(match.reasons.join(" · ")) +
+              '</span></div><button class="btn btn-secondary btn-sm" type="button" data-action="open-duplicate" data-report-id="' +
+              esc(match.report.id) +
+              '">' +
+              icon("eye", "icon-sm") +
+              "Open</button></li>"
+            );
+          })
+          .join("") +
+        "</ul></div></section>"
+      : "";
+
+    // The resident's rating of the finished repair.
+    const feedback =
+      report.status === "resolved"
+        ? '<section class="detail-block"><div class="detail-block-head"><h3>' +
+          icon("star") +
+          "Resident feedback</h3>" +
+          (report.feedback ? '<span class="muted text-sm">' + esc("Sent " + ui.formatDate(report.feedback.at)) + "</span>" : "") +
+          "</div>" +
+          (report.feedback
+            ? '<div class="callout rating-result"><div class="rating-summary">' +
+              ui.ratingStars(report.feedback.rating) +
+              "<strong>" +
+              esc(report.feedback.rating + " of 5 · " + ui.ratingLabels[report.feedback.rating]) +
+              "</strong></div>" +
+              (report.feedback.comment
+                ? '<p class="detail-description">' + esc(report.feedback.comment) + "</p>"
+                : '<p class="muted text-sm" style="margin: 0">No comment.</p>') +
+              "</div>"
+            : '<p class="muted text-sm" style="margin: 0">The resident hasn\'t rated this repair yet.</p>') +
+          "</section>"
+        : "";
+
     els.drawerBody.innerHTML =
       '<h2 class="detail-title" id="drawer-title">' +
       esc(report.title) +
@@ -1549,7 +1793,11 @@
       ui.pluralize(photos.length, "photo") +
       " · select to enlarge</span></div>" +
       ui.photoGallery(photos, "Road damage photos") +
-      '</section><section class="detail-block detail-columns"><div class="detail-column"><div class="detail-block-head"><h3>' +
+      '</section><section class="detail-block"><div class="detail-block-head"><h3>' +
+      icon("file-text") +
+      'Description</h3></div><p class="detail-description">' +
+      esc(report.description) +
+      '</p></section><section class="detail-block detail-columns"><div class="detail-column"><div class="detail-block-head"><h3>' +
       icon("info") +
       'Information</h3></div><dl class="facts"><div><dt>Severity</dt><dd>' +
       ui.severityBadge(report.severity) +
@@ -1561,25 +1809,24 @@
       esc(name) +
       "</span></span></dd></div><div><dt>Reported on</dt><dd>" +
       esc(ui.formatDate(report.reportedAt)) +
-      '</dd></div><div class="facts-wide"><dt>GPS coordinates</dt><dd class="mono">' +
+      '</dd></div><div class="facts-wide"><dt>GPS coordinates</dt><dd class="facts-coords"><span class="mono">' +
       esc(report.coordinates.lat + ", " + report.coordinates.lng) +
-      ' · <a href="' +
+      '</span><a href="' +
       esc(ui.osmUrl(report.coordinates)) +
-      '" target="_blank" rel="noreferrer">Open in OpenStreetMap</a></dd></div></dl></div><div class="detail-column"><div class="detail-block-head"><h3>' +
+      '" target="_blank" rel="noreferrer">Open in OpenStreetMap' +
+      icon("external-link", "icon-sm") +
+      '</a></dd></div></dl></div><div class="detail-column"><div class="detail-block-head"><h3>' +
       icon("map") +
       'Map</h3></div><div class="detail-map"><div class="map" id="detail-map"></div></div></div></section>' +
-      '<section class="detail-block"><div class="detail-block-head"><h3>' +
-      icon("file-text") +
-      'Description</h3></div><p class="detail-description">' +
-      esc(report.description) +
-      "</p></section>" +
+      duplicateBlock +
       '<section class="detail-block"><div class="detail-block-head"><h3>' +
       icon("hard-hat") +
-      'Assign team</h3></div><div class="callout assign-box">' +
+      'Assign team</h3></div><div class="assign-box">' +
       assignmentSummary +
       assignmentControl +
       "</div></section>" +
       repair +
+      feedback +
       '<section class="detail-block"><div class="detail-block-head"><h3>' +
       icon("activity") +
       'Activity &amp; notes</h3><span class="muted text-sm">' +
@@ -1616,7 +1863,11 @@
 
     const decisions = reviewActions(report);
     els.drawerActions.innerHTML = decisions.length
-      ? '<p class="footer-note">Decisions are recorded in the report history.</p><div class="drawer-decisions">' +
+      ? '<p class="footer-note" id="decision-note">' +
+        (report.status === "submitted"
+          ? "Mark the report under review before you verify it."
+          : "Decisions are recorded in the report history.") +
+        '</p><div class="drawer-decisions">' +
         decisions
           .map(function (decision) {
             return (
@@ -1624,7 +1875,9 @@
               decision.style +
               '" type="button" data-action="status" data-next-status="' +
               esc(decision.status) +
-              '">' +
+              '"' +
+              (decision.disabled ? ' disabled aria-describedby="decision-note"' : "") +
+              ">" +
               icon(decision.icon, "icon-sm") +
               esc(decision.label) +
               "</button>"
@@ -1683,7 +1936,7 @@
       kicker: "Report review",
       title: "Verify this report?",
       message: function (reportId) {
-        return reportId + " will be marked as verified and moved to Assignment.";
+        return reportId + " will be marked as verified and moved to Task Dispatch.";
       },
       confirmLabel: "Verify report",
       icon: "shield-check",
@@ -1760,6 +2013,11 @@
   }
 
   function decide(reportId, nextStatus, button) {
+    const report = findReport(reportId);
+    if (nextStatus === "verified" && report && report.status === "submitted") {
+      ui.showMessage("Mark " + reportId + " under review before you verify it.", "error");
+      return;
+    }
     const confirmation = statusConfirmations[nextStatus];
     if (!confirmation) {
       runSafely(function () {
@@ -2197,6 +2455,13 @@
       ui.openLightbox(images, Number(photoButton.dataset.galleryIndex), photoButton);
       return;
     }
+    const duplicateButton = event.target.closest('[data-action="open-duplicate"]');
+    if (duplicateButton) {
+      runSafely(function () {
+        openReport(duplicateButton.dataset.reportId);
+      });
+      return;
+    }
     const assignButton = event.target.closest('[data-action="assign"]');
     if (assignButton) {
       runSafely(function () {
@@ -2239,7 +2504,7 @@
     if (!openReportId) {
       return;
     }
-    const link = new URL("track.html?id=" + encodeURIComponent(openReportId), window.location.href).href;
+    const link = new URL("index.html?track=" + encodeURIComponent(openReportId) + "#track", window.location.href).href;
     const done = function () {
       ui.showMessage("Tracking link for " + openReportId + " copied.", "success");
     };
@@ -2357,7 +2622,7 @@
     if (!state) {
       return [];
     }
-    return recentEvents(25, function (entry) {
+    const updates = recentEvents(25, function (entry) {
       return ["submitted", "in_progress", "repair_submitted"].includes(entry.status) && entry.actor !== currentUser.name && entry.actor !== "Administrator";
     }).map(function (item) {
       return {
@@ -2373,6 +2638,31 @@
         },
       };
     });
+    // Residents' ratings of finished repairs.
+    const ratings = state.reports
+      .filter(function (report) {
+        return report.feedback;
+      })
+      .map(function (report) {
+        return {
+          at: report.feedback.at,
+          status: "resolved",
+          title: report.id + " · Rated " + report.feedback.rating + " of 5",
+          description: report.title,
+          meta: reporterName(report) + " · " + ui.relativeTime(report.feedback.at),
+          run: function () {
+            runSafely(function () {
+              openReport(report.id);
+            });
+          },
+        };
+      });
+    return updates
+      .concat(ratings)
+      .sort(function (first, second) {
+        return Date.parse(second.at) - Date.parse(first.at);
+      })
+      .slice(0, 25);
   }, "admin");
 
   // Live database updates (from crews, residents, or other admins): refresh.

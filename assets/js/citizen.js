@@ -53,6 +53,10 @@
   let drawerOpener = null;
   let restoreDrawerInert = null;
   let detailMap = null;
+  let currentStep = 1;
+  let reviewMap = null;
+  let reviewMatches = [];
+  const ownSubmittedText = "Your report was submitted and sent to the administrator.";
 
   function loadState() {
     state = store.getState();
@@ -104,7 +108,7 @@
     });
     $("#citizen-stats").innerHTML = [
       { label: "Reports filed", value: reports.length, icon: "clipboard-list", tone: "var(--accent)", foot: "Every report you've sent", filter: "all" },
-      { label: "In progress", value: open, icon: "construction", tone: "var(--info)", foot: "Being reviewed or repaired", filter: "open" },
+      { label: "In progress", value: open, icon: "construction", tone: "var(--st-in_progress)", foot: "Being reviewed or repaired", filter: "open" },
       { label: "Fixed", value: fixed, icon: "check-circle", tone: "var(--success)", foot: "Repairs verified by the office", filter: "resolved" },
       { label: "Closed", value: closed, icon: "ban", tone: "var(--st-duplicate)", foot: "Rejected or duplicate reports", filter: "closed" },
     ]
@@ -180,15 +184,7 @@
       }
     });
     $$("[data-portal-panel]").forEach(function (panel) {
-      const active = panel.dataset.portalPanel === view;
-      if (active && panel.hidden) {
-        panel.hidden = false;
-        panel.style.animation = "none";
-        panel.getBoundingClientRect();
-        panel.style.animation = "";
-      } else if (!active) {
-        panel.hidden = true;
-      }
+      panel.hidden = panel.dataset.portalPanel !== view;
     });
     $("#crumb-current").textContent = viewDetails[view].crumb;
     document.title = (view === "track" && trackId ? trackId + " · " : "") + viewDetails[view].title + " | ResQRoad";
@@ -295,8 +291,8 @@
     }
     map.setView(ui.mapCenter, 12);
     const L = window.L;
-    // Existing open reports, so residents can see what's already been reported.
-    // They're grey so they don't read as a severity color.
+    // Existing open reports, so residents can see what's already been
+    // reported: brand-orange dots (smaller than the new report's pin).
     state.reports
       .filter(function (report) {
         return store.openStatuses.includes(report.status) && report.coordinates;
@@ -306,8 +302,8 @@
           radius: 6,
           color: "#fff",
           weight: 2,
-          fillColor: "#7c7c7c",
-          fillOpacity: 0.9,
+          fillColor: "#cf5c36",
+          fillOpacity: 0.95,
         })
           .bindTooltip("Already reported: " + report.title, { direction: "top", offset: [0, -6] })
           .addTo(map);
@@ -399,35 +395,45 @@
     error.innerHTML = icon("alert-circle", "icon-sm") + esc(message);
   }
 
-  function validate() {
+  // Checks one step of the report form (1 the problem, 2 the location; the
+  // photos are optional) and marks the fields that need fixing.
+  function validateStep(step) {
     const problems = [];
-    const title = form.elements.namedItem("title");
-    const description = form.elements.namedItem("description");
-    const road = form.elements.namedItem("road");
-    const location = form.elements.namedItem("location");
-    form.querySelectorAll("[aria-invalid]").forEach(clearFieldError);
+    const section = stepSection(step);
+    section.querySelectorAll("[aria-invalid]").forEach(clearFieldError);
+    section.querySelectorAll(".field-error").forEach(function (error) {
+      error.remove();
+    });
 
-    if (title.value.trim().length < 5) {
-      problems.push([title, "Add a short title (at least 5 characters)."]);
+    if (step === 1) {
+      const title = form.elements.namedItem("title");
+      const description = form.elements.namedItem("description");
+      if (title.value.trim().length < 5) {
+        problems.push([title, "Add a short title (at least 5 characters)."]);
+      }
+      if (!selectedSeverity()) {
+        problems.push([form.querySelector('input[name="severity"]'), "Choose how severe the damage is."]);
+      }
+      if (description.value.trim().length < 10) {
+        problems.push([description, "Describe the damage in a sentence or two."]);
+      }
     }
-    if (!selectedSeverity()) {
-      problems.push([form.querySelector('input[name="severity"]'), "Choose how severe the damage is."]);
-    }
-    if (description.value.trim().length < 10) {
-      problems.push([description, "Describe the damage in a sentence or two."]);
-    }
-    const lat = Number(latInput.value);
-    const lng = Number(lngInput.value);
-    if (!latInput.value.trim() || !lngInput.value.trim() || !Number.isFinite(lat) || !Number.isFinite(lng)) {
-      problems.push([latInput, "Drop a pin on the map or enter the coordinates."]);
-    } else if (!inBulacan(lat, lng)) {
-      problems.push([latInput, "The location must be in Bulacan."]);
-    }
-    if (!road.value.trim()) {
-      problems.push([road, "Enter the road or street name."]);
-    }
-    if (!location.value.trim()) {
-      problems.push([location, "Enter the barangay and municipality."]);
+    if (step === 2) {
+      const road = form.elements.namedItem("road");
+      const location = form.elements.namedItem("location");
+      const lat = Number(latInput.value);
+      const lng = Number(lngInput.value);
+      if (!latInput.value.trim() || !lngInput.value.trim() || !Number.isFinite(lat) || !Number.isFinite(lng)) {
+        problems.push([latInput, "Drop a pin on the map or enter the coordinates."]);
+      } else if (!inBulacan(lat, lng)) {
+        problems.push([latInput, "The location must be in Bulacan."]);
+      }
+      if (!road.value.trim()) {
+        problems.push([road, "Enter the road or street name."]);
+      }
+      if (!location.value.trim()) {
+        problems.push([location, "Enter the barangay and municipality."]);
+      }
     }
 
     problems.forEach(function (problem) {
@@ -447,25 +453,251 @@
     return problems;
   }
 
-  // Each form section's number turns into a check mark once it's complete.
+  // Shows what's wrong on the current step and moves to the first field.
+  function showProblems(problems) {
+    errorBox.innerHTML =
+      icon("alert-circle") +
+      "<span>" +
+      esc(problems.length === 1 ? problems[0][1] : "Please fix the " + problems.length + " highlighted fields.") +
+      "</span>";
+    errorBox.hidden = false;
+    const first = problems[0][0];
+    first.focus({ preventScroll: true });
+    first.closest(".form-section, .field").scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  /* ---------- Report steps ---------- */
+
+  // The form shows one step at a time: 1 the problem, 2 the location, 3 the
+  // photos, and 4 a review of everything before it is sent. Going back keeps
+  // everything already entered (fields, the pin, and the photos).
+  const stepNames = { 1: "Problem", 2: "Location", 3: "Photos", 4: "Review" };
+
+  function stepSection(step) {
+    return form.querySelector('[data-step="' + step + '"]');
+  }
+
+  // The orange bar on top: steps before this one are done.
   function updateProgress() {
-    const title = form.elements.namedItem("title").value.trim();
-    const description = form.elements.namedItem("description").value.trim();
-    const done = {
-      details: title.length >= 5 && Boolean(selectedSeverity()) && description.length >= 10,
-      location:
-        Boolean(latInput.value.trim() && lngInput.value.trim()) &&
-        inBulacan(Number(latInput.value), Number(lngInput.value)) &&
-        Boolean(form.elements.namedItem("road").value.trim()) &&
-        Boolean(form.elements.namedItem("location").value.trim()),
-      photos: photos.length > 0,
-    };
-    Object.keys(done).forEach(function (key, index) {
-      const section = form.querySelector('[data-section="' + key + '"]');
-      const badge = section.querySelector(".form-step-badge");
-      section.classList.toggle("is-done", done[key]);
-      badge.innerHTML = done[key] ? icon("check", "icon-sm") : String(index + 1);
+    $$("[data-stepper]").forEach(function (item) {
+      const step = Number(item.dataset.stepper);
+      const button = item.querySelector("button");
+      item.classList.toggle("is-done", step < currentStep);
+      item.classList.toggle("is-current", step === currentStep);
+      if (step === currentStep) {
+        button.setAttribute("aria-current", "step");
+      } else {
+        button.removeAttribute("aria-current");
+      }
+      button.setAttribute(
+        "aria-label",
+        "Step " + step + ": " + stepNames[step] + (step < currentStep ? " (done)" : step === currentStep ? " (current step)" : ""),
+      );
     });
+  }
+
+  function showStep(step, options) {
+    currentStep = Math.max(1, Math.min(4, step));
+    $$("#report-form [data-step]").forEach(function (section) {
+      section.hidden = Number(section.dataset.step) !== currentStep;
+    });
+    errorBox.hidden = true;
+    $("[data-step-back]").hidden = currentStep === 1;
+    $("[data-step-next]").hidden = currentStep === 4;
+    $("[data-step-submit]").hidden = currentStep !== 4;
+    if (currentStep < 4) {
+      $("[data-step-next-label]").textContent = "Next: " + stepNames[currentStep + 1];
+    }
+    updateProgress();
+    if (currentStep === 2 && picker) {
+      window.setTimeout(function () {
+        picker.map.invalidateSize();
+      }, 50);
+    }
+    if (currentStep === 4) {
+      renderReview();
+    } else if (reviewMap) {
+      reviewMap.destroy();
+      reviewMap = null;
+    }
+    if (!options || options.focus !== false) {
+      // Start the new step at the top of the form, with focus on its heading.
+      const top = $("#report-layout").getBoundingClientRect().top + window.scrollY - 80;
+      if (window.scrollY > top) {
+        window.scrollTo({ top: top, behavior: "smooth" });
+      }
+      const heading = stepSection(currentStep).querySelector("h2");
+      heading.tabIndex = -1;
+      heading.focus({ preventScroll: true });
+    }
+  }
+
+  // Moves to `target`, checking every step on the way (going back is free).
+  function goToStep(target) {
+    for (let step = currentStep; step < target; step += 1) {
+      const problems = validateStep(step);
+      if (problems.length) {
+        if (step !== currentStep) {
+          showStep(step, { focus: false });
+        }
+        showProblems(problems);
+        return false;
+      }
+    }
+    showStep(target);
+    return true;
+  }
+
+  function reportValues() {
+    return {
+      title: form.elements.namedItem("title").value.trim(),
+      description: form.elements.namedItem("description").value.trim(),
+      severity: selectedSeverity(),
+      road: form.elements.namedItem("road").value.trim(),
+      location: form.elements.namedItem("location").value.trim(),
+      latitude: Number(latInput.value),
+      longitude: Number(lngInput.value),
+    };
+  }
+
+  function reviewBlock(step, title, body) {
+    return (
+      '<section class="review-block"><div class="review-block-head"><h3>' +
+      esc(title) +
+      '</h3><button class="btn btn-ghost btn-sm" type="button" data-go-step="' +
+      step +
+      '">' +
+      icon("reset", "icon-sm") +
+      "Edit</button></div>" +
+      body +
+      "</section>"
+    );
+  }
+
+  // How a possible duplicate the server found looks next to the page's own.
+  function serverMatch(summary) {
+    const report = store.getReport(summary.id) || {
+      id: summary.id,
+      title: summary.title,
+      status: summary.status,
+      road: "",
+      location: "",
+    };
+    const near = summary.distance <= 25 ? "At almost the same spot" : "About " + Math.round(summary.distance / 5) * 5 + " m away";
+    return { report: report, distance: summary.distance, active: true, reasons: [near] };
+  }
+
+  // Reports that may be about the same road problem: open ones need a
+  // decision before sending; a fixed one is only for information.
+  function duplicatePanel(matches) {
+    if (!matches.length) {
+      return "";
+    }
+    const active = matches.some(function (match) {
+      return match.active;
+    });
+    return (
+      '<section class="duplicate-panel' +
+      (active ? "" : " is-info") +
+      '" aria-labelledby="duplicate-title"><div class="duplicate-head">' +
+      icon(active ? "alert-triangle" : "info") +
+      '<div><h3 id="duplicate-title">' +
+      (active ? "Possible duplicate report" : "A similar report here was already fixed") +
+      "</h3><p>" +
+      esc(
+        active
+          ? "A report that looks like the same road problem is already with the Road Maintenance Office. Check it before you send yours. If yours is about a different problem, you can still submit it."
+          : "This spot had a similar problem that was repaired. If the damage is back, go ahead and submit your report.",
+      ) +
+      '</p></div></div><ul class="duplicate-list">' +
+      matches
+        .map(function (match) {
+          const report = match.report;
+          return (
+            '<li class="duplicate-item"><div class="duplicate-copy"><div class="toolbar-group"><span class="id-tag">' +
+            esc(report.id) +
+            "</span>" +
+            ui.statusPill(report.status) +
+            (report.severity ? ui.severityBadge(report.severity) : "") +
+            "</div><strong>" +
+            esc(report.title) +
+            "</strong>" +
+            (report.road ? "<span>" + esc(report.road + " · " + report.location) + "</span>" : "") +
+            '<span class="duplicate-reasons">' +
+            esc(match.reasons.join(" · ")) +
+            '</span></div><button class="btn btn-secondary btn-sm" type="button" data-view-duplicate="' +
+            esc(report.id) +
+            '">' +
+            icon("eye", "icon-sm") +
+            "View report</button></li>"
+          );
+        })
+        .join("") +
+      "</ul></section>"
+    );
+  }
+
+  // Step 4: everything the resident entered, with Edit buttons, plus any
+  // possible duplicates nearby. `serverMatches` comes from a refused send.
+  function renderReview(serverMatches) {
+    const values = reportValues();
+    if (reviewMap) {
+      reviewMap.destroy();
+      reviewMap = null;
+    }
+    reviewMatches = serverMatches || store.findSimilarReports(values, { includeResolved: true, limit: 3 });
+    const box = $("#report-review");
+    box.innerHTML =
+      duplicatePanel(reviewMatches) +
+      reviewBlock(
+        1,
+        "What's the problem?",
+        '<dl class="facts"><div class="facts-wide"><dt>Title</dt><dd>' +
+          esc(values.title) +
+          '</dd></div><div class="facts-wide"><dt>Severity</dt><dd>' +
+          ui.severityBadge(values.severity) +
+          '</dd></div><div class="facts-wide"><dt>Description</dt><dd class="review-text">' +
+          esc(values.description) +
+          "</dd></div></dl>",
+      ) +
+      reviewBlock(
+        2,
+        "Where is it?",
+        '<dl class="facts"><div><dt>Road or street</dt><dd>' +
+          esc(values.road) +
+          "</dd></div><div><dt>Barangay and municipality</dt><dd>" +
+          esc(values.location) +
+          '</dd></div><div class="facts-wide"><dt>GPS coordinates</dt><dd class="mono">' +
+          esc(values.latitude.toFixed(6) + ", " + values.longitude.toFixed(6)) +
+          '</dd></div></dl><div class="map review-map" data-review-map></div>',
+      ) +
+      reviewBlock(
+        3,
+        "Photos",
+        photos.length
+          ? '<ul class="thumb-list review-photos">' +
+              photos
+                .map(function (photo) {
+                  return '<li class="thumb"><img src="' + esc(photo.src) + '" alt="" /><span>' + esc(photo.name) + "</span></li>";
+                })
+                .join("") +
+              "</ul>"
+          : '<p class="muted text-sm" style="margin: 0">No photos added. Photos are optional, but they help the office verify the damage faster.</p>',
+      );
+    reviewMap = ui.renderMap(
+      box.querySelector("[data-review-map]"),
+      [
+        {
+          id: "Your report",
+          title: values.title,
+          road: values.road,
+          severity: values.severity,
+          status: "submitted",
+          coordinates: { lat: values.latitude, lng: values.longitude },
+        },
+      ],
+      { popup: false, zoom: 16, emptyMessage: "Location unavailable." },
+    );
   }
 
   function resetForm() {
@@ -484,7 +716,8 @@
       picker.map.setView(ui.mapCenter, 12);
     }
     setPickerStatus("No location selected yet", false);
-    updateProgress();
+    reviewMatches = [];
+    showStep(1, { focus: false });
   }
 
   function showSuccess(report) {
@@ -548,19 +781,14 @@
       return;
     }
 
+    // Each report starts as a short summary; View details opens everything
+    // about it (progress, photos, location, the repair, and every update).
     $("#my-reports").innerHTML = reports
-      .map(function (report, index) {
+      .map(function (report) {
         const photo = ui.reportPhotos(report)[0];
-        const latest = (report.history || []).filter(function (entry) {
-          return entry.status !== "note";
-        }).slice(-1)[0];
-        // Once a repair is verified, residents see the crew's notes and their
-        // photos of the finished repair.
-        const repairNotes = report.status === "resolved" && report.repair ? repairResult(report) : "";
+        const canRate = report.status === "resolved" && !report.feedback;
         return (
-          '<article class="card my-report" style="--i:' +
-          Math.min(index, 10) +
-          '"><div class="my-report-head"><div class="my-report-thumb">' +
+          '<article class="card my-report"><div class="my-report-head"><div class="my-report-thumb">' +
           ui.photoImg(photo) +
           '</div><div><span class="id-tag">' +
           esc(report.id) +
@@ -575,28 +803,23 @@
           ui.severityBadge(report.severity) +
           '</p></div><div class="my-report-side">' +
           ui.statusPill(report.status) +
+          '<div class="my-report-actions">' +
+          (canRate
+            ? '<button class="btn btn-soft btn-sm" type="button" data-rate-report="' +
+              esc(report.id) +
+              '">' +
+              icon("star", "icon-sm") +
+              'Rate the repair<span class="visually-hidden"> of ' +
+              esc(report.id) +
+              "</span></button>"
+            : "") +
           '<button class="btn btn-secondary btn-sm" type="button" data-open-report="' +
           esc(report.id) +
           '">' +
           icon("file-text", "icon-sm") +
           'View details<span class="visually-hidden"> of ' +
           esc(report.id) +
-          '</span></button></div></div><div class="my-report-body"><p class="my-report-desc">' +
-          esc(report.description) +
-          '</p><div class="journey-card">' +
-          ui.journey(report) +
-          "</div>" +
-          repairNotes +
-          '</div><details><summary>Progress updates' +
-          (latest ? " · last update " + esc(ui.relativeTime(latest.at)) : "") +
-          icon("chevron-down", "icon-sm") +
-          "</summary><div>" +
-          ui.timeline(report, { publicOnly: true }) +
-          '<p style="margin: 1rem 0 0"><a class="link-button" href="' +
-          esc(hashFor("track", report.id)) +
-          '" data-portal-tab="track">Track this report' +
-          icon("arrow-right", "icon-sm") +
-          "</a></p></div></details></article>"
+          "</span></button></div></div></div></article>"
         );
       })
       .join("");
@@ -762,6 +985,7 @@
     renderTrackRecent();
     const mine = report.reporterId === citizen.id;
     box.innerHTML = publicView.trackCard(report, {
+      submittedText: mine ? ownSubmittedText : null,
       headActions:
         '<div class="toolbar-group">' +
         (mine
@@ -784,8 +1008,9 @@
     });
   }
 
+  // The public tracking link: the tracker on the home page.
   function copyTrackingLink(reportId) {
-    const link = new URL("track.html?id=" + encodeURIComponent(reportId), window.location.href).href;
+    const link = new URL("index.html?track=" + encodeURIComponent(reportId) + "#track", window.location.href).href;
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(link).then(
         function () {
@@ -848,7 +1073,7 @@
           return ["assigned", "in_progress", "repair_submitted"].includes(report.status);
         }),
         icon: "construction",
-        tone: "var(--info)",
+        tone: "var(--st-in_progress)",
       },
       {
         label: "Fixed roads",
@@ -959,6 +1184,14 @@
     }
     const sameReport = drawer.body.dataset.reportId === reportId;
     const scroll = sameReport ? drawer.body.scrollTop : 0;
+    // Live updates re-render the panel; keep a rating being written.
+    const feedbackForm = sameReport ? drawer.body.querySelector("[data-feedback-form]") : null;
+    const feedbackDraft = feedbackForm
+      ? {
+          rating: (feedbackForm.querySelector('input[name="rating"]:checked') || {}).value || "",
+          comment: feedbackForm.elements.namedItem("comment").value,
+        }
+      : null;
     if (detailMap) {
       detailMap.destroy();
       detailMap = null;
@@ -993,7 +1226,11 @@
           " · select to enlarge</span></div>" +
           ui.photoGallery(photos, "Road damage photos")
         : '</div><p class="muted text-sm" style="margin: 0">You didn\'t add photos to this report.</p>') +
-      '</section><section class="detail-block detail-columns"><div class="detail-column"><div class="detail-block-head"><h3>' +
+      '</section><section class="detail-block"><div class="detail-block-head"><h3>' +
+      icon("file-text") +
+      'Description</h3></div><p class="detail-description">' +
+      esc(report.description) +
+      '</p></section><section class="detail-block detail-columns"><div class="detail-column"><div class="detail-block-head"><h3>' +
       icon("info") +
       'Information</h3></div><dl class="facts"><div><dt>Severity</dt><dd>' +
       ui.severityBadge(report.severity) +
@@ -1005,18 +1242,15 @@
       esc(ui.relativeTime(publicView.lastUpdate(report))) +
       '</dd></div><div class="facts-wide"><dt>Road and place</dt><dd>' +
       esc(report.road + " · " + report.location) +
-      '</dd></div><div class="facts-wide"><dt>GPS coordinates</dt><dd class="mono">' +
+      '</dd></div><div class="facts-wide"><dt>GPS coordinates</dt><dd class="facts-coords"><span class="mono">' +
       esc(report.coordinates.lat + ", " + report.coordinates.lng) +
-      ' · <a href="' +
+      '</span><a href="' +
       esc(ui.osmUrl(report.coordinates)) +
-      '" target="_blank" rel="noreferrer">Open in OpenStreetMap</a></dd></div></dl></div><div class="detail-column"><div class="detail-block-head"><h3>' +
+      '" target="_blank" rel="noreferrer">Open in OpenStreetMap' +
+      icon("external-link", "icon-sm") +
+      '</a></dd></div></dl></div><div class="detail-column"><div class="detail-block-head"><h3>' +
       icon("map") +
       'Map</h3></div><div class="detail-map"><div class="map" id="detail-map"></div></div></div></section>' +
-      '<section class="detail-block"><div class="detail-block-head"><h3>' +
-      icon("file-text") +
-      'Description</h3></div><p class="detail-description">' +
-      esc(report.description) +
-      "</p></section>" +
       (report.status === "resolved" && report.repair
         ? '<section class="detail-block"><div class="detail-block-head"><h3>' +
           icon("wrench") +
@@ -1028,10 +1262,11 @@
           repairResult(report) +
           "</section>"
         : "") +
+      feedbackBlock(report) +
       '<section class="detail-block"><div class="detail-block-head"><h3>' +
       icon("activity") +
       "Progress updates</h3></div>" +
-      ui.timeline(report, { publicOnly: true }) +
+      ui.timeline(report, { publicOnly: true, submittedText: ownSubmittedText }) +
       "</section>";
     drawer.actions.innerHTML =
       '<p class="footer-note">Only you and the Road Maintenance Office can see that you filed this report.</p>' +
@@ -1046,7 +1281,78 @@
       emptyMessage: "Location coordinates are unavailable.",
     });
     drawer.body.dataset.reportId = reportId;
+    const newFeedbackForm = drawer.body.querySelector("[data-feedback-form]");
+    if (feedbackDraft && newFeedbackForm) {
+      newFeedbackForm.elements.namedItem("comment").value = feedbackDraft.comment;
+      const star = newFeedbackForm.querySelector('input[name="rating"][value="' + feedbackDraft.rating + '"]');
+      if (star) {
+        star.checked = true;
+      }
+      showRating(newFeedbackForm, Number(feedbackDraft.rating) || 0);
+    }
     drawer.body.scrollTop = scroll;
+  }
+
+  /* ---------- Feedback on a finished repair ---------- */
+
+  // Once a report is resolved, its resident rates the repair (1 to 5 stars,
+  // with an optional comment). The rating is sent once and then shown here.
+  function feedbackBlock(report) {
+    if (report.status !== "resolved") {
+      return "";
+    }
+    if (report.feedback) {
+      return (
+        '<section class="detail-block" id="feedback-block"><div class="detail-block-head"><h3>' +
+        icon("star") +
+        'Your feedback</h3><span class="muted text-sm">' +
+        esc("Sent " + ui.formatDay(report.feedback.at)) +
+        '</span></div><div class="callout rating-result"><div class="rating-summary">' +
+        ui.ratingStars(report.feedback.rating) +
+        "<strong>" +
+        esc(ui.ratingLabels[report.feedback.rating]) +
+        "</strong></div>" +
+        (report.feedback.comment ? '<p class="detail-description">' + esc(report.feedback.comment) + "</p>" : "") +
+        '<p class="muted text-sm" style="margin: 0">Thank you. The Road Maintenance Office reads every rating.</p></div></section>'
+      );
+    }
+    let stars = "";
+    for (let value = 1; value <= 5; value += 1) {
+      stars +=
+        '<label class="rating-star"><input type="radio" name="rating" value="' +
+        value +
+        '" /><span class="visually-hidden">' +
+        esc(value + " of 5 stars: " + ui.ratingLabels[value]) +
+        "</span>" +
+        icon("star") +
+        "</label>";
+    }
+    return (
+      '<section class="detail-block" id="feedback-block"><div class="detail-block-head"><h3>' +
+      icon("star") +
+      'Rate the repair</h3></div><form class="callout rating-form" data-feedback-form data-report-id="' +
+      esc(report.id) +
+      '" novalidate><fieldset class="rating-field"><legend class="field-label">How happy are you with how this road was fixed?</legend><div class="rating-options">' +
+      stars +
+      '</div><span class="rating-caption" data-rating-caption>Choose 1 to 5 stars.</span></fieldset><label class="field"><span class="field-label">Comment <span class="optional">Optional</span></span><textarea name="comment" rows="3" maxlength="500" placeholder="Tell the Road Maintenance Office how the repair turned out."></textarea></label><p class="field-error" data-feedback-error hidden></p><div class="rating-actions"><button class="btn btn-primary" type="submit">' +
+      icon("send", "icon-sm") +
+      "Send feedback</button></div></form></section>"
+    );
+  }
+
+  // Lights up the stars up to `value` (the chosen or pointed-at rating).
+  function showRating(feedbackForm, value) {
+    feedbackForm.querySelectorAll(".rating-star").forEach(function (star, index) {
+      star.classList.toggle("is-on", index < value);
+    });
+    feedbackForm.querySelector("[data-rating-caption]").textContent = value
+      ? ui.ratingLabels[value]
+      : "Choose 1 to 5 stars.";
+  }
+
+  function checkedRating(feedbackForm) {
+    const checked = feedbackForm.querySelector('input[name="rating"]:checked');
+    return checked ? Number(checked.value) : 0;
   }
 
   function openDetails(reportId, opener) {
@@ -1152,11 +1458,34 @@
       showView("report", { push: true });
       window.scrollTo({ top: 0, behavior: "smooth" });
       window.setTimeout(function () {
-        form.elements.namedItem("title").focus({ preventScroll: true });
+        const field = stepSection(currentStep).querySelector("input:not([type='file']), textarea");
+        (field || stepSection(currentStep).querySelector("h2")).focus({ preventScroll: true });
       }, 300);
     } else if (event.target.closest("[data-open-report]")) {
       const button = event.target.closest("[data-open-report]");
       openDetails(button.dataset.openReport, button);
+    } else if (event.target.closest("[data-rate-report]")) {
+      // Opens the report's details at its rating form.
+      const button = event.target.closest("[data-rate-report]");
+      openDetails(button.dataset.rateReport, button);
+      const block = drawer.body.querySelector("#feedback-block");
+      if (block) {
+        window.setTimeout(function () {
+          block.scrollIntoView({ block: "start" });
+          const firstStar = block.querySelector('input[name="rating"]');
+          if (firstStar) {
+            firstStar.focus({ preventScroll: true });
+          }
+        }, 60);
+      }
+    } else if (event.target.closest("[data-view-duplicate]")) {
+      // The report form keeps everything while the resident checks it.
+      const button = event.target.closest("[data-view-duplicate]");
+      openReport(button.dataset.viewDuplicate, button);
+    } else if (event.target.closest("[data-go-step]")) {
+      goToStep(Number(event.target.closest("[data-go-step]").dataset.goStep));
+    } else if (event.target.closest("[data-step-back]")) {
+      showStep(currentStep - 1);
     } else if (event.target.closest("[data-track-pick]")) {
       showView("track", { push: true, id: event.target.closest("[data-track-pick]").dataset.trackPick });
     } else if (event.target.closest("[data-copy-track]")) {
@@ -1200,6 +1529,16 @@
     }
   });
 
+  $("#refresh-live-map").addEventListener("click", function (event) {
+    ui.refreshMap(event.currentTarget, function () {
+      loadState();
+      renderLiveMap();
+      if (liveMap) {
+        liveMap.refresh();
+      }
+    });
+  });
+
   // Report details panel.
   drawer.body.addEventListener("click", function (event) {
     const photo = event.target.closest("[data-gallery-index]");
@@ -1209,6 +1548,61 @@
       });
       ui.openLightbox(images, Number(photo.dataset.galleryIndex), photo);
     }
+  });
+
+  // The rating stars light up as they're chosen or pointed at.
+  drawer.body.addEventListener("change", function (event) {
+    const feedbackForm = event.target.closest("[data-feedback-form]");
+    if (feedbackForm && event.target.name === "rating") {
+      feedbackForm.querySelector("[data-feedback-error]").hidden = true;
+      showRating(feedbackForm, checkedRating(feedbackForm));
+    }
+  });
+  drawer.body.addEventListener("pointerover", function (event) {
+    const star = event.target.closest(".rating-star");
+    if (star) {
+      showRating(star.closest("[data-feedback-form]"), Number(star.querySelector("input").value));
+    }
+  });
+  drawer.body.addEventListener("pointerout", function (event) {
+    const options = event.target.closest(".rating-options");
+    if (options && !options.contains(event.relatedTarget)) {
+      const feedbackForm = options.closest("[data-feedback-form]");
+      showRating(feedbackForm, checkedRating(feedbackForm));
+    }
+  });
+
+  drawer.body.addEventListener("submit", function (event) {
+    const feedbackForm = event.target.closest("[data-feedback-form]");
+    if (!feedbackForm) {
+      return;
+    }
+    event.preventDefault();
+    const button = feedbackForm.querySelector('button[type="submit"]');
+    const error = feedbackForm.querySelector("[data-feedback-error]");
+    const rating = checkedRating(feedbackForm);
+    if (button.classList.contains("is-loading")) {
+      return;
+    }
+    if (!rating) {
+      error.innerHTML = icon("alert-circle", "icon-sm") + "Choose 1 to 5 stars first.";
+      error.hidden = false;
+      feedbackForm.querySelector('input[name="rating"]').focus();
+      return;
+    }
+    error.hidden = true;
+    button.classList.add("is-loading");
+    store
+      .submitFeedback(feedbackForm.dataset.reportId, rating, feedbackForm.elements.namedItem("comment").value)
+      .then(function () {
+        ui.showMessage("Thank you for rating the repair.", "success");
+        render();
+      })
+      .catch(function (failure) {
+        button.classList.remove("is-loading");
+        error.innerHTML = icon("alert-circle", "icon-sm") + esc(failure.message);
+        error.hidden = false;
+      });
   });
   drawer.close.addEventListener("click", function () {
     closeDetails();
@@ -1306,25 +1700,54 @@
     });
   });
 
-  form.addEventListener("submit", async function (event) {
+  // "Next" moves on to the next step once this one is complete; on the
+  // review step the report is sent.
+  form.addEventListener("submit", function (event) {
     event.preventDefault();
-    const submitButton = form.querySelector('button[type="submit"]');
+    if (currentStep < 4) {
+      goToStep(currentStep + 1);
+      return;
+    }
+    submitReport($("[data-step-submit]"));
+  });
+
+  async function submitReport(submitButton) {
     if (submitButton.classList.contains("is-loading")) {
       return;
     }
     errorBox.hidden = true;
-    const problems = validate();
-    if (problems.length) {
-      errorBox.innerHTML =
-        icon("alert-circle") +
-        "<span>" +
-        esc(problems.length === 1 ? problems[0][1] : "Please fix the " + problems.length + " highlighted fields.") +
-        "</span>";
-      errorBox.hidden = false;
-      const first = problems[0][0];
-      first.focus({ preventScroll: true });
-      first.closest(".form-section, .field").scrollIntoView({ behavior: "smooth", block: "center" });
-      return;
+    // Everything is checked again, in case a field changed since.
+    for (const step of [1, 2]) {
+      const problems = validateStep(step);
+      if (problems.length) {
+        showStep(step, { focus: false });
+        showProblems(problems);
+        return;
+      }
+    }
+
+    // A possible duplicate that's still open: the resident decides.
+    const active = reviewMatches.filter(function (match) {
+      return match.active;
+    });
+    let confirmDuplicate = false;
+    if (active.length) {
+      const confirmed = await ui.confirm({
+        kicker: "Possible duplicate",
+        title: "Submit your report anyway?",
+        message:
+          active[0].report.id +
+          (active.length > 1 ? " and " + ui.pluralize(active.length - 1, "other report") : "") +
+          " may already be about this road problem. Submit yours only if it's about a different problem.",
+        confirmLabel: "Submit anyway",
+        cancelLabel: "Go back",
+        icon: "copy",
+        opener: submitButton,
+      });
+      if (!confirmed) {
+        return;
+      }
+      confirmDuplicate = true;
     }
 
     submitButton.classList.add("is-loading");
@@ -1339,6 +1762,7 @@
         longitude: lngInput.value,
         severity: selectedSeverity(),
         evidencePhotos: photos,
+        confirmDuplicate: confirmDuplicate,
       });
       submitButton.classList.remove("is-loading");
       if (report.photosTrimmed) {
@@ -1351,24 +1775,23 @@
     } catch (error) {
       console.error("Could not submit the report.", error);
       submitButton.classList.remove("is-loading");
-      errorBox.innerHTML =
-        icon("alert-circle") +
-        "<span>" +
-        esc(error.message) +
-        (error.duplicateId
-          ? ' <a href="' + esc(hashFor("track", error.duplicateId)) + '" data-portal-tab="track">Follow ' + esc(error.duplicateId) + " instead</a>."
-          : "") +
-        "</span>";
+      if (error.possibleDuplicates && error.possibleDuplicates.length) {
+        // The server knows of a possible duplicate this page hadn't seen
+        // yet: show it, and the next Submit asks the resident to decide.
+        renderReview(error.possibleDuplicates.map(serverMatch));
+      }
+      errorBox.innerHTML = icon("alert-circle") + "<span>" + esc(error.message) + "</span>";
       errorBox.hidden = false;
       errorBox.scrollIntoView({ behavior: "smooth", block: "center" });
     }
-  });
+  }
 
   function setFilter(filter) {
     myFilter = filter;
-    $$("#my-filter [data-filter]").forEach(function (button) {
-      button.setAttribute("aria-pressed", String(button.dataset.filter === filter));
-    });
+    $("#my-filter").value = filter;
+    if (window.RoadWatchMenus) {
+      window.RoadWatchMenus.sync();
+    }
     renderMyReports();
   }
 
@@ -1389,11 +1812,8 @@
     renderMyReports();
     renderRecent();
   });
-  $("#my-filter").addEventListener("click", function (event) {
-    const chip = event.target.closest("[data-filter]");
-    if (chip) {
-      setFilter(chip.dataset.filter);
-    }
+  $("#my-filter").addEventListener("change", function (event) {
+    setFilter(event.target.value);
   });
   $("#citizen-stats").addEventListener("click", function (event) {
     const tile = event.target.closest("[data-kpi-filter]");
@@ -1418,7 +1838,12 @@
       myReports().forEach(function (report) {
         const before = knownStatuses.get(report.id);
         if (before && before !== report.status) {
-          ui.showMessage(report.id + " is now " + ui.statusLabel(report.status) + ".", report.status === "rejected" ? "info" : "success");
+          ui.showMessage(
+            report.status === "resolved"
+              ? report.id + " is fixed. Open it in My reports to rate the repair."
+              : report.id + " is now " + ui.statusLabel(report.status) + ".",
+            report.status === "rejected" ? "info" : "success",
+          );
         }
       });
       rememberStatuses();
@@ -1453,7 +1878,7 @@
     initPicker();
     const initial = parseHash(window.location.hash);
     showView(initial.name, { id: initial.id });
-    updateProgress();
+    showStep(1, { focus: false });
   } catch (error) {
     console.error("Could not load the citizen portal.", error);
     ui.showMessage(error.message, "error");

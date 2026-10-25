@@ -10,6 +10,8 @@
     citizen: "citizen.html",
   };
   const loginPage = "login.html";
+  // The role a workspace page is for (<body data-required-role>).
+  const requiredRole = document.body && document.body.dataset.requiredRole;
 
   function backend() {
     return window.RoadWatchBackend;
@@ -38,17 +40,25 @@
       window.location.replace(target + "?next=" + encodeURIComponent(workspaces[role]));
       return null;
     }
+    // The workspace stays hidden until the sign-in is confirmed (see
+    // [data-booting] in app.css), so its empty frame never flashes on screen.
+    document.body.removeAttribute("data-booting");
     return user;
   }
 
   let signingOut = false;
 
+  // Ends the session, then leaves the workspace without keeping it in the
+  // browser history, so Back can't bring it up again.
   async function signOut(redirectTo) {
     signingOut = true;
+    if (requiredRole) {
+      document.body.setAttribute("data-booting", "");
+    }
     try {
       await backend().signOut();
     } finally {
-      window.location.assign(redirectTo || loginPage);
+      window.location.replace(redirectTo || loginPage);
     }
   }
 
@@ -62,9 +72,33 @@
     loginPage: loginPage,
   };
 
+  // A workspace the browser restores from its back/forward cache checks the
+  // sign-in with the server again before anything is shown. (The server
+  // also marks workspaces as never cached and sends signed-out visitors to
+  // the sign-in page.)
+  window.addEventListener("pageshow", function (event) {
+    if (!event.persisted || !requiredRole) {
+      return;
+    }
+    document.body.setAttribute("data-booting", "");
+    fetch("/api/auth/me", { credentials: "same-origin", cache: "no-store" })
+      .then(function (response) {
+        return response.json();
+      })
+      .then(function (body) {
+        if (body.user && body.user.role === requiredRole) {
+          document.body.removeAttribute("data-booting");
+        } else {
+          window.location.replace(loginPage + "?next=" + encodeURIComponent(workspaces[requiredRole]));
+        }
+      })
+      .catch(function () {
+        window.location.reload();
+      });
+  });
+
   // If the account is signed out or deactivated elsewhere while a protected
   // page is open, go back to the sign-in page.
-  const requiredRole = document.body && document.body.dataset.requiredRole;
   if (requiredRole && window.RoadWatchStore) {
     window.RoadWatchStore.ready().then(function () {
       window.RoadWatchStore.onExternalChange(function () {

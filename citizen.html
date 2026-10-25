@@ -35,18 +35,18 @@
     <script src="assets/js/public-view.js" defer></script>
     <script src="assets/js/citizen.js" defer></script>
   </head>
-  <body class="app-body" data-required-role="citizen">
+  <body class="app-body" data-required-role="citizen" data-booting>
     <a class="skip-link" href="#main">Skip to content</a>
     <div class="shell">
       <aside class="sidebar" id="sidebar" aria-label="Resident navigation">
         <div class="sidebar-head">
-          <a class="sidebar-brand" href="citizen.html" aria-label="ResQRoad resident portal">
+          <div class="sidebar-brand">
             <span class="sidebar-logo-full">
               <img class="logo-on-light" src="assets/images/resqroad-logotype.png" alt="ResQRoad" width="748" height="127" />
               <img class="logo-on-dark" src="assets/images/resqroad-logotype-white.png" alt="ResQRoad" width="748" height="127" />
             </span>
             <img class="sidebar-logo-mark" src="assets/images/resqroad-mark.png" alt="" width="384" height="408" />
-          </a>
+          </div>
           <button class="sidebar-icon-btn sidebar-close" type="button" data-sidebar-close aria-label="Close navigation"><svg data-icon="x"></svg></button>
         </div>
         <div class="sidebar-scroll">
@@ -67,14 +67,9 @@
           </nav>
         </div>
         <div class="sidebar-foot">
-          <div class="sidebar-status">
-            <strong><span class="live-dot" aria-hidden="true"></span>Synced with the road office</strong>
-            <span>Status updates from staff appear here right away.</span>
-          </div>
           <button class="sidebar-user" type="button" data-popover-target="citizen-menu" data-popover-placement="top-start" data-popover-width="trigger" aria-haspopup="menu" aria-expanded="false" aria-controls="citizen-menu" aria-label="Account menu">
             <span class="avatar" data-user-avatar aria-hidden="true"></span>
             <span class="person-copy"><strong data-current-user></strong><span>Resident</span></span>
-            <svg data-icon="chevrons-up-down"></svg>
           </button>
         </div>
       </aside>
@@ -106,9 +101,26 @@
 
             <div class="portal-layout" id="report-layout">
               <form id="report-form" novalidate>
+                <!-- One step at a time: problem, location, photos, then a review before sending. -->
+                <nav class="card report-steps" aria-label="Report steps">
+                  <ol class="stepper">
+                    <li class="stepper-step" data-stepper="1">
+                      <button type="button" data-go-step="1"><span class="stepper-bar" aria-hidden="true"></span><span class="stepper-text"><small>Step 1</small><strong>Problem</strong></span></button>
+                    </li>
+                    <li class="stepper-step" data-stepper="2">
+                      <button type="button" data-go-step="2"><span class="stepper-bar" aria-hidden="true"></span><span class="stepper-text"><small>Step 2</small><strong>Location</strong></span></button>
+                    </li>
+                    <li class="stepper-step" data-stepper="3">
+                      <button type="button" data-go-step="3"><span class="stepper-bar" aria-hidden="true"></span><span class="stepper-text"><small>Step 3</small><strong>Photos</strong></span></button>
+                    </li>
+                    <li class="stepper-step" data-stepper="4">
+                      <button type="button" data-go-step="4"><span class="stepper-bar" aria-hidden="true"></span><span class="stepper-text"><small>Step 4</small><strong>Review</strong></span></button>
+                    </li>
+                  </ol>
+                </nav>
                 <p class="alert alert-error" id="report-error" role="alert" hidden></p>
 
-                <section class="card form-section" data-section="details">
+                <section class="card form-section" data-section="details" data-step="1">
                   <div class="form-section-head">
                     <span class="form-step-badge">1</span>
                     <div>
@@ -155,7 +167,7 @@
                   </div>
                 </section>
 
-                <section class="card form-section" data-section="location">
+                <section class="card form-section" data-section="location" data-step="2" hidden>
                   <div class="form-section-head">
                     <span class="form-step-badge">2</span>
                     <div>
@@ -199,7 +211,7 @@
                   </div>
                 </section>
 
-                <section class="card form-section" data-section="photos">
+                <section class="card form-section" data-section="photos" data-step="3" hidden>
                   <div class="form-section-head">
                     <span class="form-step-badge">3</span>
                     <div>
@@ -218,9 +230,24 @@
                   </div>
                 </section>
 
+                <section class="card form-section" data-section="review" data-step="4" hidden>
+                  <div class="form-section-head">
+                    <span class="form-step-badge">4</span>
+                    <div>
+                      <h2>Review your report</h2>
+                      <p>Check everything before you send it. Use Edit to fix anything that's wrong.</p>
+                    </div>
+                  </div>
+                  <div class="form-section-body" id="report-review"></div>
+                </section>
+
                 <div class="card form-submit">
-                  <p><svg data-icon="shield-check" class="icon-sm"></svg> Your name stays private. Only the Road Maintenance Office sees who filed the report.</p>
-                  <button class="btn btn-primary btn-lg" type="submit"><svg data-icon="send"></svg>Submit report</button>
+                  <p data-step-note><svg data-icon="shield-check" class="icon-sm"></svg> Your name stays private. Only the Road Maintenance Office sees who filed the report.</p>
+                  <div class="form-nav">
+                    <button class="btn btn-secondary btn-lg" type="button" data-step-back hidden><svg data-icon="arrow-left"></svg>Back</button>
+                    <button class="btn btn-primary btn-lg" type="submit" data-step-next><span data-step-next-label>Next: Location</span><svg data-icon="arrow-right"></svg></button>
+                    <button class="btn btn-primary btn-lg" type="submit" data-step-submit hidden><svg data-icon="send"></svg>Submit report</button>
+                  </div>
                 </div>
               </form>
 
@@ -234,7 +261,7 @@
                       <li><svg data-icon="map-pin"></svg><span>Zoom in and place the pin right on the damage, not just the street.</span></li>
                       <li><svg data-icon="camera"></svg><span>Take one wide photo for context and one close-up of the damage.</span></li>
                       <li><svg data-icon="alert-triangle"></svg><span>Choose High only when the damage is a danger to vehicles or people.</span></li>
-                      <li><svg data-icon="copy"></svg><span>Grey dots on the map are already reported, so no need to report them again.</span></li>
+                      <li><svg data-icon="copy"></svg><span>Orange dots on the map are already reported, so no need to report them again.</span></li>
                     </ul>
                   </div>
                 </section>
@@ -278,12 +305,12 @@
                 <svg data-icon="search"></svg>
                 <input id="my-search" type="search" placeholder="Search by ID, title, or road" autocomplete="off" />
               </label>
-              <div class="toolbar-group" role="group" aria-label="Filter by progress" id="my-filter">
-                <button class="chip" type="button" data-filter="all" aria-pressed="true">All</button>
-                <button class="chip" type="button" data-filter="open" aria-pressed="false">In progress</button>
-                <button class="chip" type="button" data-filter="resolved" aria-pressed="false">Fixed</button>
-                <button class="chip" type="button" data-filter="closed" aria-pressed="false">Closed</button>
-              </div>
+              <select id="my-filter" aria-label="Filter by progress">
+                <option value="all">All reports</option>
+                <option value="open">In progress</option>
+                <option value="resolved">Fixed</option>
+                <option value="closed">Closed</option>
+              </select>
             </div>
             <div class="recent-ids portal-recent" id="my-recent" hidden></div>
             <div id="my-reports"></div>
@@ -296,10 +323,6 @@
                 <p class="eyebrow">Report tracker</p>
                 <h1 class="page-title" id="track-title">Track a report</h1>
                 <p class="page-desc">Enter a report ID to see where it is in the repair process, or pick one of your reports below.</p>
-              </div>
-              <div class="page-actions">
-                <a class="btn btn-secondary" href="#reports" data-portal-tab="reports"><svg data-icon="clipboard-list"></svg>My reports</a>
-                <button class="btn btn-primary" type="button" data-start-report><svg data-icon="plus"></svg>Report a problem</button>
               </div>
             </div>
             <section class="card track-search" aria-label="Find a report">
@@ -349,8 +372,9 @@
                 <div class="card-header">
                   <div>
                     <h2 class="card-title" id="live-map-card-title"><svg data-icon="map"></svg>Report map</h2>
-                    <p class="card-subtitle">Select a pin to see the report.</p>
+                    <p class="card-subtitle">Point at or select a pin to see the report.</p>
                   </div>
+                  <button class="btn btn-secondary btn-icon btn-sm refresh-button" type="button" id="refresh-live-map" aria-label="Refresh map" title="Refresh map"><svg data-icon="refresh"></svg></button>
                 </div>
                 <div class="card-body">
                   <div class="map" id="live-map"></div>
@@ -387,7 +411,6 @@
 
         <footer class="app-footer">
           <span>&copy; <span data-current-year></span> ResQRoad · Road Maintenance Office</span>
-          <span><svg data-icon="shield-check" class="icon-sm"></svg>Reports and accounts are stored securely in the ResQRoad database</span>
         </footer>
       </div>
     </div>
@@ -395,7 +418,6 @@
     <div class="popover" id="citizen-menu" role="menu" aria-label="Account" hidden>
       <div class="menu-label" data-current-email></div>
       <a class="menu-item" role="menuitem" href="#track" data-portal-tab="track"><svg data-icon="search"></svg>Track a report</a>
-      <a class="menu-item" role="menuitem" href="#public" data-portal-tab="public"><svg data-icon="globe"></svg>Public site</a>
       <button class="menu-item" role="menuitem" type="button" data-change-password><svg data-icon="lock"></svg>Change password</button>
       <button class="menu-item" role="menuitem" type="button" data-theme-toggle><svg data-icon="moon"></svg>Switch theme</button>
       <div class="menu-sep" role="separator"></div>

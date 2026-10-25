@@ -97,13 +97,17 @@
   --sev-medium-label: #b8540c;
   --sev-low-label: #957000;
 
-  /* One tone per workflow status; pills mix it with the surface and text. */
-  --st-submitted: #8a817b;
-  --st-under_review: #d9961e;
-  --st-verified: #cf5c36;
-  --st-assigned: #974328;
-  --st-in_progress: #2f6fd6;
-  --st-repair_submitted: #7c5cd6;
+  /* One tone per workflow status, used everywhere a status appears (pills,
+     timelines, charts, maps, notifications). Open statuses step through the
+     brand's Road Orange scale, from sand (just reported) to deep burnt orange
+     (repair done, waiting for checks), after Asphalt Gray for a new report.
+     Resolved and rejected keep the success and error colors. */
+  --st-submitted: var(--rr-asphalt);
+  --st-under_review: var(--rr-150);
+  --st-verified: var(--rr-300);
+  --st-assigned: var(--rr-500);
+  --st-in_progress: var(--rr-600);
+  --st-repair_submitted: var(--rr-800);
   --st-resolved: #2f9461;
   --st-rejected: #c0392b;
   --st-duplicate: #a39b95;
@@ -167,6 +171,7 @@
   --shadow-primary: 0 6px 18px rgb(179 79 47 / 35%);
 
   --st-submitted: #a39a94;
+  --st-repair_submitted: var(--rr-700);
   --st-duplicate: #8a827d;
   --danger: #e2584a;
 
@@ -1867,8 +1872,19 @@ button.kpi:hover {
   scrollbar-width: thin;
 }
 
+/* Steps a closed report never reached are dimmed with lighter colors, not
+   opacity: a see-through step would let the next step's line run across its
+   circle. */
 .journey.is-closed .journey-step:not(.is-complete) {
-  opacity: 0.45;
+  color: color-mix(in srgb, var(--text-3) 55%, transparent);
+}
+
+.journey.is-closed .journey-step:not(.is-complete) .journey-marker {
+  border-color: var(--border);
+}
+
+.journey.is-closed .journey-step:not(.is-complete)::before {
+  background: var(--border);
 }
 
 /* ---------- Activity timeline ---------- */
@@ -1907,8 +1923,13 @@ button.kpi:hover {
   display: none;
 }
 
-.timeline-dot {
+/* A status class on the dot (e.g. .status-resolved) picks its tone; this
+   default has no weight, so it never overrides one. */
+:where(.timeline-dot) {
   --tone: var(--st-submitted);
+}
+
+.timeline-dot {
   position: absolute;
   top: 0.15rem;
   left: 0;
@@ -2368,28 +2389,65 @@ button.kpi:hover {
   cursor: zoom-in;
 }
 
-.gallery-item:first-child:nth-last-child(n + 3) {
-  grid-row: span 2;
-  grid-column: span 2;
+/* Report photos fill the whole width, whatever their number or orientation:
+   one photo spans the row, two share it, and three or more put the first
+   photo large beside the others. Every tile is cropped to its shape (never
+   stretched), so portrait and landscape photos leave no gaps. */
+.gallery.gallery-count-1 {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.gallery.gallery-count-1 .gallery-item {
+  aspect-ratio: 16 / 9;
+}
+
+.gallery.gallery-count-2,
+.gallery.gallery-count-4 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.gallery.gallery-count-3,
+.gallery.gallery-count-5 {
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+}
+
+.gallery.gallery-count-3 {
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  aspect-ratio: 16 / 9;
+}
+
+.gallery.gallery-count-5 {
+  grid-template-columns: minmax(0, 2fr) repeat(2, minmax(0, 1fr));
+  aspect-ratio: 2 / 1;
+}
+
+.gallery.gallery-count-3 .gallery-item,
+.gallery.gallery-count-5 .gallery-item {
+  min-height: 0;
   aspect-ratio: auto;
 }
 
-/* An even grid that adds columns as space allows, for any number of photos
-   (e.g. a crew's after-repair photos). */
-.gallery.gallery-grid {
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 8.5rem), 1fr));
+.gallery.gallery-count-3 .gallery-item:first-child,
+.gallery.gallery-count-5 .gallery-item:first-child {
+  grid-row: 1 / -1;
 }
 
-.gallery.gallery-grid .gallery-item:first-child:nth-last-child(n + 3) {
-  grid-row: auto;
-  grid-column: auto;
-  aspect-ratio: 4 / 3;
+/* An even grid that adds columns as space allows, for any number of photos
+   (e.g. a crew's after-repair photos); the photos always fill the row, and a
+   single photo spans it. */
+.gallery.gallery-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 8.5rem), 1fr));
+}
+
+.gallery.gallery-grid .gallery-item:only-child {
+  aspect-ratio: 16 / 9;
 }
 
 .gallery-item img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center;
   transition:
     transform 0.4s var(--ease-out),
     filter 0.3s ease;
@@ -2586,10 +2644,11 @@ button.kpi:hover {
   filter: grayscale(1) invert(1) contrast(0.88) brightness(0.82) sepia(0.15);
 }
 
+/* Pins are 22 × 28 px (pinSize in ui.js). */
 .map-pin {
   position: relative;
-  width: 28px;
-  height: 36px;
+  width: 22px;
+  height: 28px;
   display: block;
   filter: drop-shadow(0 3px 4px rgb(0 0 0 / 30%));
   transition: transform 0.18s var(--ease-spring);
@@ -2619,10 +2678,10 @@ button.kpi:hover {
 
 .map-pin.is-pulse::after {
   position: absolute;
-  bottom: -5px;
+  bottom: -4px;
   left: 50%;
-  width: 18px;
-  height: 8px;
+  width: 14px;
+  height: 6px;
   border-radius: 50%;
   background: color-mix(in srgb, var(--pin-tone, var(--accent)) 45%, transparent);
   content: "";
@@ -2881,8 +2940,8 @@ button.kpi:hover {
 .map-pin-button {
   position: absolute;
   z-index: 1;
-  width: 28px;
-  height: 36px;
+  width: 22px;
+  height: 28px;
   padding: 0;
   border: 0;
   background: none;
@@ -2913,7 +2972,7 @@ button.kpi:hover {
   background: var(--surface);
   box-shadow: var(--shadow-lg);
   font-size: 0.82rem;
-  transform: translate(-50%, calc(-100% - 46px));
+  transform: translate(-50%, calc(-100% - 38px));
 }
 
 .map-fallback-popup.is-below {
@@ -3051,23 +3110,24 @@ button.kpi:hover {
   border-radius: 3px;
 }
 
+/* The ring sits above its legend at every card width, so the chart keeps the
+   same layout when the sidebar is collapsed and the card gets wider. */
 .donut {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 1.25rem 1.5rem;
+  gap: 1.25rem;
 }
 
 .donut svg {
   width: 9.5rem;
-  flex: 0 0 9.5rem;
+  flex: 0 0 auto;
   height: auto;
 }
 
 .donut-legend {
-  flex: 1 1 10.5rem;
-  min-width: 10.5rem;
+  width: min(100%, 18rem);
 }
 
 .donut-legend li > span:not(.pct) {
@@ -3456,19 +3516,8 @@ button.kpi:hover {
   from { transform: scaleX(0); }
 }
 
-@keyframes rise-in {
-  from {
-    opacity: 0;
-    transform: translateY(14px);
-  }
-}
-
 @keyframes shimmer {
   to { background-position: -200% 0; }
-}
-
-.rise-in {
-  animation: rise-in 0.5s var(--ease-out) both;
 }
 
 @media (prefers-reduced-motion: reduce) {

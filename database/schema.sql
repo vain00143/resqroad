@@ -96,6 +96,23 @@ CREATE TABLE IF NOT EXISTS report_notes (
   CONSTRAINT notes_actor_fk FOREIGN KEY (actor_id) REFERENCES users (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- The resident's rating of a finished repair: one per report, given by the
+-- resident who filed it once the report is resolved.
+CREATE TABLE IF NOT EXISTS report_feedback (
+  id         INT UNSIGNED     NOT NULL AUTO_INCREMENT,
+  report_id  INT UNSIGNED     NOT NULL,
+  user_id    INT UNSIGNED     NULL,
+  rating     TINYINT UNSIGNED NOT NULL COMMENT '1 (poor) to 5 (excellent)',
+  comment    TEXT             NULL,
+  created_at DATETIME(3)      NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (id),
+  UNIQUE KEY feedback_report (report_id),
+  KEY feedback_user (user_id),
+  CONSTRAINT feedback_rating CHECK (rating BETWEEN 1 AND 5),
+  CONSTRAINT feedback_report_fk FOREIGN KEY (report_id) REFERENCES reports (id) ON DELETE CASCADE,
+  CONSTRAINT feedback_user_fk FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Evidence and repair photos. The image files live in storage/photos/;
 -- `file_path` is relative to that folder. Sample reports list file names only
 -- (file_path is NULL), and the website shows stock road photos for them.

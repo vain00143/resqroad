@@ -253,10 +253,39 @@ test("1. a resident reports road damage with photos, and every device sees it li
   assert.equal(forNeighbour.report.reporter, undefined, "other residents don't see the reporter");
 });
 
-test("2. a second report at the same spot is blocked as a likely duplicate", async function () {
+test("2. a similar report nearby is a possible duplicate until the resident confirms it", async function () {
   const duplicate = await neighbour.request("POST", "/api/reports", reportForm({ latitude: spot.latitude + 0.0004 }));
   assert.equal(duplicate.status, 409);
   assert.equal(duplicate.body.duplicateId, reportId);
+  assert.equal(duplicate.body.possibleDuplicates[0].id, reportId);
+  assert.ok(duplicate.body.possibleDuplicates[0].distance > 35 && duplicate.body.possibleDuplicates[0].distance < 55);
+
+  // A different kind of problem at almost the same spot isn't a duplicate.
+  const sign = await neighbour.request(
+    "POST",
+    "/api/reports",
+    reportForm({
+      title: "Fallen road sign",
+      description: "The stop sign at the corner was knocked over by a truck.",
+      severity: "Low",
+      latitude: spot.latitude + 0.0002,
+    }),
+  );
+  assert.equal(sign.status, 201, JSON.stringify(sign.body));
+
+  // The resident checked the existing report and says theirs is different.
+  const confirmed = await neighbour.request(
+    "POST",
+    "/api/reports",
+    reportForm({ latitude: spot.latitude + 0.0004, confirmDuplicate: "true" }),
+  );
+  assert.equal(confirmed.status, 201, JSON.stringify(confirmed.body));
+  const admins = await admin.request("GET", "/api/reports/" + confirmed.body.report.id);
+  assert.match(admins.body.report.history[0].note, new RegExp("Possible duplicate of " + reportId));
+
+  // Close both, so they don't change the rest of the workflow.
+  assert.equal((await admin.request("POST", "/api/reports/" + sign.body.report.id + "/status", { status: "rejected" })).status, 200);
+  assert.equal((await admin.request("POST", "/api/reports/" + confirmed.body.report.id + "/status", { status: "duplicate" })).status, 200);
 });
 
 test("3. only the administrator can review and verify, and steps can't be skipped", async function () {
@@ -268,6 +297,9 @@ test("3. only the administrator can review and verify, and steps can't be skippe
   assert.equal(early.status, 409, "can't assign before verifying");
   const resolveEarly = await admin.request("POST", "/api/reports/" + reportId + "/status", { status: "resolved" });
   assert.equal(resolveEarly.status, 409, "can't resolve before a repair is submitted");
+  const verifyEarly = await admin.request("POST", "/api/reports/" + reportId + "/status", { status: "verified" });
+  assert.equal(verifyEarly.status, 409, "can't verify before marking it under review");
+  assert.match(verifyEarly.body.error, /under review before verifying/);
 
   const review = await admin.request("POST", "/api/reports/" + reportId + "/status", { status: "under_review" });
   assert.equal(review.status, 200);
@@ -431,9 +463,30 @@ test("8. the administrator verifies the repair and resolves the report", async f
   assert.equal(reopened.status, 201);
 });
 
+test("8b. the resident rates the finished repair once, and only they and the administrator see it", async function () {
+  const url = "/api/reports/" + reportId + "/feedback";
+  assert.equal((await neighbour.request("POST", url, { rating: 5 })).status, 403, "only the resident who filed it");
+  assert.equal((await admin.request("POST", url, { rating: 5 })).status, 403, "staff can't rate");
+  assert.equal((await visitor.request("POST", url, { rating: 5 })).status, 401);
+  assert.equal((await resident.request("POST", url, { rating: 9 })).status, 400);
+
+  const sent = await resident.request("POST", url, { rating: 4, comment: "Smooth now, thank you." });
+  assert.equal(sent.status, 201, JSON.stringify(sent.body));
+  assert.equal(sent.body.report.feedback.rating, 4);
+  assert.equal(sent.body.report.feedback.comment, "Smooth now, thank you.");
+  const live = await admin.waitFor((message) => message.type === "report" && message.report.id === reportId && message.report.feedback);
+  assert.equal(live.report.feedback.rating, 4, "the administrator sees it live");
+
+  assert.equal((await resident.request("POST", url, { rating: 5 })).status, 409, "only one rating per report");
+  assert.equal((await visitor.request("GET", "/api/reports/" + reportId)).body.report.feedback, undefined);
+  assert.equal((await neighbour.request("GET", "/api/reports/" + reportId)).body.report.feedback, undefined);
+});
+
 test("9. rejected and duplicate reports close with the reason shown to the resident", async function () {
   const extra = await resident.request("POST", "/api/reports", reportForm({ title: "Crack near the plaza", latitude: 14.9, longitude: 120.9 }));
   assert.equal(extra.status, 201);
+  const early = await resident.request("POST", "/api/reports/" + extra.body.report.id + "/feedback", { rating: 3 });
+  assert.equal(early.status, 409, "no rating before the repair is resolved");
   const reject = await admin.request("POST", "/api/reports/" + extra.body.report.id + "/status", {
     status: "rejected",
     note: "No road damage found during inspection.",
@@ -504,6 +557,7 @@ test("a retried repair upload with the same Idempotency-Key is applied once", as
   const job = await resident.request("POST", "/api/reports", reportForm({ title: "Broken curb", latitude: 14.7, longitude: 120.77 }));
   assert.equal(job.status, 201);
   const id = job.body.report.id;
+  assert.equal((await admin.request("POST", "/api/reports/" + id + "/status", { status: "under_review" })).status, 200);
   assert.equal((await admin.request("POST", "/api/reports/" + id + "/status", { status: "verified" })).status, 200);
   assert.equal((await admin.request("POST", "/api/reports/" + id + "/assign", { crewId: ids.crew })).status, 200);
   assert.equal((await crew.request("POST", "/api/reports/" + id + "/start")).status, 200);
@@ -616,6 +670,7 @@ test("the administrator adds and deletes crew accounts", async function () {
 
   // A crew with an open job can't be deleted.
   const job = await resident.request("POST", "/api/reports", reportForm({ title: "Sinkhole", latitude: 14.82, longitude: 120.95 }));
+  await admin.request("POST", "/api/reports/" + job.body.report.id + "/status", { status: "under_review" });
   await admin.request("POST", "/api/reports/" + job.body.report.id + "/status", { status: "verified" });
   await admin.request("POST", "/api/reports/" + job.body.report.id + "/assign", { crewId: added.body.user.id });
   assert.equal((await admin.request("DELETE", "/api/users/" + added.body.user.id)).status, 409);
@@ -658,11 +713,39 @@ test("signing out ends the session", async function () {
 
 test("only the website's pages are served, never server files", async function () {
   assert.equal((await fetch(base + "/")).status, 200);
-  for (const page of ["/admin.html", "/maintenance.html", "/citizen.html", "/login.html", "/track.html"]) {
+  for (const page of ["/login.html", "/register.html", "/track.html"]) {
     assert.equal((await fetch(base + page)).status, 200, page);
   }
   assert.equal((await fetch(base + "/assets/js/data-store.js")).status, 200);
   for (const hidden of ["/.env", "/.env.example", "/package.json", "/server/db.js", "/database/schema.sql", "/tools/seed.js", "/storage/photos"]) {
     assert.equal((await fetch(base + hidden)).status, 404, hidden);
   }
+});
+
+test("workspace pages open only for their signed-in role and are never cached", async function () {
+  const browsers = { admin: new Device("admin browser"), crew: new Device("crew browser"), citizen: new Device("resident browser") };
+  await browsers.admin.signIn("admin@test.ph");
+  await browsers.crew.signIn("crew@test.ph");
+  await browsers.citizen.signIn("nilo@test.ph");
+  const workspaces = { "/admin.html": "admin", "/maintenance.html": "crew", "/citizen.html": "citizen" };
+  for (const [page, role] of Object.entries(workspaces)) {
+    const signedOut = await fetch(base + page, { redirect: "manual" });
+    assert.equal(signedOut.status, 302, page + " signed out");
+    assert.equal(signedOut.headers.get("location"), "/login.html?next=" + page.slice(1));
+    assert.equal(signedOut.headers.get("cache-control"), "no-store");
+
+    const opened = await fetch(base + page, { redirect: "manual", headers: { Cookie: browsers[role].cookie } });
+    assert.equal(opened.status, 200, page + " for its role");
+    assert.equal(opened.headers.get("cache-control"), "no-store");
+
+    const other = browsers[role === "citizen" ? "admin" : "citizen"];
+    assert.equal((await fetch(base + page, { redirect: "manual", headers: { Cookie: other.cookie } })).status, 302, page + " other role");
+  }
+
+  // After signing out, the same cookie no longer opens the workspace.
+  const laptop = new Device("signed-out laptop");
+  await laptop.signIn("crew@test.ph");
+  const cookie = laptop.cookie;
+  await laptop.request("POST", "/api/auth/logout");
+  assert.equal((await fetch(base + "/maintenance.html", { redirect: "manual", headers: { Cookie: cookie } })).status, 302);
 });

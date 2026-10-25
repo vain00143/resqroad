@@ -119,6 +119,32 @@ INSERT INTO `photos` (`id`, `report_id`, `kind`, `name`, `file_path`, `mime_type
 UNLOCK TABLES;
 
 --
+-- Table structure for table `report_feedback`
+--
+
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `report_feedback` (
+  `id` int unsigned NOT NULL AUTO_INCREMENT,
+  `report_id` int unsigned NOT NULL,
+  `user_id` int unsigned DEFAULT NULL,
+  `rating` tinyint unsigned NOT NULL COMMENT '1 (poor) to 5 (excellent)',
+  `comment` text COLLATE utf8mb4_unicode_ci,
+  `created_at` datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `feedback_report` (`report_id`),
+  KEY `feedback_user` (`user_id`),
+  CONSTRAINT `feedback_report_fk` FOREIGN KEY (`report_id`) REFERENCES `reports` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `feedback_user_fk` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `feedback_rating` CHECK ((`rating` between 1 and 5))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `report_feedback` (none in the sample data)
+--
+
+--
 -- Table structure for table `report_history`
 --
 

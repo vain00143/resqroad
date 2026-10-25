@@ -4,7 +4,7 @@ import fs from "node:fs";
 import http from "node:http";
 import os from "node:os";
 import { config } from "./config.js";
-import { addMissingColumns, pool, explainDatabaseError } from "./db.js";
+import { upgradeSchema, pool, explainDatabaseError } from "./db.js";
 import { createApp } from "./app.js";
 import { attachLive } from "./live.js";
 import { deleteExpiredSessions } from "./auth.js";
@@ -28,7 +28,7 @@ export async function startServer(options) {
   const quiet = Boolean(options && options.quiet);
 
   await pool.query("SELECT 1 FROM users LIMIT 1");
-  await addMissingColumns(pool);
+  await upgradeSchema(pool);
   fs.mkdirSync(photosDir, { recursive: true });
 
   const server = http.createServer(createApp());

@@ -35,18 +35,18 @@
     <script src="assets/js/public-view.js" defer></script>
     <script src="assets/js/admin.js" defer></script>
   </head>
-  <body class="app-body" data-required-role="admin">
+  <body class="app-body" data-required-role="admin" data-booting>
     <a class="skip-link" href="#main">Skip to content</a>
     <div class="shell">
       <aside class="sidebar" id="sidebar" aria-label="Admin navigation">
         <div class="sidebar-head">
-          <a class="sidebar-brand" href="admin.html" aria-label="ResQRoad admin dashboard">
+          <div class="sidebar-brand">
             <span class="sidebar-logo-full">
               <img class="logo-on-light" src="assets/images/resqroad-logotype.png" alt="ResQRoad" width="748" height="127" />
               <img class="logo-on-dark" src="assets/images/resqroad-logotype-white.png" alt="ResQRoad" width="748" height="127" />
             </span>
             <img class="sidebar-logo-mark" src="assets/images/resqroad-mark.png" alt="" width="384" height="408" />
-          </a>
+          </div>
           <button class="sidebar-icon-btn sidebar-close" type="button" data-sidebar-close aria-label="Close navigation"><svg data-icon="x"></svg></button>
         </div>
         <div class="sidebar-scroll">
@@ -55,8 +55,8 @@
             <button class="nav-item is-active" type="button" data-admin-view="dashboard" data-tip="Dashboard" aria-current="page">
               <svg data-icon="dashboard"></svg><span class="nav-label">Dashboard</span>
             </button>
-            <button class="nav-item" type="button" data-admin-view="analytics" data-tip="Analytics &amp; Reports">
-              <svg data-icon="chart-line"></svg><span class="nav-label">Analytics &amp; Reports</span>
+            <button class="nav-item" type="button" data-admin-view="analytics" data-tip="Insights &amp; Statistics">
+              <svg data-icon="chart-line"></svg><span class="nav-label">Insights &amp; Statistics</span>
             </button>
           </nav>
           <p class="sidebar-section">Workflow</p>
@@ -64,11 +64,11 @@
             <button class="nav-item" type="button" data-admin-view="reports" data-tip="Review Reports">
               <svg data-icon="file-search"></svg><span class="nav-label">Review Reports</span><span class="nav-badge is-hot" data-nav-count="reports"></span>
             </button>
-            <button class="nav-item" type="button" data-admin-view="assignments" data-tip="Assignment">
-              <svg data-icon="hard-hat"></svg><span class="nav-label">Assignment</span><span class="nav-badge" data-nav-count="assignments"></span>
+            <button class="nav-item" type="button" data-admin-view="assignments" data-tip="Task Dispatch">
+              <svg data-icon="hard-hat"></svg><span class="nav-label">Task Dispatch</span><span class="nav-badge" data-nav-count="assignments"></span>
             </button>
-            <button class="nav-item" type="button" data-admin-view="maps" data-tip="Map">
-              <svg data-icon="map"></svg><span class="nav-label">Map</span>
+            <button class="nav-item" type="button" data-admin-view="maps" data-tip="Live Map">
+              <svg data-icon="map"></svg><span class="nav-label">Live Map</span>
             </button>
           </nav>
           <p class="sidebar-section">Administration</p>
@@ -82,14 +82,9 @@
           </nav>
         </div>
         <div class="sidebar-foot">
-          <div class="sidebar-status">
-            <strong><span class="live-dot" aria-hidden="true"></span>Workspace synced</strong>
-            <span>Connected to the ResQRoad server. Updates appear live on every device.</span>
-          </div>
           <button class="sidebar-user" type="button" data-popover-target="user-menu" data-popover-placement="top-start" data-popover-width="trigger" aria-haspopup="menu" aria-expanded="false" aria-controls="user-menu" aria-label="Account menu">
             <span class="avatar" data-tone="2" aria-hidden="true">AU</span>
             <span class="person-copy"><strong data-current-user>Admin User</strong><span>Administrator</span></span>
-            <svg data-icon="chevrons-up-down"></svg>
           </button>
         </div>
       </aside>
@@ -122,7 +117,7 @@
                 <p id="dashboard-summary">Monitor incoming reports and the repair workflow.</p>
               </div>
               <div class="welcome-actions">
-                <button class="btn btn-light" type="button" data-switch-view="maps"><svg data-icon="map"></svg>Open map</button>
+                <button class="btn btn-light" type="button" data-switch-view="maps"><svg data-icon="map"></svg>Open Live Map</button>
                 <button class="btn btn-primary" type="button" data-open-queue="review"><svg data-icon="file-search"></svg>Review queue<span class="btn-count" data-count="review">0</span></button>
               </div>
             </div>
@@ -192,8 +187,8 @@
           <section class="view" data-admin-view-panel="analytics" aria-labelledby="analytics-title" hidden>
             <div class="page-head">
               <div>
-                <p class="eyebrow">Insights</p>
-                <h1 class="page-title" id="analytics-title">Analytics &amp; Reports</h1>
+                <p class="eyebrow">Overview</p>
+                <h1 class="page-title" id="analytics-title">Insights &amp; Statistics</h1>
                 <p class="page-desc">Explore report trends, totals, and severity breakdowns.</p>
               </div>
               <div class="page-actions">
@@ -202,6 +197,7 @@
                   <option value="6">Last 6 months</option>
                   <option value="8" selected>Last 8 months</option>
                   <option value="12">Last 12 months</option>
+                  <option value="all">All months</option>
                 </select>
                 <button class="btn btn-secondary" type="button" id="print-report"><svg data-icon="printer"></svg>Print</button>
                 <button class="btn btn-primary" type="button" id="export-csv"><svg data-icon="download"></svg>Export CSV</button>
@@ -219,7 +215,7 @@
                 </div>
                 <div class="card-body"><div id="monthly-report-chart"></div></div>
               </section>
-              <section class="card" aria-labelledby="severity-title">
+              <section class="card donut-card" aria-labelledby="severity-title">
                 <div class="card-header">
                   <div>
                     <h2 class="card-title" id="severity-title"><svg data-icon="alert-triangle"></svg>Reports by severity</h2>
@@ -316,9 +312,9 @@
                 </select>
               </span>
               <select id="sort-reports" aria-label="Sort reports">
+                <option value="severity" selected>Highest severity first</option>
                 <option value="newest">Newest first</option>
                 <option value="oldest">Oldest first</option>
-                <option value="severity">Highest severity</option>
               </select>
               <div class="view-toggle" role="group" aria-label="Layout">
                 <button type="button" data-layout="grid" aria-pressed="true" aria-label="Card view" title="Card view"><svg data-icon="grid"></svg></button>
@@ -357,8 +353,8 @@
             <div class="page-head">
               <div>
                 <p class="eyebrow">Workflow</p>
-                <h1 class="page-title" id="assignments-title">Assignment</h1>
-                <p class="page-desc">Open verified reports to assign or change a maintenance team.</p>
+                <h1 class="page-title" id="assignments-title">Task Dispatch</h1>
+                <p class="page-desc">Dispatch verified reports to a maintenance team, highest severity first.</p>
               </div>
             </div>
             <div class="grid grid-3 assign-summary" id="assign-summary"></div>
@@ -403,7 +399,7 @@
             <div class="page-head">
               <div>
                 <p class="eyebrow">Workflow</p>
-                <h1 class="page-title" id="maps-title">Map</h1>
+                <h1 class="page-title" id="maps-title">Live Map</h1>
                 <p class="page-desc">See verified road reports and their severity across Bulacan.</p>
               </div>
             </div>
@@ -426,7 +422,7 @@
                 <div class="card-header">
                   <div>
                     <h2 class="card-title" id="admin-map-title"><svg data-icon="map"></svg>Report map</h2>
-                    <p class="card-subtitle">Select a pin to see the report.</p>
+                    <p class="card-subtitle">Point at or select a pin to see the report.</p>
                   </div>
                   <button class="btn btn-secondary btn-icon btn-sm refresh-button" type="button" id="refresh-map" aria-label="Refresh map" title="Refresh map"><svg data-icon="refresh"></svg></button>
                 </div>
@@ -586,12 +582,14 @@
 
     <div class="popover" id="user-menu" role="menu" aria-label="Account" hidden>
       <div class="menu-label">admin@resqroad.ph</div>
-      <button class="menu-item" role="menuitem" type="button" data-switch-view="public"><svg data-icon="globe"></svg>Public site</button>
       <button class="menu-item" role="menuitem" type="button" data-change-password><svg data-icon="lock"></svg>Change password</button>
       <button class="menu-item" role="menuitem" type="button" data-theme-toggle><svg data-icon="moon"></svg>Switch theme</button>
       <div class="menu-sep" role="separator"></div>
       <button class="menu-item is-danger" role="menuitem" type="button" data-sign-out="login.html"><svg data-icon="log-out"></svg>Log out</button>
     </div>
+
+    <!-- The printable Insights & Statistics report (filled in when printing). -->
+    <article class="print-sheet" id="print-sheet" aria-hidden="true"></article>
 
     <div class="drawer-scrim" id="drawer-scrim"></div>
     <aside class="drawer" id="report-drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-title" aria-hidden="true">

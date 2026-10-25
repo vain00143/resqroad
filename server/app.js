@@ -6,7 +6,7 @@ import path from "node:path";
 import express from "express";
 import multer from "multer";
 import { config, rootDir } from "./config.js";
-import { HttpError, authenticate } from "./auth.js";
+import { HttpError, authenticate, readToken, userForToken } from "./auth.js";
 import { accountRoutes } from "./accounts.js";
 import { reportRoutes } from "./reports.js";
 import { photoFromDatabase, photosDir, photoUrlPrefix } from "./photos.js";
@@ -20,8 +20,25 @@ const pages = new Set(
   }),
 );
 
+// Each workspace page and the role that may open it.
+const workspacePages = {
+  "admin.html": "admin",
+  "maintenance.html": "maintenance",
+  "citizen.html": "citizen",
+};
+
 function noCache(response) {
   response.setHeader("Cache-Control", "no-cache");
+}
+
+// The signed-in website user for a page request, or null.
+async function pageUser(request) {
+  const found = readToken(request);
+  if (!found || found.via !== "cookie") {
+    return null;
+  }
+  const session = await userForToken(found.token);
+  return session ? session.user : null;
 }
 
 export function createApp() {
@@ -163,13 +180,37 @@ export function createApp() {
     noCache(response);
     response.sendFile("index.html", { root: rootDir });
   });
-  app.get("/:page", function (request, response, next) {
-    if (!pages.has(request.params.page)) {
+  app.get("/:page", async function (request, response, next) {
+    const page = request.params.page;
+    if (!pages.has(page)) {
       next();
       return;
     }
-    noCache(response);
-    response.sendFile(request.params.page, { root: rootDir });
+    const role = workspacePages[page];
+    if (!role) {
+      noCache(response);
+      response.sendFile(page, { root: rootDir });
+      return;
+    }
+    // Workspaces are never stored by the browser, so after signing out the
+    // Back button asks the server again, and anyone who isn't signed in with
+    // the right role is sent to the sign-in page.
+    response.setHeader("Cache-Control", "no-store");
+    let user = null;
+    try {
+      user = await pageUser(request);
+    } catch (error) {
+      // The database is unreachable: serve the page, which shows the problem
+      // and checks the sign-in again itself.
+      console.error("Couldn't check the sign-in for " + page + ":", explainDatabaseError(error));
+      response.sendFile(page, { root: rootDir });
+      return;
+    }
+    if (!user || user.role !== role) {
+      response.redirect(302, "/login.html?next=" + encodeURIComponent(page));
+      return;
+    }
+    response.sendFile(page, { root: rootDir });
   });
 
   app.use(function (error, request, response, next) {

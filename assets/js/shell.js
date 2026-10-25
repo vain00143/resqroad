@@ -56,9 +56,12 @@
   }
 
   // Follow the system setting until the person picks a theme themselves.
+  // The public site, sign-in, and registration always stay dark
+  // (<html data-theme-fixed>); only the workspaces have the theme switch.
+  const fixedTheme = root.hasAttribute("data-theme-fixed");
   const systemDark = window.matchMedia("(prefers-color-scheme: dark)");
   systemDark.addEventListener("change", function (event) {
-    if (!readPref(themeKey)) {
+    if (!fixedTheme && !readPref(themeKey)) {
       setTheme(event.matches ? "dark" : "light", false);
     }
   });

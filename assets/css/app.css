@@ -7,6 +7,27 @@
   background: var(--bg);
 }
 
+/* Until the sign-in is confirmed (auth.js removes data-booting), a workspace
+   shows only a loading spinner, never its empty frame or another account's
+   page. */
+.app-body[data-booting] .shell {
+  visibility: hidden;
+}
+
+.app-body[data-booting]::after {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  width: 2rem;
+  height: 2rem;
+  margin: -1rem 0 0 -1rem;
+  border: 3px solid var(--border-strong);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  content: "";
+  animation: spin 0.8s linear infinite;
+}
+
 /* Keep the scrollbar's space when a panel locks page scrolling, so the
    page behind it doesn't widen and reflow (e.g. 3 to 4 report columns). */
 html:has(> body.app-body) {
@@ -96,11 +117,12 @@ html:has(> body.app-body) {
   gap: 0.5rem;
 }
 
+/* The logotype is a label, not a link: the sidebar already leads everywhere. */
 .sidebar-brand {
   min-width: 0;
   display: flex;
   align-items: center;
-  text-decoration: none;
+  user-select: none;
 }
 
 /* The logotype comes in dark ink (light theme) and white (dark theme); the
@@ -274,30 +296,6 @@ html:has(> body.app-body) {
   border-top: 1px solid var(--sb-divider);
 }
 
-.sidebar-status {
-  padding: 0.75rem 0.85rem;
-  display: grid;
-  gap: 0.15rem;
-  border: 1px solid var(--sb-panel-border);
-  border-radius: 12px;
-  background: var(--sb-panel);
-  font-size: 0.74rem;
-  line-height: 1.45;
-}
-
-.sidebar-status strong {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  color: var(--sb-strong);
-  font-size: 0.78rem;
-  font-weight: 600;
-}
-
-.sidebar-status span {
-  color: var(--sb-muted);
-}
-
 .live-dot {
   width: 0.5rem;
   height: 0.5rem;
@@ -334,11 +332,6 @@ html:has(> body.app-body) {
   color: var(--sb-muted);
 }
 
-.sidebar-user > .icon {
-  margin-left: auto;
-  color: var(--sb-icon);
-}
-
 /* Collapsed (desktop): icon rail with tooltips. */
 .shell.is-collapsed .sidebar-head {
   padding: 0;
@@ -348,9 +341,7 @@ html:has(> body.app-body) {
 .shell.is-collapsed .sidebar-logo-full,
 .shell.is-collapsed .nav-label,
 .shell.is-collapsed .sidebar-section,
-.shell.is-collapsed .sidebar-status,
-.shell.is-collapsed .sidebar-user .person-copy,
-.shell.is-collapsed .sidebar-user > .icon {
+.shell.is-collapsed .sidebar-user .person-copy {
   display: none;
 }
 
@@ -559,16 +550,8 @@ html:has(> body.app-body) {
 
 /* ---------- Views ---------- */
 
-.view {
-  animation: view-in 0.38s var(--ease-out) both;
-}
-
-@keyframes view-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-}
+/* Sections and filtered lists appear at once, with no slide-in, so moving
+   between them is never slowed down. */
 
 .page-head {
   margin-bottom: 1.5rem;
@@ -968,8 +951,6 @@ button.crew-row:hover {
     border-color 0.2s ease,
     box-shadow 0.25s ease,
     transform 0.25s var(--ease-out);
-  animation: rise-in 0.45s var(--ease-out) both;
-  animation-delay: calc(var(--i, 0) * 35ms);
 }
 
 .report-card:hover {
@@ -1358,6 +1339,209 @@ button.crew-row:hover {
   border-right: 0 !important;
 }
 
+/* GPS coordinates, with the OpenStreetMap link on its own line below. */
+.facts .facts-coords {
+  display: grid;
+  justify-items: start;
+  gap: 0.35rem;
+}
+
+.facts-coords a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.facts-coords a .icon {
+  color: inherit;
+}
+
+/* ---------- Possible duplicate reports ---------- */
+
+.duplicate-panel {
+  --tone: var(--warning);
+  padding: 1rem 1.1rem;
+  display: grid;
+  gap: 0.85rem;
+  border: 1px solid color-mix(in srgb, var(--tone) 35%, var(--border));
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--tone) 7%, var(--surface));
+}
+
+.duplicate-panel.is-info {
+  --tone: var(--accent);
+}
+
+.duplicate-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+}
+
+.duplicate-head > .icon {
+  margin-top: 0.15rem;
+  color: var(--tone);
+}
+
+.duplicate-head h3 {
+  margin: 0 0 0.2rem;
+  font-size: 0.95rem;
+}
+
+.duplicate-head p {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 0.84rem;
+}
+
+.duplicate-list {
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+  list-style: none;
+}
+
+.duplicate-item {
+  padding: 0.75rem 0.85rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.duplicate-copy {
+  min-width: 0;
+  display: grid;
+  gap: 0.2rem;
+  font-size: 0.8rem;
+}
+
+.duplicate-copy strong {
+  color: var(--heading);
+  font-size: 0.9rem;
+}
+
+.duplicate-copy > span {
+  color: var(--text-3);
+}
+
+.duplicate-copy .duplicate-reasons {
+  color: var(--text-2);
+  font-weight: 500;
+}
+
+/* ---------- Resident feedback (rating of a finished repair) ---------- */
+
+.rating-display {
+  display: inline-flex;
+  gap: 0.15rem;
+}
+
+.rating-display .icon {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.icon.star-on {
+  color: var(--rr-500);
+  fill: var(--rr-500);
+}
+
+.icon.star-off {
+  color: var(--border-strong);
+}
+
+.rating-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.rating-summary strong {
+  color: var(--heading);
+  font-size: 0.9rem;
+}
+
+.rating-result,
+.rating-form {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.rating-field {
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+  border: 0;
+}
+
+.rating-field legend {
+  margin-bottom: 0.5rem;
+  padding: 0;
+}
+
+.rating-options {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.rating-star {
+  position: relative;
+  width: 2.5rem;
+  height: 2.5rem;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.rating-star input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.rating-star .icon {
+  width: 1.75rem;
+  height: 1.75rem;
+  color: var(--border-strong);
+  transition:
+    color 0.12s ease,
+    fill 0.12s ease,
+    transform 0.12s var(--ease-out);
+}
+
+.rating-star.is-on .icon {
+  color: var(--rr-500);
+  fill: var(--rr-500);
+}
+
+.rating-star:hover .icon {
+  transform: scale(1.08);
+}
+
+.rating-star:focus-within {
+  box-shadow: var(--focus-ring);
+}
+
+.rating-caption {
+  color: var(--text-2);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.rating-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
 .detail-map {
   height: 100%;
   min-height: 14rem;
@@ -1623,8 +1807,22 @@ button.crew-row:hover {
 
 /* ---------- Public site (inside every workspace) ---------- */
 
+/* The map card is as tall as Report progress and Recently fixed beside it,
+   and the map fills it, so no empty space is left under the map. */
+.pv-map-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.pv-map-card .card-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
 .pv-map {
-  height: 24rem;
+  flex: 1 1 auto;
+  min-height: 20rem;
 }
 
 .pv-side {
@@ -1798,11 +1996,167 @@ button.pv-fixed-item:hover {
   padding-top: 0.75rem;
 }
 
+/* Reports by severity: the donut stays above its legend and centered in its
+   card, whether the sidebar is open (narrow card) or collapsed (wide card). */
+.donut-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.donut-card > .card-body {
+  flex: 1;
+  display: grid;
+  align-content: center;
+}
+
 .chart-head-legend {
   margin-top: 0.5rem;
 }
 
+/* The printed Insights & Statistics report (admin.js fills it in just
+   before printing): black on white, summary first, then plain tables. */
+.print-sheet {
+  display: none;
+}
+
 @media print {
+  @page {
+    margin: 14mm;
+  }
+
+  body.is-printing-report {
+    background: #fff !important;
+  }
+
+  body.is-printing-report > :not(.print-sheet) {
+    display: none !important;
+  }
+
+  body.is-printing-report .print-sheet {
+    display: block;
+    color: #111;
+    font-family: var(--font-body);
+    font-size: 10pt;
+    line-height: 1.45;
+  }
+
+  .print-sheet h1,
+  .print-sheet h2 {
+    color: #111;
+    letter-spacing: 0;
+  }
+
+  .print-head {
+    margin-bottom: 6mm;
+    padding-bottom: 4mm;
+    display: flex;
+    align-items: center;
+    gap: 6mm;
+    border-bottom: 2px solid #b34f2f;
+  }
+
+  .print-head img {
+    width: 38mm;
+    height: auto;
+  }
+
+  .print-head h1 {
+    margin: 0 0 1mm;
+    font-size: 17pt;
+  }
+
+  .print-head p {
+    margin: 0;
+    color: #444;
+    font-size: 9pt;
+  }
+
+  .print-sheet section {
+    margin-bottom: 6mm;
+    break-inside: avoid;
+  }
+
+  .print-sheet h2 {
+    margin: 0 0 2mm;
+    font-size: 11.5pt;
+  }
+
+  .print-figures {
+    margin: 0;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2.5mm;
+  }
+
+  .print-figures div {
+    padding: 2.5mm 3mm;
+    border: 1px solid #ccc;
+    border-radius: 2mm;
+  }
+
+  .print-figures dt {
+    color: #555;
+    font-size: 8.5pt;
+  }
+
+  .print-figures dd {
+    margin: 0.5mm 0 0;
+    font-size: 12pt;
+    font-weight: 700;
+  }
+
+  .print-columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6mm;
+  }
+
+  .print-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 9pt;
+  }
+
+  .print-table th,
+  .print-table td {
+    padding: 1.4mm 2mm;
+    border-bottom: 1px solid #ddd;
+    text-align: left;
+    vertical-align: top;
+  }
+
+  .print-table th {
+    border-bottom: 1.5px solid #999;
+    color: #333;
+    font-size: 8pt;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .print-table tr {
+    break-inside: avoid;
+  }
+
+  .print-reports td strong {
+    display: block;
+  }
+
+  .print-reports td span {
+    display: block;
+    color: #555;
+    font-size: 8.5pt;
+  }
+
+  .print-note {
+    margin: 0 0 2mm;
+    color: #555;
+    font-size: 8.5pt;
+  }
+
+  .print-sheet section:last-child {
+    break-inside: auto;
+  }
+
   .sidebar,
   .topbar,
   .app-footer,
@@ -1885,8 +2239,39 @@ button.pv-fixed-item:hover {
 .job-card {
   scroll-margin-top: calc(var(--topbar-h) + 1rem);
   overflow: hidden;
-  animation: rise-in 0.45s var(--ease-out) both;
-  animation-delay: calc(var(--i, 0) * 40ms);
+}
+
+/* A completed job shows only its summary until "View more details". */
+.job-toggle {
+  width: 100%;
+  padding: 0.8rem 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 0;
+  border-top: 1px solid var(--border);
+  background: transparent;
+  color: var(--link);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-align: left;
+}
+
+.job-toggle:hover {
+  background: var(--surface-2);
+}
+
+.job-toggle .icon {
+  color: inherit;
+  transition: transform 0.2s ease;
+}
+
+.job-toggle[aria-expanded="true"] .icon {
+  transform: rotate(180deg);
+}
+
+.job-card.is-collapsed .job-head {
+  padding-bottom: 1rem;
 }
 
 .job-card:focus {
@@ -2026,16 +2411,36 @@ button.pv-fixed-item:hover {
   font-size: 0.82rem;
 }
 
+/* "Up next" fills its card, which is as tall as "Recent updates" beside it:
+   the photo takes the left part at full height and the job the rest; with
+   no job, "You're all caught up" sits in the middle. */
+.next-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.next-slot {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.next-slot > .empty {
+  flex: 1;
+  align-content: center;
+}
+
 .next-job {
+  flex: 1;
   padding: 1.25rem;
   display: grid;
-  grid-template-columns: 9rem minmax(0, 1fr);
-  gap: 1.25rem;
-  align-items: center;
+  grid-template-columns: minmax(11rem, 2fr) minmax(0, 3fr);
+  gap: 1.5rem;
+  align-items: stretch;
 }
 
 .next-job-media {
-  height: 7rem;
+  min-height: 12rem;
   overflow: hidden;
   border-radius: var(--radius-md);
   background: var(--surface-3);
@@ -2047,13 +2452,31 @@ button.pv-fixed-item:hover {
   object-fit: cover;
 }
 
+.next-job-body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
 .next-job h3 {
   margin: 0.35rem 0 0.25rem;
-  font-size: 1.05rem;
+  font-size: 1.15rem;
+}
+
+.next-job .detail-description {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--text-2);
+  font-size: 0.88rem;
+  line-height: 1.6;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
 }
 
 .next-job .job-actions {
-  margin-top: 0.85rem;
+  margin-top: auto;
 }
 
 /* ---------- Notifications popover ---------- */
@@ -2103,8 +2526,19 @@ button.pv-fixed-item:hover {
   background: var(--hover);
 }
 
+/* New updates get a small orange dot; each update's own dot shows its
+   status color. */
 .notif-item.is-unread {
-  background: color-mix(in srgb, var(--accent) 6%, transparent);
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.notif-item.is-unread::after {
+  width: 0.5rem;
+  height: 0.5rem;
+  margin-top: 0.45rem;
+  border-radius: 50%;
+  background: var(--accent);
+  content: "";
 }
 
 .notif-item .timeline-dot {
@@ -2218,12 +2652,10 @@ button.pv-fixed-item:hover {
      the full sidebar, with the same layout as when it isn't collapsed. */
   .shell.is-collapsed .sidebar-logo-full,
   .shell.is-collapsed .nav-label,
-  .shell.is-collapsed .sidebar-section,
-  .shell.is-collapsed .sidebar-user > .icon {
+  .shell.is-collapsed .sidebar-section {
     display: block;
   }
 
-  .shell.is-collapsed .sidebar-status,
   .shell.is-collapsed .sidebar-user .person-copy {
     display: grid;
   }
@@ -2290,7 +2722,7 @@ button.pv-fixed-item:hover {
   }
 
   .pv-map {
-    height: 18rem;
+    min-height: 18rem;
   }
 
   .search-trigger {
@@ -2319,6 +2751,7 @@ button.pv-fixed-item:hover {
   }
 
   .next-job-media {
+    min-height: 0;
     height: 9rem;
   }
 
@@ -2361,6 +2794,14 @@ button.pv-fixed-item:hover {
   .job-thumb {
     width: 4rem;
     height: 3.25rem;
+  }
+
+  .duplicate-item {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .duplicate-item .btn {
+    justify-self: start;
   }
 
   .page-actions,

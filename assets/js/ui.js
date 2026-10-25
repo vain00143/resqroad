@@ -112,6 +112,31 @@
     return new Intl.NumberFormat(undefined, { maximumFractionDigits: digits == null ? 0 : digits }).format(value);
   }
 
+  // A length of time given in days, counted in whole days ("8 days"), or in
+  // hours when it is under a day. Null when there is nothing to show.
+  function duration(days) {
+    if (days == null || !Number.isFinite(days)) {
+      return null;
+    }
+    if (days < 1) {
+      const hours = Math.max(1, Math.round(days * 24));
+      return { value: hours, unit: hours === 1 ? "hr" : "hrs" };
+    }
+    const whole = Math.round(days);
+    return { value: whole, unit: whole === 1 ? "day" : "days" };
+  }
+
+  function durationText(days) {
+    const time = duration(days);
+    return time ? time.value + " " + time.unit : "—";
+  }
+
+  // The same, for big numbers: the unit in a <small> after the value.
+  function durationHtml(days) {
+    const time = duration(days);
+    return time ? time.value + "<small>" + time.unit + "</small>" : "—";
+  }
+
   function debounce(fn, wait) {
     let timer = null;
     return function () {
@@ -152,6 +177,17 @@
       (options && options.suffix ? " " + escapeHtml(options.suffix) : "") +
       "</span>"
     );
+  }
+
+  // A resident's rating of a finished repair (1 to 5 stars).
+  const ratingLabels = { 1: "Poor", 2: "Fair", 3: "Good", 4: "Very good", 5: "Excellent" };
+
+  function ratingStars(rating) {
+    let stars = "";
+    for (let star = 1; star <= 5; star += 1) {
+      stars += icon("star", star <= rating ? "star-on" : "star-off");
+    }
+    return '<span class="rating-display" role="img" aria-label="' + rating + ' out of 5 stars">' + stars + "</span>";
   }
 
   function initials(name) {
@@ -233,14 +269,17 @@
 
   // A grid of photo thumbnails. Each opens the lightbox through the page's
   // click handler, which reads the images in the same [data-gallery-group].
-  // `className` adds a layout, e.g. "gallery-grid" for an even grid.
+  // `className` adds a layout, e.g. "gallery-grid" for an even grid. Without
+  // one, the photos fill the full width in a layout made for their number
+  // (one to five), whatever their orientation.
   function photoGallery(photos, label, className) {
     if (!photos.length) {
       return '<p class="muted text-sm">No photos</p>';
     }
+    const layout = className || (photos.length <= 5 ? "gallery-count-" + photos.length : "gallery-grid");
     return (
-      '<div class="gallery' +
-      (className ? " " + escapeHtml(className) : "") +
+      '<div class="gallery ' +
+      escapeHtml(layout) +
       '" data-gallery-group aria-label="' +
       escapeHtml(label) +
       '">' +
@@ -384,9 +423,12 @@
     );
   }
 
-  // Activity list, newest first. `publicOnly` hides notes and staff names.
+  // Activity list, newest first. `publicOnly` hides notes and staff names,
+  // and tells residents and the public that a submitted report went to the
+  // administrator (options.submittedText can say it in the resident's words).
   function timeline(report, options) {
     const publicOnly = options && options.publicOnly;
+    const submittedText = (options && options.submittedText) || "Report submitted and sent to the administrator.";
     const entries = (report.history || [])
       .slice()
       .reverse()
@@ -404,7 +446,10 @@
           const title = isNote
             ? "<strong>" + escapeHtml(entry.actor || "Staff") + "</strong> added a note"
             : publicOnly
-              ? "<strong>" + escapeHtml(statusLabel(entry.status)) + "</strong> · " + escapeHtml(entry.description)
+              ? "<strong>" +
+                escapeHtml(statusLabel(entry.status)) +
+                "</strong> · " +
+                escapeHtml(entry.status === "submitted" ? submittedText : entry.description)
               : escapeHtml(entry.description);
           const meta = publicOnly
             ? formatDate(entry.at)
@@ -1171,6 +1216,8 @@
 
   const mapCenter = [14.866, 120.83];
   const schematicBounds = { north: 14.94, south: 14.82, west: 120.75, east: 121.0 };
+  // Pin size in pixels (the drawing is 28 × 36; see .map-pin in core.css).
+  const pinSize = [22, 28];
   const pinSvg =
     '<svg viewBox="0 0 28 36" aria-hidden="true" focusable="false"><path class="pin-shape" d="M26.5 13.5c0 9-12.5 22.5-12.5 22.5S1.5 22.5 1.5 13.5a12.5 12.5 0 1 1 25 0Z"/><circle class="pin-dot" cx="14" cy="13.5" r="4.5"/></svg>';
   const mapControllers = new WeakMap();
@@ -1324,12 +1371,60 @@
     const markers = new Map();
     let options = {};
 
+    // Pointing at a pin shows its report right away and hides it again when
+    // the pointer leaves (with a moment to reach the popup's button).
+    // Clicking or tapping a pin keeps its report open until it's closed.
+    let closeTimer = null;
+
+    function cancelClose() {
+      window.clearTimeout(closeTimer);
+    }
+
+    function closeSoon(popup) {
+      cancelClose();
+      closeTimer = window.setTimeout(function () {
+        if (popup.rrHover && map.hasLayer(popup)) {
+          map.closePopup(popup);
+        }
+      }, 250);
+    }
+
+    function showPopup(marker, hover) {
+      const popup = marker.rrPopup;
+      if (!popup) {
+        return;
+      }
+      cancelClose();
+      if (map.hasLayer(popup)) {
+        if (!hover) {
+          popup.rrHover = false;
+        }
+        return;
+      }
+      popup.rrHover = hover;
+      // A popup shown on hover never moves the map under the pointer.
+      popup.options.autoPan = !hover;
+      popup.setLatLng(marker.getLatLng()).openOn(map);
+    }
+
     map.on("popupopen", function (event) {
-      bindPopupActions(event.popup.getElement(), options);
+      const element = event.popup.getElement();
+      bindPopupActions(element, options);
+      if (!element.rrHoverBound) {
+        element.rrHoverBound = true;
+        element.addEventListener("mouseenter", cancelClose);
+        element.addEventListener("mouseleave", function () {
+          if (event.popup.rrHover) {
+            closeSoon(event.popup);
+          }
+        });
+      }
     });
 
     function update(reports, nextOptions) {
       options = nextOptions || {};
+      cancelClose();
+      map.closePopup();
       layer.clearLayers();
       markers.clear();
       const list = validReports(reports);
@@ -1339,26 +1434,46 @@
           icon: L.divIcon({
             className: "rr-pin-icon",
             html: pinMarkup(report, pulse),
-            iconSize: [28, 36],
-            iconAnchor: [14, 36],
-            popupAnchor: [0, -34],
+            iconSize: pinSize,
+            iconAnchor: [pinSize[0] / 2, pinSize[1]],
+            popupAnchor: [0, 2 - pinSize[1]],
           }),
           keyboard: true,
           riseOnHover: true,
-          title: report.id + " · " + report.road,
+          // With a popup, hovering already shows the report.
+          title: options.popup === false ? report.id + " · " + report.road : "",
         });
         if (options.popup !== false) {
           const content = typeof options.popup === "function" ? options.popup(report) : reportPopup(report, options);
-          marker.bindPopup(content, {
-            maxWidth: 260,
-            minWidth: 240,
-            autoPanPadding: [24, 24],
-            className: "rr-popup",
+          const popup = L.popup(
+            {
+              maxWidth: 260,
+              minWidth: 240,
+              autoPanPadding: [24, 24],
+              className: "rr-popup",
+            },
+            marker,
+          ).setContent(content);
+          marker.rrPopup = popup;
+          marker.on("mouseover", function () {
+            showPopup(marker, true);
+          });
+          marker.on("mouseout", function () {
+            if (popup.rrHover) {
+              closeSoon(popup);
+            }
           });
         }
         marker.on("click", function () {
+          showPopup(marker, false);
           if (options.onSelect) {
             options.onSelect(report.id);
+          }
+        });
+        // Enter on a focused pin does the same as a click.
+        marker.on("keypress", function (event) {
+          if (event.originalEvent && event.originalEvent.key === "Enter") {
+            marker.fire("click");
           }
         });
         marker.on("add", function () {
@@ -1393,9 +1508,7 @@
       map.flyTo(marker.getLatLng(), Math.max(map.getZoom(), 15), { duration: reducedMotion.matches ? 0 : 0.6 });
       if (!focusOptions || focusOptions.openPopup !== false) {
         window.setTimeout(function () {
-          if (marker.getPopup()) {
-            marker.openPopup();
-          }
+          showPopup(marker, false);
         }, reducedMotion.matches ? 0 : 650);
       }
     }
@@ -1452,7 +1565,7 @@
       popup.style.left = clamp(marker.offsetLeft, half + 8, canvas.clientWidth - half - 8) + "px";
       popup.style.top = marker.offsetTop + "px";
       canvas.appendChild(popup);
-      if (marker.offsetTop - 46 < popup.offsetHeight + 8) {
+      if (marker.offsetTop - 38 < popup.offsetHeight + 8) {
         popup.classList.add("is-below");
       }
       marker.querySelector(".map-pin").classList.add("is-active");
@@ -1526,6 +1639,20 @@
     }
     container.addEventListener("click", onClick);
 
+    // Pointing at a pin shows its report right away, as on the live map.
+    function onPointerOver(event) {
+      const marker = event.pointerType === "mouse" && event.target.closest("[data-map-report]");
+      const active = container.querySelector(".map-pin.is-active");
+      if (!marker || (active && marker.contains(active))) {
+        return;
+      }
+      const report = reportsById.get(marker.dataset.mapReport);
+      if (report) {
+        openPopup(marker, report);
+      }
+    }
+    container.addEventListener("pointerover", onPointerOver);
+
     return {
       kind: "schematic",
       update: update,
@@ -1538,6 +1665,7 @@
       refresh: function () {},
       destroy: function () {
         container.removeEventListener("click", onClick);
+        container.removeEventListener("pointerover", onPointerOver);
         container.innerHTML = "";
       },
     };
@@ -1643,10 +1771,40 @@
     return window.L.divIcon({
       className: "rr-pin-icon",
       html: pinMarkup({ severity: severity || "Medium" }, pulse),
-      iconSize: [28, 36],
-      iconAnchor: [14, 36],
-      popupAnchor: [0, -34],
+      iconSize: pinSize,
+      iconAnchor: [pinSize[0] / 2, pinSize[1]],
+      popupAnchor: [0, 2 - pinSize[1]],
     });
+  }
+
+  // A map's refresh button: reloads every report from the server, then
+  // `redraw()` draws the map again. The icon spins while it works, and
+  // clicks wait until the refresh is done.
+  function refreshMap(button, redraw) {
+    if (button.getAttribute("aria-busy") === "true") {
+      return;
+    }
+    button.setAttribute("aria-busy", "true");
+    button.disabled = true;
+    button.classList.add("is-spinning");
+    const minimumSpin = new Promise(function (resolve) {
+      window.setTimeout(resolve, 450);
+    });
+    Promise.all([store().refresh(), minimumSpin])
+      .then(function () {
+        if (redraw) {
+          redraw();
+        }
+        showMessage("Map updated with the latest reports.", "info");
+      })
+      .catch(function (error) {
+        showMessage(error.message, "error");
+      })
+      .finally(function () {
+        button.removeAttribute("aria-busy");
+        button.disabled = false;
+        button.classList.remove("is-spinning");
+      });
   }
 
   function mapLegend() {
@@ -1698,10 +1856,14 @@
     daysBetween: daysBetween,
     pluralize: pluralize,
     formatNumber: formatNumber,
+    durationText: durationText,
+    durationHtml: durationHtml,
     debounce: debounce,
     statusLabel: statusLabel,
     statusPill: statusPill,
     severityBadge: severityBadge,
+    ratingLabels: ratingLabels,
+    ratingStars: ratingStars,
     initials: initials,
     avatar: avatar,
     reportPhotos: reportPhotos,
@@ -1732,6 +1894,7 @@
     mapLegend: mapLegend,
     createBaseMap: createBaseMap,
     pinIcon: pinIcon,
+    refreshMap: refreshMap,
     mapCenter: mapCenter,
     hasLeaflet: hasLeaflet,
     setBackgroundInert: setBackgroundInert,

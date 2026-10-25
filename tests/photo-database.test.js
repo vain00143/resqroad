@@ -192,6 +192,7 @@ test("unknown photo addresses and path tricks are not served", async function ()
 });
 
 test("repair photos are saved in MySQL too", async function () {
+  assert.equal((await call("admin", "POST", "/api/reports/" + reportId + "/status", { status: "under_review" })).status, 200);
   assert.equal((await call("admin", "POST", "/api/reports/" + reportId + "/status", { status: "verified" })).status, 200);
   assert.equal((await call("admin", "POST", "/api/reports/" + reportId + "/assign", { crewId: ids.crew })).status, 200);
   assert.equal((await call("crew", "POST", "/api/reports/" + reportId + "/start")).status, 200);

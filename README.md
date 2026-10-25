@@ -55,14 +55,19 @@ You need [Node.js](https://nodejs.org/) 20.12 or newer and MySQL 8.0 or newer
 
 | Page | Who | What it does |
 | --- | --- | --- |
-| `index.html` | Everyone | Public landing page: live numbers, how it works, a live map of verified reports, recently fixed roads, and a report tracker. |
+| `index.html` | Everyone | Public landing page: live numbers, how it works, a live map of verified reports, recently fixed roads, and the report tracker at the bottom (`index.html?track=RPT-1048#track` opens a report there). |
 | `login.html` | Everyone | One sign-in for residents, administrators, and maintenance crews. The account decides which workspace opens. |
 | `register.html` | Residents | Create a free resident account (signs you in right away). |
-| `citizen.html` | Residents | Report a road problem (title, severity, map pin or GPS, photos), follow every report you've filed and open its full details, and — without leaving the portal — track a report by ID, browse the live map, and see the public site. |
-| `track.html` | Everyone | Look up any report by ID (e.g. `track.html?id=RPT-1048`) and see its public progress. |
-| `admin.html` | Administrator | Dashboard, Analytics & Reports, Review Reports, Assignment, Map, User management, and the public site. |
+| `citizen.html` | Residents | Report a road problem in four steps (the problem, the location by map pin or GPS, photos, and a review before sending), follow every report you've filed, open its full details, rate a finished repair, and — without leaving the portal — track a report by ID, browse the live map, and see the public site. |
+| `admin.html` | Administrator | Dashboard, Insights & Statistics (with a printable report), Review Reports, Task Dispatch, Live Map, User management, and the public site. |
 | `maintenance.html` | Maintenance crews | Overview, assigned jobs (start repairs, submit notes with after-repair photos), repair sites, and the public site. |
 | `admin-login.html`, `maintenance-login.html` | — | Old sign-in addresses; they redirect to `login.html`. |
+| `track.html` | — | Old tracker address; `track.html?id=RPT-1048` redirects to the tracker on the home page. |
+
+The three workspaces (`admin.html`, `maintenance.html`, `citizen.html`) are
+only served to someone signed in with that role; anyone else is sent to the
+sign-in page. They are never cached, so after logging out the browser's Back
+button can't show them again.
 
 ## Accounts
 
@@ -112,13 +117,22 @@ reloads the 21 sample reports (accounts are kept).
 `Submitted → Under Review → Verified → Assigned → In Progress → Repair Submitted → Resolved`,
 with `Rejected` and `Duplicate` as closing outcomes.
 
-1. A resident files a report from `citizen.html`. Reports within about 100 m of
-   another **open** report are blocked as likely duplicates.
-2. The administrator reviews it under **Review Reports → Needs review**, then
-   marks it under review, verifies, rejects (with an optional reason shown to
-   the resident), or marks it a duplicate.
-3. Verified reports appear under **Assignment**, where the administrator assigns
-   or reassigns a crew. The crew workload panel shows open jobs per crew.
+1. A resident files a report from `citizen.html`, one step at a time (the
+   problem, the location, photos, then a review of everything before
+   sending). **Possible duplicates**: an open report within about 150 m that
+   looks like the same road problem (distance, kind of problem, wording, and
+   severity are compared in `assets/js/duplicates.js`) is shown on the review
+   step. The resident can open it, or submit anyway if theirs is a different
+   problem; the administrator then sees which report it resembled. Nothing
+   is rejected automatically, and a fixed report nearby is only mentioned.
+2. The administrator reviews it under **Review Reports → Needs review**
+   (highest severity first, with possible duplicates tagged), marks it under
+   review, and then verifies it (**Verify report** is only available once the
+   report is under review), rejects it (with an optional reason shown to the
+   resident), or marks it a duplicate.
+3. Verified reports appear under **Task Dispatch** (highest severity first),
+   where the administrator assigns or reassigns a crew. The crew workload
+   panel shows open jobs per crew.
 4. The assigned crew starts the repair and submits notes plus one to ten
    photos of the finished repair. The resident's photos already show the
    damage, so before photos are optional (the mobile app still sends them).
@@ -126,6 +140,10 @@ with `Rejected` and `Duplicate` as closing outcomes.
    resolves it or requests more work (the note is shown on the crew's job). A
    resubmitted repair replaces the photos shown; earlier ones are kept on the
    server for the record.
+6. Once a report is resolved, the resident who filed it can **rate the
+   repair** (1 to 5 stars and an optional comment, once per report) from its
+   details in My reports. Administrators see the rating in the report's
+   details, in their notifications, and in the CSV export.
 
 The server enforces every rule above (who may make each change, and which step
 can follow which), for the website and the mobile app alike. Every decision is
@@ -157,6 +175,7 @@ safe to run again). All times are stored in UTC.
 | `reports` | Reports. The public ID is `RPT-` + `id` (new reports continue from the highest number). `title`, `road`, `location`, `latitude`, `longitude`, `severity`, `description`, `status`, `reporter_id` → `users`, `assigned_to` → `users`, `assigned_name`, `repair_notes`, `repair_submitted_at`, `reported_at`, `updated_at`. |
 | `report_history` | Each workflow step: `report_id`, `status`, `description`, `actor` (name), `actor_id`, `note` (reason shown to the resident or crew), `created_at`. |
 | `report_notes` | Internal staff notes (administrators only): `report_id`, `note`, `actor`, `created_at`. |
+| `report_feedback` | The resident's rating of a finished repair, one per report: `report_id` (unique), `user_id`, `rating` (1–5), `comment`, `created_at`. Seen only by administrators and that resident. |
 | `photos` | Evidence (`kind` = `evidence`) and repair (`before` \| `after`) photos: `report_id`, original `name`, `file_path` (inside `storage/photos/`, and the address under `/uploads/`), `mime_type`, `size_bytes`, `uploaded_by`, `replaced_at` (earlier repair photos after a resubmission). Sample reports list file names only (`file_path` is empty) and the website shows stock road photos for them. |
 | `photo_data` | The photo files themselves when `PHOTO_STORAGE=database` (used on hosts without a permanent disk): `photo_id`, `file_path`, `mime_type`, `data`. Deleted together with their photo. |
 
@@ -402,15 +421,20 @@ The design follows `ResQRoad Brandsheet.pdf`:
 
 - **Colors**: the Road Orange scale (`#7B3621` → `#EFC88B`), Pastel Rust,
   Black, Blush Mist, and Asphalt Gray are tokens at the top of
-  `assets/css/core.css`. Severity and each workflow status keep their own hues.
+  `assets/css/core.css`. Severity keeps its own hues (red, orange, yellow).
+  Workflow statuses step through the Road Orange scale after Asphalt Gray
+  (submitted), with green for resolved and red for rejected, and use the
+  same color everywhere they appear.
 - **Type**: headlines use **Nofex** when it's installed, otherwise **Archivo
   Expanded**, which has the same wide, heavy build; body copy and UI use
   **Poppins**.
 - **Logo**: `assets/images/resqroad-mark.png` (the Q mark and favicon),
   `resqroad-logotype.png` (light backgrounds), `resqroad-logotype-white.png`
   (dark backgrounds).
-- **Themes**: light and dark, following the system setting until someone picks
-  one with the sun/moon button. Every page works at phone width.
+- **Themes**: the public site, sign-in, and registration are always dark and
+  share one continuous background. The three workspaces have light and dark
+  themes, following the system setting until someone picks one with **Switch
+  theme** in the account menu. Every page works at phone width.
 
 ## Code layout
 
@@ -442,6 +466,7 @@ assets/css/core.css           Design tokens, base styles, shared components
 assets/css/app.css            Workspace shell (sidebar, top bar) and views
 assets/css/site.css           Landing page, sign-in, citizen portal, tracker
 assets/js/data-store.js       RoadWatchStore: API client, live cache, workflow helpers
+assets/js/duplicates.js       Possible duplicate reports (used by the website and the server)
 assets/js/auth.js             RoadWatchAuth: sign-in and role checks
 assets/js/ui.js               Toasts, dialogs, lightbox, maps, formatting
 assets/js/menus.js            Accessible custom select menus

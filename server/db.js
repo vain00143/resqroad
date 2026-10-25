@@ -39,19 +39,26 @@ export async function one(sql, params) {
   return rows[0] || null;
 }
 
-// Runs `work(connection)` in a transaction; rolls back if it throws.
+// Runs `work(connection)` in a transaction; rolls back if it throws. When two
+// requests lock the same rows at once (e.g. the same upload sent twice),
+// MySQL cancels one with a deadlock; that one runs again from the start and
+// then sees what the other saved.
 export async function transaction(work) {
-  const connection = await pool.getConnection();
-  try {
-    await connection.beginTransaction();
-    const result = await work(connection);
-    await connection.commit();
-    return result;
-  } catch (error) {
-    await connection.rollback().catch(function () {});
-    throw error;
-  } finally {
-    connection.release();
+  for (let attempt = 1; ; attempt += 1) {
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+      const result = await work(connection);
+      await connection.commit();
+      return result;
+    } catch (error) {
+      await connection.rollback().catch(function () {});
+      if (!(error && error.code === "ER_LOCK_DEADLOCK" && attempt < 3)) {
+        throw error;
+      }
+    } finally {
+      connection.release();
+    }
   }
 }
 
@@ -69,11 +76,30 @@ export async function setupDatabase() {
     await connection.query("USE `" + name + "`");
     const schema = fs.readFileSync(path.join(rootDir, "database", "schema.sql"), "utf8");
     await connection.query(schema);
-    await addMissingColumns(connection);
+    await upgradeSchema(connection);
   } finally {
     await connection.end();
   }
 }
+
+// Tables added to database/schema.sql after the first release, created on
+// every server start too, in case db:setup wasn't run after updating.
+const addedTables = [
+  "CREATE TABLE IF NOT EXISTS report_feedback (" +
+    "id INT UNSIGNED NOT NULL AUTO_INCREMENT, " +
+    "report_id INT UNSIGNED NOT NULL, " +
+    "user_id INT UNSIGNED NULL, " +
+    "rating TINYINT UNSIGNED NOT NULL COMMENT '1 (poor) to 5 (excellent)', " +
+    "comment TEXT NULL, " +
+    "created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3), " +
+    "PRIMARY KEY (id), " +
+    "UNIQUE KEY feedback_report (report_id), " +
+    "KEY feedback_user (user_id), " +
+    "CONSTRAINT feedback_rating CHECK (rating BETWEEN 1 AND 5), " +
+    "CONSTRAINT feedback_report_fk FOREIGN KEY (report_id) REFERENCES reports (id) ON DELETE CASCADE, " +
+    "CONSTRAINT feedback_user_fk FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE SET NULL" +
+    ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+];
 
 // Columns added to database/schema.sql after the first release.
 // CREATE TABLE IF NOT EXISTS leaves existing tables alone, so databases set up
@@ -97,7 +123,11 @@ const addedColumns = [
   },
 ];
 
-export async function addMissingColumns(connection) {
+// Brings a database set up by an earlier version up to date.
+export async function upgradeSchema(connection) {
+  for (const statement of addedTables) {
+    await connection.query(statement);
+  }
   for (const item of addedColumns) {
     const [rows] = await connection.query(
       "SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?",

@@ -34,18 +34,18 @@
     <script src="assets/js/public-view.js" defer></script>
     <script src="assets/js/maintenance.js" defer></script>
   </head>
-  <body class="app-body" data-required-role="maintenance">
+  <body class="app-body" data-required-role="maintenance" data-booting>
     <a class="skip-link" href="#main">Skip to content</a>
     <div class="shell">
       <aside class="sidebar" id="sidebar" aria-label="Maintenance navigation">
         <div class="sidebar-head">
-          <a class="sidebar-brand" href="maintenance.html" aria-label="ResQRoad maintenance workspace">
+          <div class="sidebar-brand">
             <span class="sidebar-logo-full">
               <img class="logo-on-light" src="assets/images/resqroad-logotype.png" alt="ResQRoad" width="748" height="127" />
               <img class="logo-on-dark" src="assets/images/resqroad-logotype-white.png" alt="ResQRoad" width="748" height="127" />
             </span>
             <img class="sidebar-logo-mark" src="assets/images/resqroad-mark.png" alt="" width="384" height="408" />
-          </a>
+          </div>
           <button class="sidebar-icon-btn sidebar-close" type="button" data-sidebar-close aria-label="Close navigation"><svg data-icon="x"></svg></button>
         </div>
         <div class="sidebar-scroll">
@@ -67,14 +67,9 @@
           </nav>
         </div>
         <div class="sidebar-foot">
-          <div class="sidebar-status">
-            <strong><span class="live-dot" aria-hidden="true"></span>Synced with dispatch</strong>
-            <span>New assignments appear here automatically.</span>
-          </div>
           <button class="sidebar-user" type="button" data-popover-target="user-menu" data-popover-placement="top-start" data-popover-width="trigger" aria-haspopup="menu" aria-expanded="false" aria-controls="user-menu" aria-label="Account menu">
             <span class="avatar" data-user-avatar aria-hidden="true">RM</span>
             <span class="person-copy"><strong data-current-user></strong><span data-current-team>Road maintenance</span></span>
-            <svg data-icon="chevrons-up-down"></svg>
           </button>
         </div>
       </aside>
@@ -115,14 +110,14 @@
             <div class="grid grid-kpi" id="job-summary" aria-label="Job overview"></div>
 
             <div class="grid grid-2-1">
-              <section class="card" aria-labelledby="next-title">
+              <section class="card next-card" aria-labelledby="next-title">
                 <div class="card-header">
                   <div>
                     <h2 class="card-title" id="next-title"><svg data-icon="zap"></svg>Up next</h2>
                     <p class="card-subtitle">Your highest-priority job right now.</p>
                   </div>
                 </div>
-                <div id="next-job"></div>
+                <div class="next-slot" id="next-job"></div>
               </section>
               <section class="card" aria-labelledby="crew-activity-title">
                 <div class="card-header">
@@ -139,9 +134,12 @@
               <div class="card-header">
                 <div>
                   <h2 class="card-title" id="overview-map-title"><svg data-icon="map"></svg>My repair sites</h2>
-                  <p class="card-subtitle">Select a marker to jump to that repair assignment.</p>
+                  <p class="card-subtitle">Point at a marker to see the job; select it to jump to that repair assignment.</p>
                 </div>
-                <button class="link-button" type="button" data-switch-view="map">Full map<svg data-icon="arrow-right" class="icon-sm"></svg></button>
+                <div class="toolbar-group">
+                  <button class="link-button" type="button" data-switch-view="map">Full map<svg data-icon="arrow-right" class="icon-sm"></svg></button>
+                  <button class="btn btn-secondary btn-icon btn-sm refresh-button" type="button" data-refresh-map aria-label="Refresh map" title="Refresh map"><svg data-icon="refresh"></svg></button>
+                </div>
               </div>
               <div class="card-body">
                 <div class="map overview-map" id="maintenance-map"></div>
@@ -191,6 +189,7 @@
                     <h2 class="card-title" id="crew-map-title"><svg data-icon="map"></svg>Repair site map</h2>
                     <p class="card-subtitle">Pins show each repair assigned to you.</p>
                   </div>
+                  <button class="btn btn-secondary btn-icon btn-sm refresh-button" type="button" data-refresh-map aria-label="Refresh map" title="Refresh map"><svg data-icon="refresh"></svg></button>
                 </div>
                 <div class="card-body">
                   <div class="map" id="crew-map"></div>
@@ -234,7 +233,6 @@
 
     <div class="popover" id="user-menu" role="menu" aria-label="Account" hidden>
       <div class="menu-label" data-current-email></div>
-      <button class="menu-item" role="menuitem" type="button" data-switch-view="public"><svg data-icon="globe"></svg>Public site</button>
       <button class="menu-item" role="menuitem" type="button" data-change-password><svg data-icon="lock"></svg>Change password</button>
       <button class="menu-item" role="menuitem" type="button" data-theme-toggle><svg data-icon="moon"></svg>Switch theme</button>
       <div class="menu-sep" role="separator"></div>

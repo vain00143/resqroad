@@ -92,8 +92,8 @@
   function skeleton() {
     return (
       '<div class="grid grid-kpi" data-pv-stats aria-label="Public numbers"></div>' +
-      '<div class="grid grid-2-1 grid-align-start">' +
-      '<section class="card" aria-labelledby="pv-map-title">' +
+      '<div class="grid grid-2-1">' +
+      '<section class="card pv-map-card" aria-labelledby="pv-map-title">' +
       cardHead("pv-map-title", "map", "Live map", "Verified road damage across Bulacan, color-coded by severity.") +
       '<div class="card-body"><div class="map pv-map" data-pv-map></div><div data-pv-legend></div></div></section>' +
       '<div class="pv-side">' +
@@ -174,13 +174,7 @@
     container.querySelector("[data-pv-stats]").innerHTML = [
       kpi("Reports filed", String(state.reports.length), "clipboard-list", "var(--accent)", "Every report residents have sent"),
       kpi("Repairs completed", String(fixed.length), "check-circle", "var(--success)", "Verified by the Road Maintenance Office"),
-      kpi(
-        "Average time to fix",
-        averageFix == null ? "—" : esc(ui.formatNumber(averageFix, 1)) + "<small>days</small>",
-        "timer",
-        "var(--info)",
-        "From report to verified repair",
-      ),
+      kpi("Average time to fix", ui.durationHtml(averageFix), "timer", "var(--st-in_progress)", "From report to verified repair"),
       kpi("Active road crews", String(state.personnel.length), "hard-hat", "var(--st-assigned)", "Crews working on reported roads"),
     ].join("");
 
@@ -250,7 +244,8 @@
   /* ---------- Tracking card ---------- */
 
   // A report's public progress, as the tracker shows it. The caller draws the
-  // map into [data-track-map]. options.headActions: buttons for the header.
+  // map into [data-track-map]. options.headActions: buttons for the header;
+  // options.submittedText: how the timeline describes the submitted step.
   function trackCard(report, options) {
     const resolvedTime = resolvedAt(report);
     const age = resolvedTime
@@ -261,7 +256,7 @@
     const repairDone = report.status === "resolved" && report.repair;
     const afterPhotos = repairDone ? ui.repairPhotos(report, "after") : [];
     return (
-      '<article class="card rise-in"><div class="track-result-head"><div><div class="toolbar-group"><span class="id-tag">' +
+      '<article class="card track-card"><div class="track-result-head"><div><div class="toolbar-group"><span class="id-tag">' +
       esc(report.id) +
       "</span>" +
       ui.statusPill(report.status) +
@@ -284,7 +279,7 @@
       '</span></p><div class="journey-card">' +
       ui.journey(report) +
       '</div><div class="track-columns" style="margin-top: 1.5rem"><section><h3 class="section-label">Progress updates</h3>' +
-      ui.timeline(report, { publicOnly: true }) +
+      ui.timeline(report, { publicOnly: true, submittedText: options && options.submittedText }) +
       (repairDone && (report.repair.notes || afterPhotos.length)
         ? '<div class="callout" style="margin-top: 1.25rem"><p class="section-label">What the crew did</p>' +
           (report.repair.notes ? '<p class="detail-description">' + esc(report.repair.notes) + "</p>" : "") +
@@ -295,7 +290,7 @@
             : "") +
           "</div>"
         : "") +
-      '</section><section><div class="map" data-track-map></div><dl class="facts" style="margin-top: 1rem"><div><dt>Last update</dt><dd>' +
+      '</section><section class="track-side"><div class="map" data-track-map></div><dl class="facts"><div><dt>Last update</dt><dd>' +
       esc(ui.relativeTime(lastUpdate(report))) +
       "</dd></div><div><dt>Timeline</dt><dd>" +
       esc(age) +

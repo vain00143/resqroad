@@ -12,6 +12,8 @@
    The server decides what each account may see and do (see server/ and
    README.md for the database schema and the API). */
 
+import { findSimilarReports as similarReports } from "./duplicates.js";
+
 const openStatuses = ["submitted", "under_review", "verified", "assigned", "in_progress", "repair_submitted"];
 const closedStatuses = ["resolved", "rejected", "duplicate"];
 const crewOpenStatuses = ["assigned", "in_progress", "repair_submitted"];
@@ -57,6 +59,7 @@ async function api(path, options) {
     failure.status = response.status;
     if (body && body.duplicateId) {
       failure.duplicateId = body.duplicateId;
+      failure.possibleDuplicates = body.possibleDuplicates || [];
     }
     throw failure;
   }
@@ -587,23 +590,8 @@ async function addReport(input) {
     throw new Error("Choose no more than five evidence photos.");
   }
 
-  // Quick check against the reports already on screen; the server checks
-  // again when the report is saved.
-  const duplicate = Array.from(cache.reports.values()).find(function (report) {
-    return (
-      openStatuses.includes(report.status) &&
-      Math.abs(report.coordinates.lat - latitude) < 0.001 &&
-      Math.abs(report.coordinates.lng - longitude) < 0.001
-    );
-  });
-  if (duplicate) {
-    const error = new Error(
-      "A report already exists very close to this location (" + duplicate.id + "). Check the map before adding another report.",
-    );
-    error.duplicateId = duplicate.id;
-    throw error;
-  }
-
+  // The report form shows possible duplicates before this is called; the
+  // server checks again and refuses one the resident didn't confirm.
   const form = new FormData();
   form.append("title", title);
   form.append("road", road);
@@ -612,11 +600,45 @@ async function addReport(input) {
   form.append("severity", severity);
   form.append("latitude", String(latitude));
   form.append("longitude", String(longitude));
+  if (input.confirmDuplicate) {
+    form.append("confirmDuplicate", "true");
+  }
   await appendPhotos(form, "photos", photos);
   const body = await api("reports", { method: "POST", form: form });
   putReport(body.report, true);
   emit();
   return getReport(body.report.id) || body.report;
+}
+
+// Existing reports that may describe the same road problem as `candidate`
+// (see duplicates.js). options: includeResolved, limit.
+function findSimilarReports(candidate, options) {
+  return similarReports(candidate, getState().reports, options);
+}
+
+// The resident rates the repair of one of their resolved reports (1 to 5
+// stars, with an optional comment).
+async function submitFeedback(reportId, rating, comment) {
+  requireRole(["citizen"]);
+  const report = rawReport(reportId);
+  if (report.status !== "resolved") {
+    throw new Error("You can rate the repair once the report is resolved.");
+  }
+  const value = Number(rating);
+  if (!Number.isInteger(value) || value < 1 || value > 5) {
+    throw new Error("Choose a rating from 1 to 5 stars.");
+  }
+  const text = String(comment || "").trim();
+  if (text.length > 500) {
+    throw new Error("Keep your comment under 500 characters.");
+  }
+  const body = await api("reports/" + encodeURIComponent(reportId) + "/feedback", {
+    method: "POST",
+    json: { rating: value, comment: text },
+  });
+  putReport(body.report, true);
+  emit();
+  return getReport(reportId) || body.report;
 }
 
 /* ---------- Accounts ---------- */
@@ -795,6 +817,8 @@ window.RoadWatchStore = {
   setStatus: setStatus,
   addNote: addNote,
   addReport: addReport,
+  findSimilarReports: findSimilarReports,
+  submitFeedback: submitFeedback,
   addPersonnel: addPersonnel,
   deletePersonnel: deletePersonnel,
   registerCitizen: registerCitizen,
