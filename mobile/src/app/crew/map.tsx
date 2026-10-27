@@ -5,6 +5,7 @@ import { Linking, ScrollView, StyleSheet, useWindowDimensions, View } from "reac
 import { AppText } from "@/components/AppText";
 import { Button } from "@/components/Button";
 import { Card } from "@/components/Card";
+import { useTabBarSpace } from "@/components/FloatingTabBar";
 import { Icon } from "@/components/Icon";
 import { MapView } from "@/components/map/MapView";
 import type { MapMarker } from "@/components/map/mapHtml";
@@ -29,6 +30,7 @@ export default function RepairSites() {
   const { user, reports, loaded, connection } = useSession();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [mapTouched, setMapTouched] = useState(false);
+  const tabBarSpace = useTabBarSpace();
 
   const jobs = useMemo(() => myJobs(reports, user?.id), [reports, user?.id]);
   const active = jobs.filter((report) => inTab(report, "active"));
@@ -51,7 +53,7 @@ export default function RepairSites() {
   );
 
   return (
-    <ScrollView contentContainerStyle={styles.content} scrollEnabled={!mapTouched}>
+    <ScrollView contentContainerStyle={[styles.content, { paddingBottom: tabBarSpace + 24 }]} scrollEnabled={!mapTouched}>
       {connection === "offline" ? <OfflineState compact={loaded} /> : null}
 
       <MapView

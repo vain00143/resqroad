@@ -82,12 +82,13 @@ const styles = StyleSheet.create({
       "radial-gradient(80% 60% at 100% 0%, rgba(207, 92, 54, 0.4), transparent 60%), " +
       "radial-gradient(70% 60% at 0% 100%, rgba(123, 54, 33, 0.5), transparent 60%)",
   },
-  // The headline and actions sit a little above the middle of the screen.
-  main: { flex: 1, justifyContent: "center", gap: 22, paddingBottom: "14%" },
+  // The headline sits a little above the middle of the screen, with the
+  // buttons set a little lower, apart from it.
+  main: { flex: 1, justifyContent: "center", gap: 22, paddingBottom: "6%" },
   copy: { gap: 12 },
   headline: { fontSize: 32, lineHeight: 35 },
   description: { lineHeight: 20 },
-  actions: { gap: 10 },
+  actions: { gap: 10, marginTop: 28 },
   trackLink: { alignSelf: "center", paddingVertical: 8 },
   devLink: { alignSelf: "center", paddingTop: 16 },
 });

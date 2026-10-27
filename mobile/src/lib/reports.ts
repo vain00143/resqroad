@@ -49,6 +49,20 @@ export function inBulacan(lat: number, lng: number) {
   return lat >= bulacan.south && lat <= bulacan.north && lng >= bulacan.west && lng <= bulacan.east;
 }
 
+// A report's `location` is the barangay, then the municipality and province:
+// "Borol 1st, Balagtas, Bulacan". The form asks for the two parts separately
+// (as the website does) and joins them for the server.
+export function joinPlace(barangay: string, municipality: string) {
+  return barangay.trim() + ", " + municipality.trim();
+}
+
+export function splitPlace(location: string) {
+  const comma = location.indexOf(",");
+  return comma < 0
+    ? { barangay: location.trim(), municipality: "" }
+    : { barangay: location.slice(0, comma).trim(), municipality: location.slice(comma + 1).trim() };
+}
+
 // Accepts "RPT-1048", "rpt 1048", or "1048".
 export function normalizeReportId(input: string): string | null {
   const match = /^(?:rpt)?[\s-]*(\d+)$/i.exec(input.trim());

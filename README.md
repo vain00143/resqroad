@@ -309,7 +309,7 @@ encrypted connections, and `TRUST_PROXY=1` behind the host's proxy.
 The Android app for residents and maintenance crews lives in `mobile/`. It's
 built with [Expo](https://expo.dev/) (React Native) and uses the same server,
 accounts, and live updates as the website. Administrators keep using the
-website. The current version is **1.2.0**.
+website. The current version is **1.3.0**.
 
 ```powershell
 cd mobile
@@ -361,40 +361,46 @@ residents can register in the app (typing the password twice). Administrators
 are pointed to the website. The welcome screen has **Log in**, **Create a
 resident account**, and **Track a report by ID**.
 
-- **Home** (residents and crews) has the ResQRoad logo, a Live badge for the
-  live connection, and the person's initials top right. Tapping the initials
+- **Home** (residents and crews) has a white top bar with the ResQRoad logo
+  and the person's initials on the right. Tapping the initials
   opens a small menu: **Change password** (the current password, then the new
   one twice; other devices are signed out), **Theme** (System, Light, or Dark;
   saved on the phone and applied to the whole app, status bar included), and
-  **Log out** (after a confirmation). Below the greeting are three numbers and
-  then the latest reports (residents) or the next jobs (crews).
+  **Log out** (after a confirmation). Below the greeting are four summary
+  cards in a two-by-two grid, like the website's (residents: My reports, Open,
+  In progress, Resolved; crews: To start, In progress, Awaiting review,
+  Completed), then the three newest open reports (residents; resolved and
+  closed ones are in My reports) or the next jobs (crews). Opening a report
+  slides its page in from the right, and going back slides it out.
 - **Report cards** (Home, My reports, My jobs, and the crew map) follow the
   website's: the first photo cropped to a fixed frame (a plain placeholder
   when there's none) with the severity and how long ago it was reported over
   it, then the ID, title, road and place, and a footer with the status and
   date. Crews see the same cards; the API doesn't send them reporters' names.
-- **Residents** have four tabs on a floating bar: **Home**, **Report**, **My
+- **Residents** have four tabs on a floating bar (over the screen, with
+  nothing behind it; the orange highlight slides to the chosen tab): **Home**, **Report**, **My
   reports** (with Open, Resolved, and Closed filters), and **Track** (the round
   button at the end: any report by ID, also available signed out from the
   welcome screen).
 - **Report** is a form in four steps, one page each, with a step indicator and
   Back and Next: (1) title, severity, and description; (2) the location, with
-  a map pin or "Use my location", the road or street, and the barangay and
-  municipality; (3) photos from the camera or gallery, at least one and up to
+  a map pin or "Use my location", the road or street and the barangay side
+  by side, then the municipality and province (sent as one place line,
+  "Barangay, Municipality, Province", as on the website); (3) photos from the camera or gallery, at least one and up to
   five; (4) a review of everything, including the photos and a map of the pin,
   with **Edit** beside each part. **Submit report** appears only on the review,
   and each step is checked before Next. Photos are resized to 1280 px on the
   longest side and saved as JPEG at quality 0.7 before upload
   (`mobile/src/lib/photos.ts`), about 150–300 KB each. (On the website, and for
   the server, photos stay optional.)
-- **A report's page** reads top to bottom: the ID, title, status, and
-  severity; the photos; the progress through each workflow step; the
-  description; the map and place; any repair (after photos first); and the
+- **A report's page** reads top to bottom: the title, with the status and
+  severity under it (the ID is in the header); the photos; the description;
+  the progress through each workflow step; the map and place; any repair (after photos first); and the
   activity, where the resident's own first entry reads "You submitted this
   report." (crews and anyone tracking the report never see who filed it).
   Photos sit in one frame whatever their number or orientation: one
-  fills the width, two sit side by side, three are one large and two stacked,
-  and four or more make a grid with "+N" on the last tile. Tapping one opens
+  fills the width, two sit side by side, and three or more are one large and
+  two stacked, with "+N" on the third for the rest. Tapping one opens
   them full screen, uncropped, to swipe through. Repair photos work the same
   way.
 - **Maintenance crews** have three tabs: **Home**, **My jobs** (Active,

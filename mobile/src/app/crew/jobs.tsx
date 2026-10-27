@@ -4,6 +4,7 @@ import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
 
 import { AppText } from "@/components/AppText";
 import { Chips } from "@/components/Chips";
+import { useTabBarSpace } from "@/components/FloatingTabBar";
 import { Icon } from "@/components/Icon";
 import { OfflineState } from "@/components/OfflineState";
 import { ReportRow } from "@/components/ReportRow";
@@ -25,6 +26,7 @@ export default function MyJobs() {
   const { user, reports, loaded, connection, refresh } = useSession();
   const [tab, setTab] = useState<JobTab>("active");
   const [refreshing, setRefreshing] = useState(false);
+  const tabBarSpace = useTabBarSpace();
 
   const jobs = useMemo(() => myJobs(reports, user?.id), [reports, user?.id]);
   const shown = jobs.filter((report) => inTab(report, tab));
@@ -43,7 +45,7 @@ export default function MyJobs() {
       renderItem={({ item }) => (
         <ReportRow report={item} onPress={() => router.push({ pathname: "/jobs/[id]", params: { id: item.id } })} />
       )}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, { paddingBottom: tabBarSpace + 24 }]}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={pullToRefresh} tintColor={colors.accent} />}
       ListHeaderComponent={
         <View style={styles.header}>

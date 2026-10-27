@@ -5,6 +5,7 @@ import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
 import { AppText } from "@/components/AppText";
 import { Button } from "@/components/Button";
 import { Chips } from "@/components/Chips";
+import { useTabBarSpace } from "@/components/FloatingTabBar";
 import { Icon } from "@/components/Icon";
 import { OfflineState } from "@/components/OfflineState";
 import { ReportRow } from "@/components/ReportRow";
@@ -26,6 +27,7 @@ export default function MyReports() {
   const { user, reports, loaded, connection, refresh } = useSession();
   const [filter, setFilter] = useState<Filter>("all");
   const [refreshing, setRefreshing] = useState(false);
+  const tabBarSpace = useTabBarSpace();
 
   const mine = useMemo(() => reports.filter((report) => report.reporterId === user?.id), [reports, user?.id]);
   const shown = mine.filter(filters[filter].test);
@@ -41,7 +43,7 @@ export default function MyReports() {
       data={shown}
       keyExtractor={(report) => report.id}
       renderItem={({ item }) => <ReportRow report={item} />}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, { paddingBottom: tabBarSpace + 24 }]}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={pullToRefresh} tintColor={colors.accent} />}
       ListHeaderComponent={
         <View style={styles.header}>

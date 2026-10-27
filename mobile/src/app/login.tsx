@@ -89,6 +89,7 @@ export default function Login() {
         loading={busy}
         onPress={submit}
         icon={<Icon name="arrow-right" size={16} color="#FFFFFF" />}
+        style={styles.continue}
       />
 
       <View style={styles.switch}>
@@ -111,6 +112,8 @@ export default function Login() {
 
 const styles = StyleSheet.create({
   intro: { gap: 4, marginBottom: 2 },
+  // A little space between the password and the button.
+  continue: { marginTop: 14 },
   switch: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center" },
   strong: { fontFamily: fonts.semibold },
 });

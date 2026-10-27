@@ -16,9 +16,34 @@ export default function CrewHome() {
     <HomeScaffold
       subtitle={(user?.team || "Maintenance crew") + " · Maintenance"}
       stats={[
-        { label: "Active jobs", value: active.length, color: statusColors.in_progress },
-        { label: "Awaiting review", value: jobs.filter((report) => inTab(report, "review")).length, color: statusColors.repair_submitted },
-        { label: "Completed", value: jobs.filter((report) => inTab(report, "done")).length, color: statusColors.resolved },
+        {
+          label: "To start",
+          value: jobs.filter((report) => report.status === "assigned").length,
+          color: statusColors.assigned,
+          icon: "clipboard-list",
+          caption: "Not started yet",
+        },
+        {
+          label: "In progress",
+          value: jobs.filter((report) => report.status === "in_progress").length,
+          color: statusColors.in_progress,
+          icon: "wrench",
+          caption: "Repairs underway",
+        },
+        {
+          label: "Awaiting review",
+          value: jobs.filter((report) => inTab(report, "review")).length,
+          color: statusColors.repair_submitted,
+          icon: "clock",
+          caption: "Sent for checking",
+        },
+        {
+          label: "Completed",
+          value: jobs.filter((report) => inTab(report, "done")).length,
+          color: statusColors.resolved,
+          icon: "check-circle",
+          caption: "Fixed and verified",
+        },
       ]}
       listTitle="Up next"
       reports={active.slice(0, 3)}

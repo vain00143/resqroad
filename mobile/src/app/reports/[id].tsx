@@ -18,8 +18,8 @@ import { normalizeReportId, type Report } from "@/lib/reports";
 import { useSession } from "@/lib/session";
 import { severityColors, useTheme } from "@/theme";
 
-// One report's public progress, as one page: the title, photos, progress,
-// description, location, and activity. Signed-in people see live changes
+// One report's public progress, as one page: the title, photos, description,
+// progress, location, and activity. Signed-in people see live changes
 // from the shared store; others (tracking by ID) load it from the server.
 export default function ReportDetail() {
   const { colors } = useTheme();
@@ -137,12 +137,12 @@ export default function ReportDetail() {
         </Section>
       ) : null}
 
-      <Section title="Progress">
-        <ReportProgress report={report} />
-      </Section>
-
       <Section title="Description">
         <AppText>{report.description}</AppText>
+      </Section>
+
+      <Section title="Progress">
+        <ReportProgress report={report} />
       </Section>
 
       <Section title="Location">

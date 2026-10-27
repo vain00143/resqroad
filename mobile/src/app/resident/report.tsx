@@ -16,6 +16,7 @@ import { AppText } from "@/components/AppText";
 import { Button } from "@/components/Button";
 import { Section } from "@/components/Card";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { useTabBarSpace } from "@/components/FloatingTabBar";
 import { Icon } from "@/components/Icon";
 import { KeyboardAware } from "@/components/KeyboardAware";
 import { MapView } from "@/components/map/MapView";
@@ -38,7 +39,15 @@ import {
   withRetries,
 } from "@/lib/api";
 import { appendPhoto, photoLimits, takePendingPhotos, type LocalPhoto } from "@/lib/photos";
-import { inBulacan, isOpen, reportStatuses, type Report, type ReportStatus, type Severity } from "@/lib/reports";
+import {
+  inBulacan,
+  isOpen,
+  joinPlace,
+  reportStatuses,
+  type Report,
+  type ReportStatus,
+  type Severity,
+} from "@/lib/reports";
 import { clearReportDraft, loadReportDraft, saveReportDraft } from "@/lib/reportDraft";
 import { useSession } from "@/lib/session";
 import { brand, fonts, mix, radius, severityColors, useTheme } from "@/theme";
@@ -51,12 +60,12 @@ const maxPhotos = photoLimits.report;
 const steps = [
   {
     label: "Details",
-    title: "What's the problem?",
+    title: "Report details",
     text: "Give the road damage a short title and tell us how serious it is.",
   },
   {
     label: "Location",
-    title: "Where is it?",
+    title: "Location",
     text: "Tap the map to drop a pin on the exact spot, or use your current location.",
   },
   {
@@ -72,7 +81,7 @@ const steps = [
 ];
 const reviewStep = steps.length - 1;
 
-type Field = "title" | "severity" | "description" | "point" | "road" | "location" | "photos";
+type Field = "title" | "severity" | "description" | "point" | "road" | "barangay" | "municipality" | "photos";
 type Problem = { field: Field; message: string };
 
 // An open report nearby that the server thinks may be the same road problem
@@ -117,11 +126,13 @@ export default function ReportProblem() {
   const { colors } = useTheme();
   const { height } = useWindowDimensions();
   const { reports, upsertReport, user } = useSession();
+  const tabBarSpace = useTabBarSpace();
   const userId = user?.id ?? null;
   const scroll = useRef<ScrollViewInstance>(null);
   // Where each field sits on its page, to scroll a problem into view.
   const fieldY = useRef<Partial<Record<Field, number>>>({});
-  const locationRef = useRef<TextInputInstance>(null);
+  const barangayRef = useRef<TextInputInstance>(null);
+  const municipalityRef = useRef<TextInputInstance>(null);
 
   const [step, setStep] = useState(0);
   // Set by Edit on the review page: Next then goes straight back to it.
@@ -132,7 +143,9 @@ export default function ReportProblem() {
   const [point, setPoint] = useState<MapPoint | null>(null);
   const [panKey, setPanKey] = useState(0);
   const [road, setRoad] = useState("");
-  const [location, setLocation] = useState("");
+  const [barangay, setBarangay] = useState("");
+  // The municipality and province, e.g. "Balagtas, Bulacan".
+  const [municipality, setMunicipality] = useState("");
   const [photos, setPhotos] = useState<LocalPhoto[]>([]);
   const [locating, setLocating] = useState(false);
   const [mapTouched, setMapTouched] = useState(false);
@@ -175,7 +188,8 @@ export default function ReportProblem() {
         setDescription(draft.description);
         setPoint(draft.point);
         setRoad(draft.road);
-        setLocation(draft.location);
+        setBarangay(draft.barangay);
+        setMunicipality(draft.municipality);
         setPhotos(draft.photos);
         setStep(Math.min(Math.max(0, draft.step ?? 0), reviewStep));
         setRestored(true);
@@ -200,10 +214,10 @@ export default function ReportProblem() {
       return;
     }
     const timer = setTimeout(() => {
-      void saveReportDraft(userId, { title, severity, description, point, road, location, photos, step });
+      void saveReportDraft(userId, { title, severity, description, point, road, barangay, municipality, photos, step });
     }, 400);
     return () => clearTimeout(timer);
-  }, [userId, draftReady, submitted, title, severity, description, point, road, location, photos, step]);
+  }, [userId, draftReady, submitted, title, severity, description, point, road, barangay, municipality, photos, step]);
 
   // Wake the hosted server while people fill in the form.
   useEffect(() => {
@@ -283,7 +297,8 @@ export default function ReportProblem() {
       if (!point) return { field: "point", message: "Drop a pin on the map or use your location." };
       if (pinOutside) return { field: "point", message: "This spot is outside Bulacan. Move the pin to the damaged road." };
       if (!road.trim()) return { field: "road", message: "Enter the road or street." };
-      if (!location.trim()) return { field: "location", message: "Enter the barangay and municipality." };
+      if (!barangay.trim()) return { field: "barangay", message: "Enter the barangay." };
+      if (!municipality.trim()) return { field: "municipality", message: "Enter the municipality and province." };
     }
     if (page === 2 && photos.length === 0) {
       return { field: "photos", message: "Add at least one photo of the damage." };
@@ -381,7 +396,7 @@ export default function ReportProblem() {
       form.append("severity", severity as string);
       form.append("description", description.trim());
       form.append("road", road.trim());
-      form.append("location", location.trim());
+      form.append("location", joinPlace(barangay, municipality));
       form.append("latitude", String(point?.lat));
       form.append("longitude", String(point?.lng));
       if (confirmed) {
@@ -445,7 +460,8 @@ export default function ReportProblem() {
     setDescription("");
     setPoint(null);
     setRoad("");
-    setLocation("");
+    setBarangay("");
+    setMunicipality("");
     setPhotos([]);
     setError(null);
     setInvalid(null);
@@ -459,7 +475,7 @@ export default function ReportProblem() {
 
   if (submitted) {
     return (
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: tabBarSpace + 24 }]}>
         <View style={[styles.done, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <View style={[styles.doneIcon, { backgroundColor: mix(colors.success, colors.surface, 0.14) }]}>
             <Icon name="check-circle" size={26} color={colors.success} />
@@ -566,28 +582,51 @@ export default function ReportProblem() {
               onMarkerPress={(id) => router.push({ pathname: "/reports/[id]", params: { id } })}
               onTouchingChange={setMapTouched}
             />
-            <View onLayout={at("road")}>
-              <TextField
-                label="Road or street"
-                value={road}
-                onChangeText={edit("road", setRoad)}
-                maxLength={80}
-                placeholder="e.g. MacArthur Highway"
-                returnKeyType="next"
-                submitBehavior="submit"
-                onSubmitEditing={() => locationRef.current?.focus()}
-                error={problem("road")}
-              />
+            {/* The road and barangay side by side, then the municipality and province. */}
+            <View
+              style={styles.fieldRow}
+              onLayout={(event) => {
+                at("road")(event);
+                at("barangay")(event);
+              }}
+            >
+              <View style={styles.flex}>
+                <TextField
+                  label="Road or street"
+                  value={road}
+                  onChangeText={edit("road", setRoad)}
+                  maxLength={80}
+                  placeholder="e.g. Rizal St."
+                  returnKeyType="next"
+                  submitBehavior="submit"
+                  onSubmitEditing={() => barangayRef.current?.focus()}
+                  error={problem("road")}
+                />
+              </View>
+              <View style={styles.flex}>
+                <TextField
+                  ref={barangayRef}
+                  label="Barangay"
+                  value={barangay}
+                  onChangeText={edit("barangay", setBarangay)}
+                  maxLength={60}
+                  placeholder="e.g. Guinhawa"
+                  returnKeyType="next"
+                  submitBehavior="submit"
+                  onSubmitEditing={() => municipalityRef.current?.focus()}
+                  error={problem("barangay")}
+                />
+              </View>
             </View>
-            <View onLayout={at("location")}>
+            <View onLayout={at("municipality")}>
               <TextField
-                ref={locationRef}
-                label="Barangay and municipality"
-                value={location}
-                onChangeText={edit("location", setLocation)}
-                maxLength={80}
-                placeholder="e.g. Guinhawa, Malolos City"
-                error={problem("location")}
+                ref={municipalityRef}
+                label="Municipality and province"
+                value={municipality}
+                onChangeText={edit("municipality", setMunicipality)}
+                maxLength={90}
+                placeholder="e.g. Malolos City, Bulacan"
+                error={problem("municipality")}
               />
             </View>
           </>
@@ -623,9 +662,7 @@ export default function ReportProblem() {
         {step === reviewStep ? (
           <View style={[styles.review, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Section first title="Details" aside={<EditLink part="details" onPress={() => editPart(0)} />}>
-              <AppText variant="bodyStrong" tone="heading">
-                {title.trim()}
-              </AppText>
+              <AppText variant="title">{title.trim()}</AppText>
               {severity ? <SeverityBadge severity={severity} /> : null}
               <AppText variant="label" tone="text2">
                 {description.trim()}
@@ -641,7 +678,7 @@ export default function ReportProblem() {
               <View style={styles.meta}>
                 <Icon name="map-pin" size={14} />
                 <AppText variant="label" tone="text2" style={styles.flex}>
-                  {road.trim()} · {location.trim()}
+                  {road.trim()} · {joinPlace(barangay, municipality)}
                 </AppText>
               </View>
               {point ? (
@@ -668,7 +705,8 @@ export default function ReportProblem() {
         {error ? <Notice tone="error" message={error} /> : null}
       </ScrollView>
 
-      <View style={[styles.footer, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
+      {/* No backdrop of its own: the buttons sit on the page, above the tab bar. */}
+      <View style={[styles.footer, { marginBottom: tabBarSpace }]}>
         {/* What sending is waiting for, beside the button so it's always in view. */}
         {sending && progress ? (
           <View style={styles.footerNotice}>
@@ -833,13 +871,14 @@ const styles = StyleSheet.create({
   duplicateItem: { flexDirection: "row", alignItems: "center", gap: 10, padding: 10, borderWidth: 1, borderRadius: radius.md },
   duplicateText: { flex: 1, gap: 3 },
   duplicateTags: { flexDirection: "row", alignItems: "center", gap: 8 },
+  fieldRow: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
   footer: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 10,
     paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingTop: 4,
+    paddingBottom: 6,
   },
   footerNotice: { width: "100%" },
   backButton: { minWidth: 96 },

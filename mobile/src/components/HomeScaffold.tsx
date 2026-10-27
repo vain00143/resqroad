@@ -5,15 +5,16 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AccountMenu } from "@/components/AccountMenu";
 import { AppText } from "@/components/AppText";
 import { BuildInfo } from "@/components/BuildInfo";
-import { LiveBadge } from "@/components/LiveBadge";
+import { useTabBarSpace } from "@/components/FloatingTabBar";
+import { Icon, type IconName } from "@/components/Icon";
 import { Logotype } from "@/components/Logotype";
 import { OfflineState } from "@/components/OfflineState";
 import { ReportRow } from "@/components/ReportRow";
 import type { Report } from "@/lib/reports";
 import { useSession } from "@/lib/session";
-import { fonts, radius, useTheme } from "@/theme";
+import { fonts, mix, radius, useTheme } from "@/theme";
 
-type Stat = { label: string; value: number; color: string };
+type Stat = { label: string; value: number; color: string; icon: IconName; caption: string };
 
 type Props = {
   subtitle: string;
@@ -25,11 +26,13 @@ type Props = {
   onOpen?: (report: Report) => void;
 };
 
-// The signed-in home screen shared by residents and crews: the logo and the
-// account menu, three numbers, then the latest reports as cards.
+// The signed-in home screen shared by residents and crews: a white bar with
+// the logo and the account menu, four numbers in a two-by-two grid (like the
+// website's summary cards), then the latest reports as cards.
 export function HomeScaffold({ subtitle, stats, listTitle, reports, emptyText, onOpen }: Props) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const tabBarSpace = useTabBarSpace();
   const { user, loaded, connection, refresh } = useSession();
   const [refreshing, setRefreshing] = useState(false);
 
@@ -43,15 +46,17 @@ export function HomeScaffold({ subtitle, stats, listTitle, reports, emptyText, o
 
   return (
     <View style={styles.root}>
-      <View style={[styles.top, { paddingTop: insets.top + 10 }]}>
-        <Logotype height={18} />
-        <View style={styles.topRight}>
-          <LiveBadge />
-          <AccountMenu />
-        </View>
+      <View
+        style={[
+          styles.top,
+          { paddingTop: insets.top + 10, backgroundColor: colors.surface, borderBottomColor: colors.border },
+        ]}
+      >
+        <Logotype height={22} />
+        <AccountMenu />
       </View>
       <ScrollView
-        contentContainerStyle={[styles.content, { paddingBottom: 24 }]}
+        contentContainerStyle={[styles.content, { paddingBottom: tabBarSpace + 24 }]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={pullToRefresh} tintColor={colors.accent} />}
       >
         <View style={styles.greeting}>
@@ -70,15 +75,23 @@ export function HomeScaffold({ subtitle, stats, listTitle, reports, emptyText, o
               {stats.map((stat) => (
                 <View
                   key={stat.label}
-                  accessibilityLabel={stat.label + ": " + (loaded ? stat.value : "loading")}
+                  accessible
+                  accessibilityLabel={stat.label + ": " + (loaded ? stat.value : "loading") + ". " + stat.caption}
                   style={[styles.stat, { backgroundColor: colors.surface, borderColor: colors.border }]}
                 >
-                  <View style={[styles.statBar, { backgroundColor: stat.color }]} />
+                  <View style={styles.statHead}>
+                    <AppText variant="caption" tone="text2" numberOfLines={1} style={styles.statLabel}>
+                      {stat.label}
+                    </AppText>
+                    <View style={[styles.statIcon, { backgroundColor: mix(stat.color, colors.surface, 0.14) }]}>
+                      <Icon name={stat.icon} size={14} color={stat.color} />
+                    </View>
+                  </View>
                   <AppText style={styles.statValue} tone="heading">
                     {loaded ? stat.value : "–"}
                   </AppText>
                   <AppText variant="caption" numberOfLines={2}>
-                    {stat.label}
+                    {stat.caption}
                   </AppText>
                 </View>
               ))}
@@ -111,14 +124,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
-    paddingBottom: 8,
+    paddingBottom: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  topRight: { flexDirection: "row", alignItems: "center", gap: 10 },
-  content: { paddingHorizontal: 16, paddingTop: 6, gap: 16 },
+  content: { paddingHorizontal: 16, paddingTop: 16, gap: 16 },
   greeting: { gap: 2 },
-  stats: { flexDirection: "row", gap: 8 },
-  stat: { flex: 1, paddingVertical: 8, paddingLeft: 11, paddingRight: 8, borderWidth: 1, borderRadius: radius.md, overflow: "hidden" },
-  statBar: { position: "absolute", left: 0, top: 0, bottom: 0, width: 3 },
-  statValue: { fontFamily: fonts.bold, fontSize: 18, lineHeight: 22 },
+  // Two cards to a row.
+  stats: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  stat: { flexGrow: 1, flexBasis: "40%", gap: 2, padding: 12, borderWidth: 1, borderRadius: radius.md },
+  statHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 6, marginBottom: 2 },
+  statLabel: { flex: 1, fontFamily: fonts.medium },
+  statIcon: { width: 24, height: 24, alignItems: "center", justifyContent: "center", borderRadius: radius.xs },
+  statValue: { fontFamily: fonts.bold, fontSize: 22, lineHeight: 27 },
   section: { gap: 10 },
 });

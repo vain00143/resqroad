@@ -84,6 +84,8 @@ function RootNavigator() {
           headerShadowVisible: false,
           headerTitleStyle: { fontFamily: fonts.semibold, fontSize: 16 },
           contentStyle: { backgroundColor: colors.bg },
+          // Pages such as a report slide in from the right, and back out to it.
+          animation: "slide_from_right",
         }}
       >
         {/* The welcome screen sends signed-in people to their own home. */}

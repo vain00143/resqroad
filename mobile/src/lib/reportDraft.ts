@@ -7,7 +7,7 @@ import { Platform } from "react-native";
 
 import type { MapPoint } from "@/components/map/mapHtml";
 import { keepExistingPhotos, photoLimits, type LocalPhoto } from "@/lib/photos";
-import type { Severity } from "@/lib/reports";
+import { splitPlace, type Severity } from "@/lib/reports";
 
 export type ReportDraft = {
   title: string;
@@ -15,11 +15,16 @@ export type ReportDraft = {
   description: string;
   point: MapPoint | null;
   road: string;
-  location: string;
+  barangay: string;
+  municipality: string;
   photos: LocalPhoto[];
   // The form's page (0–3) when it was saved, so it reopens there.
   step?: number;
 };
+
+// Drafts saved by version 1.2 and earlier kept the barangay and municipality
+// as one line.
+type SavedDraft = Partial<ReportDraft> & { location?: string };
 
 function storageKey(userId: string) {
   return "resqroad.reportDraft." + userId;
@@ -32,7 +37,8 @@ export function isEmptyDraft(draft: ReportDraft) {
     !draft.description.trim() &&
     !draft.point &&
     !draft.road.trim() &&
-    !draft.location.trim() &&
+    !draft.barangay.trim() &&
+    !draft.municipality.trim() &&
     draft.photos.length === 0
   );
 }
@@ -43,8 +49,19 @@ export async function loadReportDraft(userId: string): Promise<ReportDraft | nul
     if (!saved) {
       return null;
     }
-    const draft = JSON.parse(saved) as ReportDraft;
-    return { ...draft, photos: (await keepExistingPhotos(draft.photos ?? [])).slice(0, photoLimits.report) };
+    const { location, ...draft } = JSON.parse(saved) as SavedDraft;
+    const place = draft.barangay === undefined && location ? splitPlace(location) : null;
+    return {
+      title: draft.title ?? "",
+      severity: draft.severity ?? null,
+      description: draft.description ?? "",
+      point: draft.point ?? null,
+      road: draft.road ?? "",
+      barangay: place?.barangay ?? draft.barangay ?? "",
+      municipality: place?.municipality ?? draft.municipality ?? "",
+      step: draft.step,
+      photos: (await keepExistingPhotos(draft.photos ?? [])).slice(0, photoLimits.report),
+    };
   } catch {
     return null;
   }

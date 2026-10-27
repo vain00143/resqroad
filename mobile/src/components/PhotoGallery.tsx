@@ -33,8 +33,8 @@ function toItems(photos: (Photo | LocalPhoto)[]): Item[] {
 
 // Photos in one tidy frame whatever their number or orientation, like the
 // website's gallery: every photo is cropped to fill its tile. One photo fills
-// the width, two sit side by side, three are one large and two stacked, and
-// four or more make a grid with "+N" on the last tile. Tapping a tile opens
+// the width, two sit side by side, and three or more are one large and two
+// stacked, with "+N" on the third for the photos past it. Tapping a tile opens
 // the whole photo, uncropped, and the viewer swipes between them.
 export function PhotoGallery({ photos, label }: { photos: (Photo | LocalPhoto)[]; label?: string }) {
   const { colors } = useTheme();
@@ -90,26 +90,13 @@ export function PhotoGallery({ photos, label }: { photos: (Photo | LocalPhoto)[]
         {tile(1, styles.fill)}
       </View>
     );
-  } else if (count === 3) {
+  } else {
     layout = (
       <View style={styles.trio}>
         {tile(0, styles.large)}
         <View style={styles.column}>
           {tile(1, styles.fill)}
-          {tile(2, styles.fill)}
-        </View>
-      </View>
-    );
-  } else {
-    layout = (
-      <View style={styles.grid}>
-        <View style={styles.row}>
-          {tile(0, styles.fill)}
-          {tile(1, styles.fill)}
-        </View>
-        <View style={styles.row}>
-          {tile(2, styles.fill)}
-          {tile(3, styles.fill, count - 4)}
+          {tile(2, styles.fill, count - 3)}
         </View>
       </View>
     );
@@ -198,8 +185,6 @@ const styles = StyleSheet.create({
   single: { aspectRatio: 16 / 10 },
   pair: { flexDirection: "row", gap, aspectRatio: 2 },
   trio: { flexDirection: "row", gap, aspectRatio: 3 / 2 },
-  grid: { gap, aspectRatio: 4 / 3 },
-  row: { flex: 1, flexDirection: "row", gap },
   column: { flex: 1, gap },
   tile: { overflow: "hidden", borderRadius: radius.sm },
   fill: { flex: 1 },
