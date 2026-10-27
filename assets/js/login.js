@@ -27,6 +27,25 @@
     return auth.workspaceFor(user);
   }
 
+  // Browsers fill a saved email and password into the form as the page
+  // opens. The fields start read-only (login.html), which browsers don't
+  // fill, until the person taps or tabs into one, so the page always opens
+  // empty; saved sign-ins are still offered once a field is chosen.
+  function unlockFields() {
+    emailInput.readOnly = false;
+    passwordInput.readOnly = false;
+  }
+  [emailInput, passwordInput].forEach(function (input) {
+    input.addEventListener("pointerdown", unlockFields);
+    input.addEventListener("focus", unlockFields);
+  });
+  // Coming back with the Back button shows the page as it was left.
+  window.addEventListener("pageshow", function (event) {
+    if (event.persisted) {
+      form.reset();
+    }
+  });
+
   passwordToggle.addEventListener("click", function () {
     const isHidden = passwordInput.type === "password";
     passwordInput.type = isHidden ? "text" : "password";

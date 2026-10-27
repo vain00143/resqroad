@@ -515,6 +515,11 @@ html:has(> body.app-body) {
   gap: 0.35rem;
 }
 
+/* Without a search box (the resident portal), still at the right end. */
+.breadcrumb + .topbar-actions {
+  margin-left: auto;
+}
+
 .topbar .btn-icon {
   color: var(--text-2);
 }
@@ -1235,6 +1240,11 @@ button.crew-row:hover {
   margin-top: 1.5rem;
 }
 
+/* A block above the report title (possible duplicates), seen first. */
+.detail-block-first {
+  margin: 0 0 1.5rem;
+}
+
 .detail-block-head {
   margin-bottom: 0.75rem;
   display: flex;
@@ -1318,9 +1328,9 @@ button.crew-row:hover {
 }
 
 .facts dt {
-  color: var(--text-3);
+  color: var(--heading);
   font-size: 0.72rem;
-  font-weight: 500;
+  font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
@@ -1368,10 +1378,6 @@ button.crew-row:hover {
   border: 1px solid color-mix(in srgb, var(--tone) 35%, var(--border));
   border-radius: var(--radius-lg);
   background: color-mix(in srgb, var(--tone) 7%, var(--surface));
-}
-
-.duplicate-panel.is-info {
-  --tone: var(--accent);
 }
 
 .duplicate-head {
@@ -2456,6 +2462,7 @@ button.pv-fixed-item:hover {
   min-width: 0;
   display: flex;
   flex-direction: column;
+  justify-content: space-between;
   gap: 0.75rem;
 }
 
@@ -2473,10 +2480,6 @@ button.pv-fixed-item:hover {
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 3;
   line-clamp: 3;
-}
-
-.next-job .job-actions {
-  margin-top: auto;
 }
 
 /* ---------- Notifications popover ---------- */

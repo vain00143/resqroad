@@ -58,7 +58,7 @@ You need [Node.js](https://nodejs.org/) 20.12 or newer and MySQL 8.0 or newer
 | `index.html` | Everyone | Public landing page: live numbers, how it works, a live map of verified reports, recently fixed roads, and the report tracker at the bottom (`index.html?track=RPT-1048#track` opens a report there). |
 | `login.html` | Everyone | One sign-in for residents, administrators, and maintenance crews. The account decides which workspace opens. |
 | `register.html` | Residents | Create a free resident account (signs you in right away). |
-| `citizen.html` | Residents | Report a road problem in four steps (the problem, the location by map pin or GPS, photos, and a review before sending), follow every report you've filed, open its full details, rate a finished repair, and — without leaving the portal — track a report by ID, browse the live map, and see the public site. |
+| `citizen.html` | Residents | Report a road problem in four steps (the report details, the location by map pin or GPS, photos, and a review before sending), follow every report you've filed, open its full details, rate a finished repair, and — without leaving the portal — track a report by ID, browse the live map, and see the public site. |
 | `admin.html` | Administrator | Dashboard, Insights & Statistics (with a printable report), Review Reports, Task Dispatch, Live Map, User management, and the public site. |
 | `maintenance.html` | Maintenance crews | Overview, assigned jobs (start repairs, submit notes with after-repair photos), repair sites, and the public site. |
 | `admin-login.html`, `maintenance-login.html` | — | Old sign-in addresses; they redirect to `login.html`. |
@@ -118,13 +118,16 @@ reloads the 21 sample reports (accounts are kept).
 with `Rejected` and `Duplicate` as closing outcomes.
 
 1. A resident files a report from `citizen.html`, one step at a time (the
-   problem, the location, photos, then a review of everything before
+   report details; the location, with the road or street, barangay, and
+   municipality and province; photos; then a review of everything before
    sending). **Possible duplicates**: an open report within about 150 m that
    looks like the same road problem (distance, kind of problem, wording, and
    severity are compared in `assets/js/duplicates.js`) is shown on the review
    step. The resident can open it, or submit anyway if theirs is a different
-   problem; the administrator then sees which report it resembled. Nothing
-   is rejected automatically, and a fixed report nearby is only mentioned.
+   problem; the administrator then sees which report it resembled, at the top
+   of the report. Nothing is rejected automatically, and only open reports
+   count: a fixed report nearby isn't flagged, since damage that comes back
+   is a new problem.
 2. The administrator reviews it under **Review Reports → Needs review**
    (highest severity first, with possible duplicates tagged), marks it under
    review, and then verifies it (**Verify report** is only available once the
@@ -172,7 +175,7 @@ safe to run again). All times are stored in UTC.
 | --- | --- |
 | `users` | Every account: `name`, `email` (unique), `password_hash` (bcrypt), `role` (`admin` \| `maintenance` \| `citizen`), `team` (crews), `active`, `created_at`, `deleted_at` (deleted crew accounts). |
 | `sessions` | Signed-in devices: a SHA-256 hash of each session token (never the token itself), `user_id`, `client` (`web` \| `mobile`), `expires_at`. |
-| `reports` | Reports. The public ID is `RPT-` + `id` (new reports continue from the highest number). `title`, `road`, `location`, `latitude`, `longitude`, `severity`, `description`, `status`, `reporter_id` → `users`, `client_key` (the app's `Idempotency-Key` for the report, unique together with `reporter_id`, so a retried upload returns the report already filed), `assigned_to` → `users`, `assigned_name`, `repair_notes`, `repair_client_key` (the key of the latest repair upload), `repair_submitted_at`, `reported_at`, `updated_at`. `server/db.js` adds `client_key` and `repair_client_key` to databases set up before they existed when the server starts. |
+| `reports` | Reports. The public ID is `RPT-` + `id` (new reports continue from the highest number). `title`, `road`, `location` (the place line, "Barangay, Municipality, Province"; older reports may have just "Barangay, Municipality"), `latitude`, `longitude`, `severity`, `description`, `status`, `reporter_id` → `users`, `client_key` (the app's `Idempotency-Key` for the report, unique together with `reporter_id`, so a retried upload returns the report already filed), `assigned_to` → `users`, `assigned_name`, `repair_notes`, `repair_client_key` (the key of the latest repair upload), `repair_submitted_at`, `reported_at`, `updated_at`. `server/db.js` adds `client_key` and `repair_client_key` to databases set up before they existed when the server starts. |
 | `report_history` | Each workflow step: `report_id`, `status`, `description`, `actor` (name), `actor_id`, `note` (reason shown to the resident or crew), `created_at`. |
 | `report_notes` | Internal staff notes (administrators only): `report_id`, `note`, `actor`, `created_at`. |
 | `report_feedback` | The resident's rating of a finished repair, one per report: `report_id` (unique), `user_id`, `rating` (1–5), `comment`, `created_at`. Seen only by administrators and that resident. |
@@ -497,10 +500,12 @@ The design follows `ResQRoad Brandsheet.pdf`:
 - **Logo**: `assets/images/resqroad-mark.png` (the Q mark and favicon),
   `resqroad-logotype.png` (light backgrounds), `resqroad-logotype-white.png`
   (dark backgrounds).
-- **Themes**: the public site, sign-in, and registration are always dark and
-  share one continuous background. The three workspaces have light and dark
-  themes, following the system setting until someone picks one with **Switch
-  theme** in the account menu. Every page works at phone width.
+- **Themes**: sign-in and registration are always dark. The landing page
+  mixes both: the hero, the "For LGU teams" band, and the footer are dark;
+  How it works, the live map, and the tracker are light. The three
+  workspaces have light and dark themes, following the system setting until
+  someone picks one with the sun/moon button at the top right (beside the
+  notifications). Every page works at phone width.
 
 ## Code layout
 

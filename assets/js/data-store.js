@@ -611,7 +611,7 @@ async function addReport(input) {
 }
 
 // Existing reports that may describe the same road problem as `candidate`
-// (see duplicates.js). options: includeResolved, limit.
+// (see duplicates.js). options: limit.
 function findSimilarReports(candidate, options) {
   return similarReports(candidate, getState().reports, options);
 }

@@ -269,14 +269,17 @@
 
   // A grid of photo thumbnails. Each opens the lightbox through the page's
   // click handler, which reads the images in the same [data-gallery-group].
-  // `className` adds a layout, e.g. "gallery-grid" for an even grid. Without
-  // one, the photos fill the full width in a layout made for their number
-  // (one to five), whatever their orientation.
+  // `className` adds a layout, e.g. "gallery-grid" for rows of thumbnails.
+  // Without one, the photos fill the full width in a layout made for their
+  // number: one, two, or three (the first large beside two stacked). Past
+  // three, the third tile shows "+N" for the rest, which stay in the group so
+  // the lightbox still steps through every photo.
   function photoGallery(photos, label, className) {
     if (!photos.length) {
       return '<p class="muted text-sm">No photos</p>';
     }
-    const layout = className || (photos.length <= 5 ? "gallery-count-" + photos.length : "gallery-grid");
+    const layout = className || "gallery-count-" + Math.min(photos.length, 3);
+    const more = className ? 0 : photos.length - 3;
     return (
       '<div class="gallery ' +
       escapeHtml(layout) +
@@ -285,17 +288,22 @@
       '">' +
       photos
         .map(function (photo, index) {
+          const counter = more > 0 && index === 2;
           return (
             '<button class="gallery-item" type="button" data-gallery-index="' +
             index +
-            '" aria-label="View photo ' +
+            '"' +
+            (more > 0 && index > 2 ? " hidden" : "") +
+            ' aria-label="View photo ' +
             (index + 1) +
             " of " +
             photos.length +
             " full size" +
             (photo.alt ? ": " + escapeHtml(photo.alt) : "") +
+            (counter ? " (" + more + " more)" : "") +
             '">' +
             photoImg(photo) +
+            (counter ? '<span class="gallery-more" aria-hidden="true">+' + more + "</span>" : "") +
             "</button>"
           );
         })

@@ -143,14 +143,16 @@
       .includes(query);
   }
 
+  // The town in a place line: "Barangay, Municipality", "Barangay,
+  // Municipality, Bulacan", or just "Municipality, Bulacan".
   function municipality(location) {
     const parts = String(location || "").split(",").map(function (part) {
       return part.trim();
     });
-    if (parts.length < 2) {
-      return parts[0] || "Unknown";
+    if (parts.length > 1 && /^bulacan$/i.test(parts[parts.length - 1])) {
+      parts.pop();
     }
-    return parts[parts.length - 1] === "Bulacan" ? parts[0] : parts[parts.length - 1];
+    return parts[parts.length - 1] || "Unknown";
   }
 
   function monthBuckets(count) {
@@ -567,17 +569,13 @@
     if (!reviewStatuses.includes(report.status)) {
       return [];
     }
-    return store.findSimilarReports(report, { includeResolved: true, limit: 3 });
+    return store.findSimilarReports(report, { limit: 3 });
   }
 
   function renderReportCard(report, index, mode) {
     // Once a crew has submitted a repair, the card previews its after photos.
     const showsRepair = Boolean(report.repair) && ["repair_submitted", "resolved"].includes(report.status);
-    const flagged =
-      mode === "review" &&
-      possibleDuplicates(report).some(function (match) {
-        return match.active;
-      });
+    const flagged = mode === "review" && possibleDuplicates(report).length > 0;
     const photos = showsRepair ? ui.repairPhotos(report, "after") : ui.reportPhotos(report);
     const slides = photos
       .map(function (photo) {
@@ -1714,21 +1712,16 @@
         "</div></div></section>"
       : "";
 
-    // Reports that may be about the same road problem, to compare before
-    // deciding (and to mark this one as a duplicate if it is).
+    // Open reports that may be about the same road problem, to compare
+    // before deciding (and to mark this one as a duplicate if it is). It
+    // comes first, above the title, so it is seen right away.
     const duplicates = possibleDuplicates(report);
     const duplicateBlock = duplicates.length
-      ? '<section class="detail-block"><div class="detail-block-head"><h3>' +
+      ? '<section class="detail-block detail-block-first"><div class="detail-block-head"><h3>' +
         icon("copy") +
         'Possible duplicates</h3><span class="muted text-sm">' +
         esc(ui.pluralize(duplicates.length, "similar report")) +
-        '</span></div><div class="duplicate-panel' +
-        (duplicates.some(function (match) {
-          return match.active;
-        })
-          ? ""
-          : " is-info") +
-        '"><p class="muted text-sm" style="margin: 0">Close by and about the same kind of problem. Open one to compare; if they are the same damage, mark this report as a duplicate.</p><ul class="duplicate-list">' +
+        '</span></div><div class="duplicate-panel"><p class="muted text-sm" style="margin: 0">Close by and about the same kind of problem. Open one to compare; if they are the same damage, mark this report as a duplicate.</p><ul class="duplicate-list">' +
         duplicates
           .map(function (match) {
             return (
@@ -1777,6 +1770,7 @@
         : "";
 
     els.drawerBody.innerHTML =
+      duplicateBlock +
       '<h2 class="detail-title" id="drawer-title">' +
       esc(report.title) +
       '</h2><p class="detail-sub"><span>' +
@@ -1818,7 +1812,6 @@
       '</a></dd></div></dl></div><div class="detail-column"><div class="detail-block-head"><h3>' +
       icon("map") +
       'Map</h3></div><div class="detail-map"><div class="map" id="detail-map"></div></div></div></section>' +
-      duplicateBlock +
       '<section class="detail-block"><div class="detail-block-head"><h3>' +
       icon("hard-hat") +
       'Assign team</h3></div><div class="assign-box">' +

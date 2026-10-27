@@ -83,6 +83,9 @@
           <nav class="breadcrumb" aria-label="Breadcrumb">
             <span>Resident</span><svg data-icon="chevron-right"></svg><strong id="crumb-current">Report a problem</strong>
           </nav>
+          <div class="topbar-actions">
+            <button class="btn btn-ghost btn-icon theme-toggle" type="button" data-theme-toggle aria-label="Switch theme" title="Switch theme"><svg class="icon-sun" data-icon="sun"></svg><svg class="icon-moon" data-icon="moon"></svg></button>
+          </div>
         </header>
 
         <main class="content" id="main" tabindex="-1">
@@ -105,7 +108,7 @@
                 <nav class="card report-steps" aria-label="Report steps">
                   <ol class="stepper">
                     <li class="stepper-step" data-stepper="1">
-                      <button type="button" data-go-step="1"><span class="stepper-bar" aria-hidden="true"></span><span class="stepper-text"><small>Step 1</small><strong>Problem</strong></span></button>
+                      <button type="button" data-go-step="1"><span class="stepper-bar" aria-hidden="true"></span><span class="stepper-text"><small>Step 1</small><strong>Details</strong></span></button>
                     </li>
                     <li class="stepper-step" data-stepper="2">
                       <button type="button" data-go-step="2"><span class="stepper-bar" aria-hidden="true"></span><span class="stepper-text"><small>Step 2</small><strong>Location</strong></span></button>
@@ -124,7 +127,7 @@
                   <div class="form-section-head">
                     <span class="form-step-badge">1</span>
                     <div>
-                      <h2>What's the problem?</h2>
+                      <h2>Report details</h2>
                       <p>Give the road damage a short title and tell us how serious it is.</p>
                     </div>
                   </div>
@@ -171,7 +174,7 @@
                   <div class="form-section-head">
                     <span class="form-step-badge">2</span>
                     <div>
-                      <h2>Where is it?</h2>
+                      <h2>Location</h2>
                       <p>Tap the map to drop a pin on the exact spot, or use your current location.</p>
                     </div>
                   </div>
@@ -202,12 +205,17 @@
                         <input name="road" maxlength="80" placeholder="e.g. MacArthur Highway" list="road-suggestions" autocomplete="off" />
                       </label>
                       <label class="field">
-                        <span class="field-label">Barangay and municipality</span>
-                        <input name="location" maxlength="80" placeholder="e.g. Guinhawa, Malolos City" list="place-suggestions" autocomplete="off" />
+                        <span class="field-label">Barangay</span>
+                        <input name="barangay" maxlength="60" placeholder="e.g. Guinhawa" list="barangay-suggestions" autocomplete="off" />
+                      </label>
+                      <label class="field span-2">
+                        <span class="field-label">Municipality and province</span>
+                        <input name="municipality" maxlength="90" placeholder="e.g. Malolos City, Bulacan" list="municipality-suggestions" autocomplete="off" />
                       </label>
                     </div>
                     <datalist id="road-suggestions"></datalist>
-                    <datalist id="place-suggestions"></datalist>
+                    <datalist id="barangay-suggestions"></datalist>
+                    <datalist id="municipality-suggestions"></datalist>
                   </div>
                 </section>
 
@@ -245,7 +253,7 @@
                   <p data-step-note><svg data-icon="shield-check" class="icon-sm"></svg> Your name stays private. Only the Road Maintenance Office sees who filed the report.</p>
                   <div class="form-nav">
                     <button class="btn btn-secondary btn-lg" type="button" data-step-back hidden><svg data-icon="arrow-left"></svg>Back</button>
-                    <button class="btn btn-primary btn-lg" type="submit" data-step-next><span data-step-next-label>Next: Location</span><svg data-icon="arrow-right"></svg></button>
+                    <button class="btn btn-primary btn-lg" type="submit" data-step-next>Next<svg data-icon="arrow-right"></svg></button>
                     <button class="btn btn-primary btn-lg" type="submit" data-step-submit hidden><svg data-icon="send"></svg>Submit report</button>
                   </div>
                 </div>
@@ -419,7 +427,6 @@
       <div class="menu-label" data-current-email></div>
       <a class="menu-item" role="menuitem" href="#track" data-portal-tab="track"><svg data-icon="search"></svg>Track a report</a>
       <button class="menu-item" role="menuitem" type="button" data-change-password><svg data-icon="lock"></svg>Change password</button>
-      <button class="menu-item" role="menuitem" type="button" data-theme-toggle><svg data-icon="moon"></svg>Switch theme</button>
       <div class="menu-sep" role="separator"></div>
       <button class="menu-item is-danger" role="menuitem" type="button" data-sign-out="index.html"><svg data-icon="log-out"></svg>Log out</button>
     </div>

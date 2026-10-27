@@ -193,7 +193,7 @@
         "</span><h3>You're all caught up</h3><p>When an administrator assigns a verified report, it will appear here.</p></div>";
     } else {
       // The job fills the card: photo on the left, then what, where, the
-      // progress, and the actions.
+      // description, the progress, and the actions, evenly spaced.
       const photo = ui.reportPhotos(next)[0];
       const assigned = lastEvent(next, "assigned");
       $("#next-job").innerHTML =

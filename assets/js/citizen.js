@@ -420,7 +420,8 @@
     }
     if (step === 2) {
       const road = form.elements.namedItem("road");
-      const location = form.elements.namedItem("location");
+      const barangay = form.elements.namedItem("barangay");
+      const municipality = form.elements.namedItem("municipality");
       const lat = Number(latInput.value);
       const lng = Number(lngInput.value);
       if (!latInput.value.trim() || !lngInput.value.trim() || !Number.isFinite(lat) || !Number.isFinite(lng)) {
@@ -431,8 +432,11 @@
       if (!road.value.trim()) {
         problems.push([road, "Enter the road or street name."]);
       }
-      if (!location.value.trim()) {
-        problems.push([location, "Enter the barangay and municipality."]);
+      if (!barangay.value.trim()) {
+        problems.push([barangay, "Enter the barangay."]);
+      }
+      if (!municipality.value.trim()) {
+        problems.push([municipality, "Enter the municipality and province."]);
       }
     }
 
@@ -468,10 +472,10 @@
 
   /* ---------- Report steps ---------- */
 
-  // The form shows one step at a time: 1 the problem, 2 the location, 3 the
-  // photos, and 4 a review of everything before it is sent. Going back keeps
-  // everything already entered (fields, the pin, and the photos).
-  const stepNames = { 1: "Problem", 2: "Location", 3: "Photos", 4: "Review" };
+  // The form shows one step at a time: 1 the report details, 2 the location,
+  // 3 the photos, and 4 a review of everything before it is sent. Going back
+  // keeps everything already entered (fields, the pin, and the photos).
+  const stepNames = { 1: "Details", 2: "Location", 3: "Photos", 4: "Review" };
 
   function stepSection(step) {
     return form.querySelector('[data-step="' + step + '"]');
@@ -505,9 +509,6 @@
     $("[data-step-back]").hidden = currentStep === 1;
     $("[data-step-next]").hidden = currentStep === 4;
     $("[data-step-submit]").hidden = currentStep !== 4;
-    if (currentStep < 4) {
-      $("[data-step-next-label]").textContent = "Next: " + stepNames[currentStep + 1];
-    }
     updateProgress();
     if (currentStep === 2 && picker) {
       window.setTimeout(function () {
@@ -548,13 +549,20 @@
     return true;
   }
 
+  // The report keeps one place line: "Barangay, Municipality, Province".
+  function placeValue() {
+    return form.elements.namedItem("barangay").value.trim() + ", " + form.elements.namedItem("municipality").value.trim();
+  }
+
   function reportValues() {
     return {
       title: form.elements.namedItem("title").value.trim(),
       description: form.elements.namedItem("description").value.trim(),
       severity: selectedSeverity(),
       road: form.elements.namedItem("road").value.trim(),
-      location: form.elements.namedItem("location").value.trim(),
+      barangay: form.elements.namedItem("barangay").value.trim(),
+      municipality: form.elements.namedItem("municipality").value.trim(),
+      location: placeValue(),
       latitude: Number(latInput.value),
       longitude: Number(lngInput.value),
     };
@@ -584,30 +592,22 @@
       location: "",
     };
     const near = summary.distance <= 25 ? "At almost the same spot" : "About " + Math.round(summary.distance / 5) * 5 + " m away";
-    return { report: report, distance: summary.distance, active: true, reasons: [near] };
+    return { report: report, distance: summary.distance, reasons: [near] };
   }
 
-  // Reports that may be about the same road problem: open ones need a
-  // decision before sending; a fixed one is only for information.
+  // Open reports that may be about the same road problem: the resident
+  // decides before sending. Fixed reports don't count, since damage that
+  // comes back after a repair is a new problem.
   function duplicatePanel(matches) {
     if (!matches.length) {
       return "";
     }
-    const active = matches.some(function (match) {
-      return match.active;
-    });
     return (
-      '<section class="duplicate-panel' +
-      (active ? "" : " is-info") +
-      '" aria-labelledby="duplicate-title"><div class="duplicate-head">' +
-      icon(active ? "alert-triangle" : "info") +
-      '<div><h3 id="duplicate-title">' +
-      (active ? "Possible duplicate report" : "A similar report here was already fixed") +
-      "</h3><p>" +
+      '<section class="duplicate-panel" aria-labelledby="duplicate-title"><div class="duplicate-head">' +
+      icon("alert-triangle") +
+      '<div><h3 id="duplicate-title">Possible duplicate report</h3><p>' +
       esc(
-        active
-          ? "A report that looks like the same road problem is already with the Road Maintenance Office. Check it before you send yours. If yours is about a different problem, you can still submit it."
-          : "This spot had a similar problem that was repaired. If the damage is back, go ahead and submit your report.",
+        "A report that looks like the same road problem is already with the Road Maintenance Office. Check it before you send yours. If yours is about a different problem, you can still submit it.",
       ) +
       '</p></div></div><ul class="duplicate-list">' +
       matches
@@ -645,13 +645,13 @@
       reviewMap.destroy();
       reviewMap = null;
     }
-    reviewMatches = serverMatches || store.findSimilarReports(values, { includeResolved: true, limit: 3 });
+    reviewMatches = serverMatches || store.findSimilarReports(values, { limit: 3 });
     const box = $("#report-review");
     box.innerHTML =
       duplicatePanel(reviewMatches) +
       reviewBlock(
         1,
-        "What's the problem?",
+        "Report details",
         '<dl class="facts"><div class="facts-wide"><dt>Title</dt><dd>' +
           esc(values.title) +
           '</dd></div><div class="facts-wide"><dt>Severity</dt><dd>' +
@@ -662,11 +662,13 @@
       ) +
       reviewBlock(
         2,
-        "Where is it?",
+        "Location",
         '<dl class="facts"><div><dt>Road or street</dt><dd>' +
           esc(values.road) +
-          "</dd></div><div><dt>Barangay and municipality</dt><dd>" +
-          esc(values.location) +
+          "</dd></div><div><dt>Barangay</dt><dd>" +
+          esc(values.barangay) +
+          '</dd></div><div class="facts-wide"><dt>Municipality and province</dt><dd>' +
+          esc(values.municipality) +
           '</dd></div><div class="facts-wide"><dt>GPS coordinates</dt><dd class="mono">' +
           esc(values.latitude.toFixed(6) + ", " + values.longitude.toFixed(6)) +
           '</dd></div></dl><div class="map review-map" data-review-map></div>',
@@ -781,7 +783,7 @@
       return;
     }
 
-    // Each report starts as a short summary; View details opens everything
+    // Each report starts as a short summary; View more details opens everything
     // about it (progress, photos, location, the repair, and every update).
     $("#my-reports").innerHTML = reports
       .map(function (report) {
@@ -790,20 +792,20 @@
         return (
           '<article class="card my-report"><div class="my-report-head"><div class="my-report-thumb">' +
           ui.photoImg(photo) +
-          '</div><div><span class="id-tag">' +
+          '</div><div><div class="toolbar-group"><span class="id-tag">' +
           esc(report.id) +
-          " · " +
-          esc(ui.formatDay(report.reportedAt)) +
-          "</span><h3>" +
+          "</span>" +
+          ui.severityBadge(report.severity) +
+          "</div><h3>" +
           esc(report.title) +
           '</h3><p class="job-meta" style="margin: 0"><span>' +
           icon("map-pin") +
           esc(report.road + " · " + report.location) +
-          "</span>" +
-          ui.severityBadge(report.severity) +
-          '</p></div><div class="my-report-side">' +
+          "</span><span>" +
+          icon("calendar") +
+          esc("Reported " + ui.formatDay(report.reportedAt)) +
+          '</span></p></div><div class="my-report-side">' +
           ui.statusPill(report.status) +
-          '<div class="my-report-actions">' +
           (canRate
             ? '<button class="btn btn-soft btn-sm" type="button" data-rate-report="' +
               esc(report.id) +
@@ -813,13 +815,11 @@
               esc(report.id) +
               "</span></button>"
             : "") +
-          '<button class="btn btn-secondary btn-sm" type="button" data-open-report="' +
+          '</div></div><button class="my-report-more" type="button" data-open-report="' +
           esc(report.id) +
-          '">' +
-          icon("file-text", "icon-sm") +
-          'View details<span class="visually-hidden"> of ' +
+          '">View more details<span class="visually-hidden"> of ' +
           esc(report.id) +
-          "</span></button></div></div></div></article>"
+          "</span></button></article>"
         );
       })
       .join("");
@@ -1726,10 +1726,8 @@
       }
     }
 
-    // A possible duplicate that's still open: the resident decides.
-    const active = reviewMatches.filter(function (match) {
-      return match.active;
-    });
+    // A possible duplicate (always an open report): the resident decides.
+    const active = reviewMatches;
     let confirmDuplicate = false;
     if (active.length) {
       const confirmed = await ui.confirm({
@@ -1756,7 +1754,7 @@
         reporterId: citizen.id,
         title: form.elements.namedItem("title").value,
         road: form.elements.namedItem("road").value,
-        location: form.elements.namedItem("location").value,
+        location: placeValue(),
         description: form.elements.namedItem("description").value,
         latitude: latInput.value,
         longitude: lngInput.value,
@@ -1857,24 +1855,43 @@
   try {
     render();
     rememberStatuses();
+    // Suggestions from earlier reports, whose place line is "Barangay,
+    // Municipality", "Barangay, Municipality, Bulacan", or "Municipality,
+    // Bulacan".
     const roads = new Set();
-    const places = new Set();
+    const barangays = new Set();
+    const municipalities = new Set();
     state.reports.forEach(function (report) {
+      const parts = String(report.location || "")
+        .split(",")
+        .map(function (part) {
+          return part.trim();
+        })
+        .filter(Boolean);
+      if (parts.length > 1 && /^bulacan$/i.test(parts[parts.length - 1])) {
+        parts.pop();
+      }
       roads.add(report.road);
-      places.add(report.location);
+      if (parts.length > 1) {
+        barangays.add(parts[0]);
+      }
+      if (parts.length) {
+        municipalities.add(parts[parts.length - 1] + ", Bulacan");
+      }
     });
-    $("#road-suggestions").innerHTML = Array.from(roads)
-      .sort()
-      .map(function (road) {
-        return '<option value="' + esc(road) + '"></option>';
-      })
-      .join("");
-    $("#place-suggestions").innerHTML = Array.from(places)
-      .sort()
-      .map(function (place) {
-        return '<option value="' + esc(place) + '"></option>';
-      })
-      .join("");
+    [
+      ["#road-suggestions", roads],
+      ["#barangay-suggestions", barangays],
+      ["#municipality-suggestions", municipalities],
+    ].forEach(function (list) {
+      $(list[0]).innerHTML = Array.from(list[1])
+        .filter(Boolean)
+        .sort()
+        .map(function (value) {
+          return '<option value="' + esc(value) + '"></option>';
+        })
+        .join("");
+    });
     initPicker();
     const initial = parseHash(window.location.hash);
     showView(initial.name, { id: initial.id });

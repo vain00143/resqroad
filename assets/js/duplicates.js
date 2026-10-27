@@ -7,7 +7,9 @@
    the kind of problem (pothole, crack, flooding, ...), how alike the titles
    and descriptions are, and the severity. Two different problems at the same
    spot (say, a pothole and a fallen sign) are not duplicates, and reports
-   farther apart than `duplicateRadiusMeters` never are. */
+   farther apart than `duplicateRadiusMeters` never are. Only open reports
+   count: once a report is resolved, rejected, or closed as a duplicate, a new
+   report at the same spot is a new problem. */
 
 export const duplicateRadiusMeters = 150;
 const sameSpotMeters = 25;
@@ -160,27 +162,22 @@ function compare(candidate, report) {
   return { distance: Math.round(distance), score: Math.round(score * 100) / 100, reasons: reasons };
 }
 
-// Existing reports that may describe the same road problem as `candidate`
-// ({ id?, title, description, severity, latitude/longitude or coordinates }).
-// Open reports come first. Fixed reports are included only with
-// options.includeResolved (useful to know about, but not the same as one
-// still being handled); rejected and duplicate reports never are.
+// Open reports that may describe the same road problem as `candidate`
+// ({ id?, title, description, severity, latitude/longitude or coordinates }),
+// most alike first. options.limit caps the list (default 5).
 export function findSimilarReports(candidate, reports, options) {
   const settings = options || {};
   return (reports || [])
     .filter(function (report) {
-      if (candidate.id && report.id === candidate.id) {
-        return false;
-      }
-      return isActiveReport(report) || (settings.includeResolved && report.status === "resolved");
+      return isActiveReport(report) && !(candidate.id && report.id === candidate.id);
     })
     .map(function (report) {
       const match = compare(candidate, report);
-      return match ? Object.assign({ report: report, active: isActiveReport(report) }, match) : null;
+      return match ? Object.assign({ report: report }, match) : null;
     })
     .filter(Boolean)
     .sort(function (first, second) {
-      return Number(second.active) - Number(first.active) || second.score - first.score || first.distance - second.distance;
+      return second.score - first.score || first.distance - second.distance;
     })
     .slice(0, settings.limit || 5);
 }

@@ -15,7 +15,10 @@
   font-display: swap;
 }
 
-:root {
+/* The light theme. .theme-light gives one part of an always-dark page (the
+   landing page's light bands) the same light surfaces and text. */
+:root,
+.theme-light {
   /* Brand palette — Road Orange, ten steps from deep burnt orange to sand. */
   --rr-900: #7b3621;
   --rr-800: #974328;
@@ -2390,9 +2393,10 @@ button.kpi:hover {
 }
 
 /* Report photos fill the whole width, whatever their number or orientation:
-   one photo spans the row, two share it, and three or more put the first
-   photo large beside the others. Every tile is cropped to its shape (never
-   stretched), so portrait and landscape photos leave no gaps. */
+   one photo spans the row, two share it, and three put the first photo large
+   beside two stacked (past three, the third shows "+N" for the rest). Every
+   tile is cropped to its shape (never stretched), so portrait and landscape
+   photos leave no gaps. */
 .gallery.gallery-count-1 {
   grid-template-columns: minmax(0, 1fr);
 }
@@ -2401,46 +2405,42 @@ button.kpi:hover {
   aspect-ratio: 16 / 9;
 }
 
-.gallery.gallery-count-2,
-.gallery.gallery-count-4 {
+.gallery.gallery-count-2 {
   grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.gallery.gallery-count-3,
-.gallery.gallery-count-5 {
-  grid-template-rows: repeat(2, minmax(0, 1fr));
 }
 
 .gallery.gallery-count-3 {
   grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  grid-template-rows: repeat(2, minmax(0, 1fr));
   aspect-ratio: 16 / 9;
 }
 
-.gallery.gallery-count-5 {
-  grid-template-columns: minmax(0, 2fr) repeat(2, minmax(0, 1fr));
-  aspect-ratio: 2 / 1;
-}
-
-.gallery.gallery-count-3 .gallery-item,
-.gallery.gallery-count-5 .gallery-item {
+.gallery.gallery-count-3 .gallery-item {
   min-height: 0;
   aspect-ratio: auto;
 }
 
-.gallery.gallery-count-3 .gallery-item:first-child,
-.gallery.gallery-count-5 .gallery-item:first-child {
+.gallery.gallery-count-3 .gallery-item:first-child {
   grid-row: 1 / -1;
 }
 
-/* An even grid that adds columns as space allows, for any number of photos
-   (e.g. a crew's after-repair photos); the photos always fill the row, and a
-   single photo spans it. */
-.gallery.gallery-grid {
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 8.5rem), 1fr));
+/* "+2" over the third photo when there are more; select it to see them. */
+.gallery-more {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgb(0 0 0 / 50%);
+  color: #fff;
+  font-size: clamp(1.25rem, 3vw, 1.75rem);
+  font-weight: 700;
+  pointer-events: none;
 }
 
-.gallery.gallery-grid .gallery-item:only-child {
-  aspect-ratio: 16 / 9;
+/* Small thumbnails in rows, for any number of photos (e.g. a crew's
+   after-repair photos). A single photo stays thumbnail-sized. */
+.gallery.gallery-grid {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 8rem), 1fr));
 }
 
 .gallery-item img {

@@ -3,9 +3,9 @@
    citizen portal, and the public report tracker.
    ========================================================================== */
 
-/* The public site, sign-in, and registration are always dark and share one
-   continuous background, the brand's ink with soft orange glows, so the page
-   never looks cut into bands between sections or between pages. */
+/* The public site, sign-in, and registration are dark and share one
+   continuous background, the brand's ink with soft orange glows. On the
+   landing page some sections are light bands (.theme-light). */
 .site-body {
   display: flex;
   flex-direction: column;
@@ -581,6 +581,25 @@
   background: transparent;
 }
 
+/* A light band on the landing page: light surfaces and text (see core.css),
+   while the hero, the LGU band, and the footer stay dark. */
+.section.theme-light {
+  background: var(--bg);
+  color: var(--text);
+}
+
+.section.section-surface.theme-light {
+  background: var(--surface-2);
+}
+
+:root[data-theme="dark"] .theme-light .step-num {
+  color: var(--surface-sunken);
+}
+
+:root[data-theme="dark"] .theme-light .map .leaflet-tile-pane {
+  filter: grayscale(0.92) sepia(0.12) contrast(0.92) brightness(1.04);
+}
+
 .section-head {
   max-width: 46rem;
   margin-bottom: clamp(2rem, 5vw, 3.25rem);
@@ -686,26 +705,30 @@
   font-size: 0.9rem;
 }
 
-/* Live map: the map is as tall as the progress tiles and Recently fixed
-   beside it, so no empty space is left under it. */
+/* Live map: the map is exactly as tall as the progress tiles and Recently
+   fixed beside it, and the severity legend sits below both. On narrow
+   screens the legend follows the map. */
 .live-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 22rem;
-  gap: 1.25rem;
-}
-
-.live-map-column {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
+  grid-template-areas:
+    "map side"
+    "legend legend";
+  gap: 0 1.25rem;
 }
 
 .live-grid .map {
-  flex: 1 1 auto;
+  grid-area: map;
+  min-width: 0;
   min-height: 24rem;
 }
 
+.live-legend {
+  grid-area: legend;
+}
+
 .live-side {
+  grid-area: side;
   display: grid;
   gap: 1.25rem;
   align-content: start;
@@ -938,8 +961,8 @@
   text-transform: none;
 }
 
-.track-recent {
-  margin: 0.9rem 0 0;
+.portal-recent.track-recent {
+  margin: 1.15rem 0 0;
 }
 
 /* The tracked report, under the two cards. */
@@ -1597,18 +1620,28 @@
   font-size: 1rem;
 }
 
-/* Status and the buttons, at the right of each report card. */
+/* Status (and Rate the repair), at the right of each report card. */
 .my-report-side {
   display: grid;
   justify-items: end;
   gap: 0.5rem;
 }
 
-.my-report-actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 0.4rem;
+.my-report-more {
+  width: 100%;
+  padding: 0.8rem 1.25rem;
+  display: block;
+  border: 0;
+  border-top: 1px solid var(--border);
+  background: transparent;
+  color: var(--link);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-align: left;
+}
+
+.my-report-more:hover {
+  background: var(--surface-2);
 }
 
 /* ---------- Track a report (in the portal) ---------- */
@@ -1796,12 +1829,19 @@
 
   .live-grid {
     grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "map"
+      "legend"
+      "side";
   }
 
   .live-grid .map {
-    flex: none;
     height: clamp(20rem, 60vw, 30rem);
     min-height: 0;
+  }
+
+  .live-legend {
+    margin-bottom: 1.25rem;
   }
 
   .footer-grid {
