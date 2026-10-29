@@ -90,9 +90,12 @@ A **report** (what everyone may see):
 - A history entry may have a `note`: the reason for a rejection, or what the
   crew still needs to fix.
 - Administrators, and the resident who filed it, also get `reporterId`,
-  `reporter` (name), and `feedback`: the resident's rating of the repair,
-  `{ "rating", "comment", "at" }`, or `null`. Administrators also get `notes`
-  (internal notes).
+  `reporter` (name), and `feedback`: the resident's feedback on the repair,
+  `{ "rating", "outcome", "tags", "comment", "photos", "at" }`, or `null`.
+  `outcome` is `fixed`, `partial`, `unresolved`, or `null` (ratings sent
+  before the question was asked); `tags` is a list of tag values from
+  `assets/js/feedback.js`; `photos` are photo objects like the others.
+  Administrators also get `notes` (internal notes).
 
 Statuses: `submitted`, `under_review`, `verified`, `assigned`, `in_progress`,
 `repair_submitted`, `resolved`, `rejected`, `duplicate`.
@@ -113,7 +116,7 @@ Statuses: `submitted`, `under_review`, `verified`, `assigned`, `in_progress`,
 | `GET /api/reports/:id` | Anyone | `{ report }` (`:id` is `RPT-1054` or `1054`). |
 | `POST /api/reports` | Resident | Multipart form: `title`, `road`, `location`, `description`, `severity` (`Low`\|`Medium`\|`High`), `latitude`, `longitude`, and up to five `photos` files. → `201 { report }`. An optional `Idempotency-Key` header (8–64 letters, numbers, `-`, `_`; one per report form) makes retries safe: sending the same key again returns `200 { report }` with the report it already filed. If an open report within about 150 m looks like the same road problem (distance, kind of problem, wording, and severity are compared), the answer is `409` with `duplicateId` and `possibleDuplicates: [{ id, title, status, distance }]` (meters). After the resident has checked them, send the form again with `confirmDuplicate=true` to file it anyway. |
 | `POST /api/reports/:id/status` | Admin | `{ status, note? }`: `under_review` (from submitted), `verified` (only from under review), `rejected` or `duplicate` (from submitted/under review), `resolved` or `in_progress` (= request more work, from repair submitted). |
-| `POST /api/reports/:id/feedback` | The resident who filed it | `{ rating, comment? }`: rate the finished repair, 1 to 5 stars, with an optional comment (500 characters). Only once the report is resolved, and only once per report. → `201 { report }`. |
+| `POST /api/reports/:id/feedback` | The resident who filed it | JSON or a multipart form: `rating` (1 to 5 stars), `outcome` (is the road fully repaired: `fixed`, `partial`, or `unresolved`), and optionally `tags` (a list, or one comma-separated value: `fast`, `quality`, `smooth`, `clean`, `debris`, `incomplete`, `uneven`, `slow`), `comment` (500 characters), and up to three `photos` files of the repaired road. Only once the report is resolved, and only once per report (`409` after that). → `201 { report }`. |
 | `POST /api/reports/:id/notes` | Admin | `{ note }`: internal note. |
 | `POST /api/reports/:id/assign` | Admin | `{ crewId }`: assign or reassign a verified report. |
 | `POST /api/reports/:id/start` | Assigned crew | Start the repair. |

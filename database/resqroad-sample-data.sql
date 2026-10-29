@@ -49,7 +49,7 @@ USE `resqroad`;
 CREATE TABLE `photos` (
   `id` int unsigned NOT NULL AUTO_INCREMENT,
   `report_id` int unsigned NOT NULL,
-  `kind` enum('evidence','before','after') COLLATE utf8mb4_unicode_ci NOT NULL,
+  `kind` enum('evidence','before','after','feedback') COLLATE utf8mb4_unicode_ci NOT NULL,
   `name` varchar(160) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'Original file name',
   `file_path` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `mime_type` varchar(40) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
@@ -129,6 +129,8 @@ CREATE TABLE `report_feedback` (
   `report_id` int unsigned NOT NULL,
   `user_id` int unsigned DEFAULT NULL,
   `rating` tinyint unsigned NOT NULL COMMENT '1 (poor) to 5 (excellent)',
+  `outcome` enum('fixed','partial','unresolved') COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'Is the road fully repaired? NULL on ratings sent before this was asked',
+  `tags` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'Quick tags, comma separated (fast, quality, smooth, ...)',
   `comment` text COLLATE utf8mb4_unicode_ci,
   `created_at` datetime(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   PRIMARY KEY (`id`),

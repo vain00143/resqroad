@@ -121,6 +121,30 @@ const addedColumns = [
       "ALTER TABLE reports ADD COLUMN repair_client_key VARCHAR(64) NULL " +
       "COMMENT 'Idempotency-Key of the latest repair upload' AFTER repair_notes",
   },
+  {
+    table: "report_feedback",
+    column: "outcome",
+    alter:
+      "ALTER TABLE report_feedback ADD COLUMN outcome ENUM('fixed', 'partial', 'unresolved') NULL " +
+      "COMMENT 'Is the road fully repaired? NULL on ratings sent before this was asked' AFTER rating",
+  },
+  {
+    table: "report_feedback",
+    column: "tags",
+    alter:
+      "ALTER TABLE report_feedback ADD COLUMN tags VARCHAR(255) NULL " +
+      "COMMENT 'Quick tags, comma separated (fast, quality, smooth, ...)' AFTER outcome",
+  },
+];
+
+// ENUM columns that gained a value after the first release.
+const widenedColumns = [
+  {
+    table: "photos",
+    column: "kind",
+    value: "feedback",
+    alter: "ALTER TABLE photos MODIFY COLUMN kind ENUM('evidence', 'before', 'after', 'feedback') NOT NULL",
+  },
 ];
 
 // Brings a database set up by an earlier version up to date.
@@ -134,6 +158,15 @@ export async function upgradeSchema(connection) {
       [item.table, item.column],
     );
     if (!rows.length) {
+      await connection.query(item.alter);
+    }
+  }
+  for (const item of widenedColumns) {
+    const [rows] = await connection.query(
+      "SELECT COLUMN_TYPE AS type FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?",
+      [item.table, item.column],
+    );
+    if (rows.length && !String(rows[0].type).includes("'" + item.value + "'")) {
       await connection.query(item.alter);
     }
   }

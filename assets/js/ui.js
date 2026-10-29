@@ -190,6 +190,70 @@
     return '<span class="rating-display" role="img" aria-label="' + rating + ' out of 5 stars">' + stars + "</span>";
   }
 
+  // "Fully repaired", "Partially repaired", or "Not repaired", as a pill in
+  // the answer's color. Empty for ratings sent before the question was asked.
+  function repairOutcomePill(value) {
+    const outcome = store().repairOutcome(value);
+    if (!outcome) {
+      return "";
+    }
+    return (
+      '<span class="pill outcome-pill status-' +
+      outcome.tone +
+      '">' +
+      icon(outcome.icon) +
+      escapeHtml(outcome.summary) +
+      "</span>"
+    );
+  }
+
+  // A resident's feedback on a finished repair: the stars, whether the road
+  // is fully repaired, the quick tags, the comment, and any photos of the
+  // repaired spot. options.emptyComment: shown when there's no comment.
+  function feedbackSummary(feedback, options) {
+    const settings = options || {};
+    const tags = (feedback.tags || []).map(store().feedbackTag).filter(Boolean);
+    const photos = photosWithData(feedback.photos);
+    return (
+      '<div class="callout feedback-result"><div class="feedback-result-head"><div class="rating-summary">' +
+      ratingStars(feedback.rating) +
+      "<strong>" +
+      escapeHtml(feedback.rating + " of 5 · " + ratingLabels[feedback.rating]) +
+      "</strong></div>" +
+      repairOutcomePill(feedback.outcome) +
+      "</div>" +
+      (tags.length
+        ? '<ul class="feedback-tags" aria-label="Tags">' +
+          tags
+            .map(function (tag) {
+              return (
+                '<li class="feedback-tag ' +
+                (tag.positive ? "is-positive" : "is-negative") +
+                '">' +
+                icon(tag.positive ? "check" : "alert-circle") +
+                escapeHtml(tag.label) +
+                "</li>"
+              );
+            })
+            .join("") +
+          "</ul>"
+        : "") +
+      (feedback.comment
+        ? '<p class="detail-description">' + escapeHtml(feedback.comment) + "</p>"
+        : settings.emptyComment
+          ? '<p class="muted text-sm" style="margin: 0">' + escapeHtml(settings.emptyComment) + "</p>"
+          : "") +
+      (photos.length
+        ? '<div class="repair-photos"><h4>Photos of the repaired road <span>' +
+          escapeHtml(pluralize(photos.length, "photo")) +
+          "</span></h4>" +
+          photoGallery(photos, "Photos of the repaired road", "gallery-grid") +
+          "</div>"
+        : "") +
+      "</div>"
+    );
+  }
+
   function initials(name) {
     const parts = String(name || "?")
       .replace(/[^A-Za-zÀ-ž\s.-]/g, "")
@@ -1872,6 +1936,8 @@
     severityBadge: severityBadge,
     ratingLabels: ratingLabels,
     ratingStars: ratingStars,
+    repairOutcomePill: repairOutcomePill,
+    feedbackSummary: feedbackSummary,
     initials: initials,
     avatar: avatar,
     reportPhotos: reportPhotos,

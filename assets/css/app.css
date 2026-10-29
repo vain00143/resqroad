@@ -1474,23 +1474,64 @@ button.crew-row:hover {
   font-size: 0.9rem;
 }
 
-.rating-result,
-.rating-form {
+/* A sent feedback (ui.feedbackSummary): stars and the answer to "Is the road
+   fully repaired?", then tags, the comment, and photos. */
+.feedback-result {
   display: grid;
   gap: 0.85rem;
 }
 
-.rating-field {
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 0.5rem;
-  border: 0;
+.feedback-result-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 0.75rem;
 }
 
-.rating-field legend {
-  margin-bottom: 0.5rem;
+.outcome-pill .icon {
+  width: 0.85rem;
+  height: 0.85rem;
+  color: var(--tone);
+}
+
+.feedback-tags {
+  margin: 0;
   padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  list-style: none;
+}
+
+.feedback-tag {
+  --tone: var(--success);
+  min-height: 1.6rem;
+  padding: 0.15rem 0.65rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border: 1px solid color-mix(in srgb, var(--tone) 24%, var(--border));
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--tone) 8%, var(--surface));
+  color: color-mix(in srgb, var(--tone) 50%, var(--text));
+  font-size: 0.76rem;
+  font-weight: 500;
+}
+
+.feedback-tag.is-negative {
+  --tone: var(--danger);
+}
+
+.feedback-tag .icon {
+  width: 0.8rem;
+  height: 0.8rem;
+  color: var(--tone);
+  stroke-width: 2.4;
+}
+
+.feedback-result .repair-photos {
+  margin-top: 0;
 }
 
 .rating-options {
@@ -1533,7 +1574,7 @@ button.crew-row:hover {
   transform: scale(1.08);
 }
 
-.rating-star:focus-within {
+.rating-star:has(input:focus-visible) {
   box-shadow: var(--focus-ring);
 }
 
@@ -1541,11 +1582,6 @@ button.crew-row:hover {
   color: var(--text-2);
   font-size: 0.82rem;
   font-weight: 600;
-}
-
-.rating-actions {
-  display: flex;
-  justify-content: flex-end;
 }
 
 .detail-map {

@@ -13,6 +13,14 @@
    README.md for the database schema and the API). */
 
 import { findSimilarReports as similarReports } from "./duplicates.js";
+import {
+  feedbackCommentMax,
+  feedbackPhotosMax,
+  feedbackTag,
+  feedbackTags,
+  repairOutcome,
+  repairOutcomes,
+} from "./feedback.js";
 
 const openStatuses = ["submitted", "under_review", "verified", "assigned", "in_progress", "repair_submitted"];
 const closedStatuses = ["resolved", "rejected", "duplicate"];
@@ -616,26 +624,38 @@ function findSimilarReports(candidate, options) {
   return similarReports(candidate, getState().reports, options);
 }
 
-// The resident rates the repair of one of their resolved reports (1 to 5
-// stars, with an optional comment).
-async function submitFeedback(reportId, rating, comment) {
+// The resident gives feedback on the repair of one of their resolved reports.
+// input: { rating (1 to 5), outcome (fixed | partial | unresolved), tags?,
+// comment?, photos? (read with RoadWatchUI.readImageFile) }.
+async function submitFeedback(reportId, input) {
   requireRole(["citizen"]);
   const report = rawReport(reportId);
   if (report.status !== "resolved") {
-    throw new Error("You can rate the repair once the report is resolved.");
+    throw new Error("You can give feedback once the report is resolved.");
   }
-  const value = Number(rating);
-  if (!Number.isInteger(value) || value < 1 || value > 5) {
+  const rating = Number(input.rating);
+  if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
     throw new Error("Choose a rating from 1 to 5 stars.");
   }
-  const text = String(comment || "").trim();
-  if (text.length > 500) {
-    throw new Error("Keep your comment under 500 characters.");
+  if (!repairOutcome(input.outcome)) {
+    throw new Error("Tell us whether the road is fully repaired.");
   }
-  const body = await api("reports/" + encodeURIComponent(reportId) + "/feedback", {
-    method: "POST",
-    json: { rating: value, comment: text },
-  });
+  const tags = (input.tags || []).filter(feedbackTag);
+  const comment = String(input.comment || "").trim();
+  if (comment.length > feedbackCommentMax) {
+    throw new Error("Keep your comment under " + feedbackCommentMax + " characters.");
+  }
+  const photos = input.photos || [];
+  if (photos.length > feedbackPhotosMax) {
+    throw new Error("Choose no more than " + feedbackPhotosMax + " photos.");
+  }
+  const form = new FormData();
+  form.append("rating", String(rating));
+  form.append("outcome", input.outcome);
+  form.append("tags", tags.join(","));
+  form.append("comment", comment);
+  await appendPhotos(form, "photos", photos);
+  const body = await api("reports/" + encodeURIComponent(reportId) + "/feedback", { method: "POST", form: form });
   putReport(body.report, true);
   emit();
   return getReport(reportId) || body.report;
@@ -819,6 +839,12 @@ window.RoadWatchStore = {
   addReport: addReport,
   findSimilarReports: findSimilarReports,
   submitFeedback: submitFeedback,
+  feedbackTags: feedbackTags,
+  feedbackTag: feedbackTag,
+  repairOutcomes: repairOutcomes,
+  repairOutcome: repairOutcome,
+  feedbackCommentMax: feedbackCommentMax,
+  feedbackPhotosMax: feedbackPhotosMax,
   addPersonnel: addPersonnel,
   deletePersonnel: deletePersonnel,
   registerCitizen: registerCitizen,

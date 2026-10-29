@@ -463,29 +463,67 @@ test("8. the administrator verifies the repair and resolves the report", async f
   assert.equal(reopened.status, 201);
 });
 
-test("8b. the resident rates the finished repair once, and only they and the administrator see it", async function () {
+function feedbackFiles() {
+  return fs
+    .readdirSync(photosDir, { recursive: true })
+    .filter((name) => String(name).includes("-feedback-"));
+}
+
+test("8b. the resident gives feedback on the finished repair once, and only they and the administrator see it", async function () {
   const url = "/api/reports/" + reportId + "/feedback";
-  assert.equal((await neighbour.request("POST", url, { rating: 5 })).status, 403, "only the resident who filed it");
-  assert.equal((await admin.request("POST", url, { rating: 5 })).status, 403, "staff can't rate");
-  assert.equal((await visitor.request("POST", url, { rating: 5 })).status, 401);
-  assert.equal((await resident.request("POST", url, { rating: 9 })).status, 400);
+  const answer = { rating: 5, outcome: "fixed" };
+  assert.equal((await neighbour.request("POST", url, answer)).status, 403, "only the resident who filed it");
+  assert.equal((await admin.request("POST", url, answer)).status, 403, "staff can't give feedback");
+  assert.equal((await visitor.request("POST", url, answer)).status, 401);
+  assert.equal((await resident.request("POST", url, { rating: 9, outcome: "fixed" })).status, 400);
+  assert.equal((await resident.request("POST", url, { rating: 4 })).status, 400, "is the road fully repaired? is required");
+  assert.equal((await resident.request("POST", url, { rating: 4, outcome: "maybe" })).status, 400);
+  assert.equal((await resident.request("POST", url, { rating: 4, outcome: "fixed", tags: ["fast", "free-lunch"] })).status, 400, "only listed tags");
+  assert.equal((await resident.request("POST", url, { rating: 4, outcome: "fixed", comment: "x".repeat(501) })).status, 400);
+  const notPhoto = photoForm(answer, [["photos", Buffer.from("not an image"), "notes.txt", "text/plain"]]);
+  assert.equal((await resident.request("POST", url, notPhoto)).status, 400);
+  const fourPhotos = photoForm(answer, [1, 2, 3, 4].map((n) => ["photos", jpeg, "repair-" + n + ".jpg", "image/jpeg"]));
+  const tooMany = await resident.request("POST", url, fourPhotos);
+  assert.equal(tooMany.status, 400);
+  assert.match(tooMany.body.error, /no more than 3 photos/);
+  assert.equal(feedbackFiles().length, 0, "nothing is kept from refused feedback");
 
-  const sent = await resident.request("POST", url, { rating: 4, comment: "Smooth now, thank you." });
+  const sent = await resident.request(
+    "POST",
+    url,
+    photoForm({ rating: 4, outcome: "partial", tags: "smooth,debris,smooth", comment: "Smooth now, but gravel was left by the curb." }, [
+      ["photos", png, "repaired.png", "image/png"],
+    ]),
+  );
   assert.equal(sent.status, 201, JSON.stringify(sent.body));
-  assert.equal(sent.body.report.feedback.rating, 4);
-  assert.equal(sent.body.report.feedback.comment, "Smooth now, thank you.");
+  const feedback = sent.body.report.feedback;
+  assert.equal(feedback.rating, 4);
+  assert.equal(feedback.outcome, "partial");
+  assert.deepEqual(feedback.tags, ["smooth", "debris"]);
+  assert.equal(feedback.comment, "Smooth now, but gravel was left by the curb.");
+  assert.equal(feedback.photos.length, 1);
+  assert.equal(feedback.photos[0].name, "repaired.png");
+  assert.equal((await visitor.request("GET", feedback.photos[0].src)).status, 200);
+  const otherPhotos = sent.body.report.evidencePhotos.concat(sent.body.report.repair.afterPhotos);
+  assert.ok(otherPhotos.every((photo) => photo.src !== feedback.photos[0].src), "kept apart from report and repair photos");
   const live = await admin.waitFor((message) => message.type === "report" && message.report.id === reportId && message.report.feedback);
-  assert.equal(live.report.feedback.rating, 4, "the administrator sees it live");
+  assert.equal(live.report.feedback.outcome, "partial", "the administrator sees it live");
+  assert.deepEqual(live.report.feedback.tags, ["smooth", "debris"]);
+  assert.equal(live.report.feedback.photos.length, 1);
 
-  assert.equal((await resident.request("POST", url, { rating: 5 })).status, 409, "only one rating per report");
+  const again = await resident.request("POST", url, photoForm(answer, [["photos", jpeg, "again.jpg", "image/jpeg"]]));
+  assert.equal(again.status, 409, "only one feedback per report");
+  assert.equal(feedbackFiles().length, 1, "the refused photo isn't kept");
   assert.equal((await visitor.request("GET", "/api/reports/" + reportId)).body.report.feedback, undefined);
   assert.equal((await neighbour.request("GET", "/api/reports/" + reportId)).body.report.feedback, undefined);
+  const stored = await db.one("SELECT outcome, tags FROM report_feedback WHERE report_id = ?", [Number(reportId.slice(4))]);
+  assert.deepEqual({ outcome: stored.outcome, tags: stored.tags }, { outcome: "partial", tags: "smooth,debris" });
 });
 
 test("9. rejected and duplicate reports close with the reason shown to the resident", async function () {
   const extra = await resident.request("POST", "/api/reports", reportForm({ title: "Crack near the plaza", latitude: 14.9, longitude: 120.9 }));
   assert.equal(extra.status, 201);
-  const early = await resident.request("POST", "/api/reports/" + extra.body.report.id + "/feedback", { rating: 3 });
+  const early = await resident.request("POST", "/api/reports/" + extra.body.report.id + "/feedback", { rating: 3, outcome: "fixed" });
   assert.equal(early.status, 409, "no rating before the repair is resolved");
   const reject = await admin.request("POST", "/api/reports/" + extra.body.report.id + "/status", {
     status: "rejected",

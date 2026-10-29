@@ -13,6 +13,7 @@ import { one, query, transaction } from "./db.js";
 import { broadcast } from "./live.js";
 import { checkPhotos, photoUpload, photoUrl, removePhotoFiles, savePhotos, storePhotoData } from "./photos.js";
 import { findSimilarReports } from "../assets/js/duplicates.js";
+import { feedbackCommentMax, feedbackPhotosMax, feedbackTag, repairOutcome } from "../assets/js/feedback.js";
 
 export const statuses = [
   "submitted",
@@ -86,7 +87,8 @@ function photoOut(row) {
   return { id: String(row.id), name: row.name, src: photoUrl(row.file_path) };
 }
 
-// Loads complete reports (with history, photos, and notes) for the given rows.
+// Loads complete reports (with history, photos, notes, and the resident's
+// feedback) for the given rows.
 async function hydrate(rows) {
   if (!rows.length) {
     return [];
@@ -102,12 +104,10 @@ async function hydrate(rows) {
   ]);
   const byReport = new Map(
     rows.map(function (row) {
-      return [row.id, { history: [], evidence: [], before: [], after: [], notes: [], feedback: null }];
+      return [row.id, { history: [], evidence: [], before: [], after: [], feedbackPhotos: [], notes: [], feedback: null }];
     }),
   );
-  feedback.forEach(function (row) {
-    byReport.get(row.report_id).feedback = { rating: row.rating, comment: row.comment || "", at: iso(row.created_at) };
-  });
+  const photoSets = { evidence: "evidence", before: "before", after: "after", feedback: "feedbackPhotos" };
   history.forEach(function (row) {
     const entry = { status: row.status, description: row.description, actor: row.actor, at: iso(row.created_at) };
     if (row.note) {
@@ -116,7 +116,18 @@ async function hydrate(rows) {
     byReport.get(row.report_id).history.push(entry);
   });
   photos.forEach(function (row) {
-    byReport.get(row.report_id)[row.kind].push(photoOut(row));
+    byReport.get(row.report_id)[photoSets[row.kind]].push(photoOut(row));
+  });
+  feedback.forEach(function (row) {
+    const extra = byReport.get(row.report_id);
+    extra.feedback = {
+      rating: row.rating,
+      outcome: row.outcome || null,
+      tags: row.tags ? row.tags.split(",") : [],
+      comment: row.comment || "",
+      photos: extra.feedbackPhotos,
+      at: iso(row.created_at),
+    };
   });
   notes.forEach(function (row) {
     byReport.get(row.report_id).notes.push({ id: String(row.id), note: row.note, actor: row.actor, at: iso(row.created_at) });
@@ -446,36 +457,72 @@ reportRoutes.post("/reports/:id/notes", requireRole("admin"), async function (re
   response.status(201).json({ report: forViewer(updated, request.user) });
 });
 
-// The resident who filed a report rates its repair once it is resolved.
-// Body: { rating (1 to 5), comment? }. One rating per report.
-reportRoutes.post("/reports/:id/feedback", requireRole("citizen"), async function (request, response) {
-  const id = parseReportId(request.params.id);
-  const body = request.body || {};
-  const rating = Number(body.rating);
-  if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
-    throw new HttpError(400, "Choose a rating from 1 to 5 stars.");
-  }
-  const comment = text(body.comment, "Comment", 500, false);
-  await transaction(async function (connection) {
-    const report = await lockReport(connection, id);
-    if (String(report.reporter_id) !== request.user.id) {
-      throw new HttpError(403, "Only the resident who filed this report can rate its repair.");
+// Quick tags from a JSON array, repeated form fields, or one comma-separated
+// value. Each must be one of the tags in assets/js/feedback.js.
+function feedbackTags(value) {
+  const list = (Array.isArray(value) ? value : String(value || "").split(","))
+    .map(function (item) {
+      return String(item).trim();
+    })
+    .filter(Boolean);
+  list.forEach(function (item) {
+    if (!feedbackTag(item)) {
+      throw new HttpError(400, "Choose tags from the list.");
     }
-    if (report.status !== "resolved") {
-      throw new HttpError(409, "You can rate the repair once the report is resolved.");
-    }
-    const [existing] = await connection.query("SELECT id FROM report_feedback WHERE report_id = ?", [id]);
-    if (existing.length) {
-      throw new HttpError(409, "You already sent feedback for this repair. Thank you!");
-    }
-    await connection.query(
-      "INSERT INTO report_feedback (report_id, user_id, rating, comment, created_at) VALUES (?, ?, ?, ?, UTC_TIMESTAMP(3))",
-      [id, request.user.id, rating, comment || null],
-    );
   });
-  const report = await publishReport(id);
-  response.status(201).json({ report: forViewer(report, request.user) });
-});
+  return Array.from(new Set(list));
+}
+
+// The resident who filed a report gives feedback on its repair once it is
+// resolved. JSON or a multipart form: `rating` (1 to 5), `outcome` (is the
+// road fully repaired: fixed, partial, or unresolved), optional `tags` and
+// `comment`, and up to three `photos` of the repaired spot. One per report.
+reportRoutes.post(
+  "/reports/:id/feedback",
+  requireRole("citizen"),
+  photoUpload([{ name: "photos", maxCount: feedbackPhotosMax }]),
+  async function (request, response) {
+    const id = parseReportId(request.params.id);
+    const body = request.body || {};
+    const rating = Number(body.rating);
+    if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+      throw new HttpError(400, "Choose a rating from 1 to 5 stars.");
+    }
+    if (!repairOutcome(body.outcome)) {
+      throw new HttpError(400, "Tell us whether the road is fully repaired.");
+    }
+    const tags = feedbackTags(body.tags);
+    const comment = text(body.comment, "Comment", feedbackCommentMax, false);
+    const photos = checkPhotos(request.files && request.files.photos);
+
+    const saved = await savePhotos(photos, reportCode(id) + "-feedback");
+    try {
+      await transaction(async function (connection) {
+        const report = await lockReport(connection, id);
+        if (String(report.reporter_id) !== request.user.id) {
+          throw new HttpError(403, "Only the resident who filed this report can give feedback on its repair.");
+        }
+        if (report.status !== "resolved") {
+          throw new HttpError(409, "You can give feedback once the report is resolved.");
+        }
+        const [existing] = await connection.query("SELECT id FROM report_feedback WHERE report_id = ?", [id]);
+        if (existing.length) {
+          throw new HttpError(409, "You already sent feedback for this repair. Thank you!");
+        }
+        await connection.query(
+          "INSERT INTO report_feedback (report_id, user_id, rating, outcome, tags, comment, created_at) VALUES (?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(3))",
+          [id, request.user.id, rating, body.outcome, tags.join(",") || null, comment || null],
+        );
+        await insertPhotos(connection, id, "feedback", saved, request.user);
+      });
+    } catch (error) {
+      await removePhotoFiles(saved);
+      throw error;
+    }
+    const report = await publishReport(id);
+    response.status(201).json({ report: forViewer(report, request.user) });
+  },
+);
 
 // Assign or reassign a verified report to a crew. Body: { crewId }.
 reportRoutes.post("/reports/:id/assign", requireRole("admin"), async function (request, response) {

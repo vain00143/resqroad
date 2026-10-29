@@ -788,7 +788,7 @@
     $("#my-reports").innerHTML = reports
       .map(function (report) {
         const photo = ui.reportPhotos(report)[0];
-        const canRate = report.status === "resolved" && !report.feedback;
+        const canRate = canGiveFeedback(report);
         return (
           '<article class="card my-report"><div class="my-report-head"><div class="my-report-thumb">' +
           ui.photoImg(photo) +
@@ -807,11 +807,11 @@
           '</span></p></div><div class="my-report-side">' +
           ui.statusPill(report.status) +
           (canRate
-            ? '<button class="btn btn-soft btn-sm" type="button" data-rate-report="' +
+            ? '<button class="btn btn-soft btn-sm" type="button" data-give-feedback="' +
               esc(report.id) +
               '">' +
               icon("star", "icon-sm") +
-              'Rate the repair<span class="visually-hidden"> of ' +
+              'Give feedback<span class="visually-hidden"> on the repair of ' +
               esc(report.id) +
               "</span></button>"
             : "") +
@@ -1184,14 +1184,6 @@
     }
     const sameReport = drawer.body.dataset.reportId === reportId;
     const scroll = sameReport ? drawer.body.scrollTop : 0;
-    // Live updates re-render the panel; keep a rating being written.
-    const feedbackForm = sameReport ? drawer.body.querySelector("[data-feedback-form]") : null;
-    const feedbackDraft = feedbackForm
-      ? {
-          rating: (feedbackForm.querySelector('input[name="rating"]:checked') || {}).value || "",
-          comment: feedbackForm.elements.namedItem("comment").value,
-        }
-      : null;
     if (detailMap) {
       detailMap.destroy();
       detailMap = null;
@@ -1215,7 +1207,9 @@
       icon("info") +
       "<span>" +
       esc(publicView.plainStatus[report.status] || "Status updated.") +
-      '</span></p><div class="journey-card">' +
+      "</span></p>" +
+      feedbackCta(report) +
+      '<div class="journey-card">' +
       ui.journey(report) +
       '</div><section class="detail-block"><div class="detail-block-head"><h3>' +
       icon("camera") +
@@ -1281,41 +1275,126 @@
       emptyMessage: "Location coordinates are unavailable.",
     });
     drawer.body.dataset.reportId = reportId;
-    const newFeedbackForm = drawer.body.querySelector("[data-feedback-form]");
-    if (feedbackDraft && newFeedbackForm) {
-      newFeedbackForm.elements.namedItem("comment").value = feedbackDraft.comment;
-      const star = newFeedbackForm.querySelector('input[name="rating"][value="' + feedbackDraft.rating + '"]');
-      if (star) {
-        star.checked = true;
-      }
-      showRating(newFeedbackForm, Number(feedbackDraft.rating) || 0);
-    }
     drawer.body.scrollTop = scroll;
   }
 
   /* ---------- Feedback on a finished repair ---------- */
 
-  // Once a report is resolved, its resident rates the repair (1 to 5 stars,
-  // with an optional comment). The rating is sent once and then shown here.
+  // Once a report is resolved, the resident who filed it gives feedback on
+  // the repair in a dialog: stars, whether the road is fully repaired, quick
+  // tags, a comment, and photos of the repaired spot. It is sent once and
+  // then shown in the report's details. Unsent answers are kept per report
+  // (until the page is closed) if the dialog is closed before sending.
+  const feedbackDrafts = new Map();
+  let feedbackDialog = null;
+
+  function canGiveFeedback(report) {
+    return report.status === "resolved" && !report.feedback;
+  }
+
+  // When the office verified the repair and closed the report.
+  function resolvedAt(report) {
+    const resolved = (report.history || []).filter(function (entry) {
+      return entry.status === "resolved";
+    });
+    return resolved.length ? resolved[resolved.length - 1].at : report.updatedAt;
+  }
+
+  // The invitation at the top of a resolved report's details.
+  function feedbackCta(report) {
+    if (!canGiveFeedback(report)) {
+      return "";
+    }
+    return (
+      '<div class="feedback-cta"><span class="feedback-cta-icon">' +
+      icon("star") +
+      '</span><div class="feedback-cta-copy"><strong>Your road was repaired. How did we do?</strong><span>Rate the repair and tell the office whether the road is fully fixed. It takes less than a minute.</span></div><button class="btn btn-primary" type="button" data-give-feedback="' +
+      esc(report.id) +
+      '">' +
+      icon("star", "icon-sm") +
+      "Give feedback</button></div>"
+    );
+  }
+
   function feedbackBlock(report) {
     if (report.status !== "resolved") {
       return "";
     }
-    if (report.feedback) {
-      return (
-        '<section class="detail-block" id="feedback-block"><div class="detail-block-head"><h3>' +
-        icon("star") +
-        'Your feedback</h3><span class="muted text-sm">' +
-        esc("Sent " + ui.formatDay(report.feedback.at)) +
-        '</span></div><div class="callout rating-result"><div class="rating-summary">' +
-        ui.ratingStars(report.feedback.rating) +
-        "<strong>" +
-        esc(ui.ratingLabels[report.feedback.rating]) +
-        "</strong></div>" +
-        (report.feedback.comment ? '<p class="detail-description">' + esc(report.feedback.comment) + "</p>" : "") +
-        '<p class="muted text-sm" style="margin: 0">Thank you. The Road Maintenance Office reads every rating.</p></div></section>'
-      );
-    }
+    return (
+      '<section class="detail-block" id="feedback-block"><div class="detail-block-head"><h3>' +
+      icon("star") +
+      "Your feedback</h3>" +
+      (report.feedback
+        ? '<span class="muted text-sm">' +
+          esc("Sent " + ui.formatDay(report.feedback.at)) +
+          "</span></div>" +
+          ui.feedbackSummary(report.feedback) +
+          '<p class="muted text-sm feedback-thanks">Thank you. The Road Maintenance Office reads every response.</p>'
+        : '</div><div class="callout feedback-empty"><p>You haven\'t given feedback on this repair yet.</p><button class="btn btn-soft btn-sm" type="button" data-give-feedback="' +
+          esc(report.id) +
+          '">' +
+          icon("star", "icon-sm") +
+          "Give feedback</button></div>") +
+      "</section>"
+    );
+  }
+
+  // The resident's own first photo (or the crew's) beside the crew's first
+  // after-repair photo. Reports filed without photos have no "before".
+  function beforeAndAfter(report) {
+    const listed = report.evidencePhotos || [];
+    const evidence = ui.photosWithData(listed).length || listed.length ? ui.reportPhotos(report) : [];
+    const before = evidence[0] || ui.repairPhotos(report, "before")[0];
+    const after = ui.repairPhotos(report, "after")[0];
+    return [
+      before ? { photo: before, label: "Before" } : null,
+      after ? { photo: after, label: "After" } : null,
+    ].filter(Boolean);
+  }
+
+  // The report being rated, at the top of the dialog.
+  function feedbackReportCard(report) {
+    const pair = beforeAndAfter(report);
+    return (
+      '<article class="feedback-report"><div class="feedback-report-copy"><div class="toolbar-group"><span class="id-tag">' +
+      esc(report.id) +
+      "</span>" +
+      ui.statusPill(report.status) +
+      "</div><h3>" +
+      esc(report.title) +
+      '</h3><dl class="feedback-report-facts"><div><dt>' +
+      icon("map-pin") +
+      "Location</dt><dd>" +
+      esc(report.road + " · " + report.location) +
+      "</dd></div><div><dt>" +
+      icon("calendar") +
+      "Resolved</dt><dd>" +
+      esc(ui.formatDay(resolvedAt(report))) +
+      "</dd></div></dl></div>" +
+      (pair.length
+        ? '<div class="feedback-compare" data-gallery-group aria-label="Before and after photos">' +
+          pair
+            .map(function (item, index) {
+              return (
+                '<button class="feedback-compare-item" type="button" data-gallery-index="' +
+                index +
+                '" aria-label="View the ' +
+                item.label.toLowerCase() +
+                ' photo full size">' +
+                ui.photoImg({ src: item.photo.src, alt: item.label + ": " + report.title }) +
+                '<span class="feedback-compare-label">' +
+                esc(item.label) +
+                "</span></button>"
+              );
+            })
+            .join("") +
+          "</div>"
+        : "") +
+      "</article>"
+    );
+  }
+
+  function feedbackForm(formId) {
     let stars = "";
     for (let value = 1; value <= 5; value += 1) {
       stars +=
@@ -1327,32 +1406,410 @@
         icon("star") +
         "</label>";
     }
+    const outcomes = store.repairOutcomes
+      .map(function (outcome) {
+        return (
+          '<label class="outcome-option status-' +
+          outcome.tone +
+          '"><input type="radio" name="outcome" value="' +
+          outcome.value +
+          '" /><span class="outcome-body">' +
+          icon(outcome.icon) +
+          "<strong>" +
+          esc(outcome.label) +
+          "</strong><small>" +
+          esc(outcome.hint) +
+          "</small></span></label>"
+        );
+      })
+      .join("");
+    const tags = store.feedbackTags
+      .map(function (tag) {
+        return (
+          '<label class="tag-option ' +
+          (tag.positive ? "is-positive" : "is-negative") +
+          '"><input type="checkbox" name="tags" value="' +
+          tag.value +
+          '" /><span>' +
+          icon("check") +
+          esc(tag.label) +
+          "</span></label>"
+        );
+      })
+      .join("");
     return (
-      '<section class="detail-block" id="feedback-block"><div class="detail-block-head"><h3>' +
-      icon("star") +
-      'Rate the repair</h3></div><form class="callout rating-form" data-feedback-form data-report-id="' +
-      esc(report.id) +
-      '" novalidate><fieldset class="rating-field"><legend class="field-label">How happy are you with how this road was fixed?</legend><div class="rating-options">' +
+      '<form class="feedback-form" id="' +
+      formId +
+      '" novalidate><fieldset class="feedback-question" data-question="rating"><legend class="field-label">Overall, how satisfied are you with the repair?</legend><div class="rating-row"><div class="rating-options">' +
       stars +
-      '</div><span class="rating-caption" data-rating-caption>Choose 1 to 5 stars.</span></fieldset><label class="field"><span class="field-label">Comment <span class="optional">Optional</span></span><textarea name="comment" rows="3" maxlength="500" placeholder="Tell the Road Maintenance Office how the repair turned out."></textarea></label><p class="field-error" data-feedback-error hidden></p><div class="rating-actions"><button class="btn btn-primary" type="submit">' +
-      icon("send", "icon-sm") +
-      "Send feedback</button></div></form></section>"
+      '</div><span class="rating-caption" data-rating-caption>Choose 1 to 5 stars.</span></div><p class="field-error" data-error="rating" hidden></p></fieldset>' +
+      '<fieldset class="feedback-question" data-question="outcome"><legend class="field-label">Is the pothole fully repaired?</legend><div class="outcome-options">' +
+      outcomes +
+      '</div><p class="field-error" data-error="outcome" hidden></p></fieldset>' +
+      '<fieldset class="feedback-question"><legend class="field-label">What stood out? <span class="optional">Optional · pick any</span></legend><div class="tag-options">' +
+      tags +
+      "</div></fieldset>" +
+      '<label class="field feedback-question"><span class="field-label">Comments <span class="optional">Optional</span></span><textarea name="comment" rows="3" maxlength="' +
+      store.feedbackCommentMax +
+      '" aria-describedby="' +
+      formId +
+      '-count"></textarea><span class="char-count" id="' +
+      formId +
+      '-count" data-comment-count></span></label>' +
+      '<div class="feedback-question"><span class="field-label" id="' +
+      formId +
+      '-photos">Photos of the repaired road <span class="optional">Optional · up to ' +
+      store.feedbackPhotosMax +
+      '</span></span><ul class="thumb-list" data-feedback-thumbs aria-live="polite"></ul><label class="dropzone dropzone-compact" data-feedback-dropzone><input type="file" accept="image/*" multiple data-feedback-photos aria-labelledby="' +
+      formId +
+      '-photos" /><span class="dropzone-icon">' +
+      icon("camera") +
+      '</span><strong>Add a photo of the finished repair</strong><span>Drop images here or browse · JPG, PNG, or WebP</span></label></div>' +
+      '<p class="alert alert-error feedback-error" role="alert" data-feedback-error hidden></p></form>'
     );
   }
 
-  // Lights up the stars up to `value` (the chosen or pointed-at rating).
-  function showRating(feedbackForm, value) {
-    feedbackForm.querySelectorAll(".rating-star").forEach(function (star, index) {
-      star.classList.toggle("is-on", index < value);
+  // Opens the feedback dialog for one of the resident's resolved reports.
+  function openFeedback(reportId, opener) {
+    const report = myReports().find(function (item) {
+      return item.id === reportId;
     });
-    feedbackForm.querySelector("[data-rating-caption]").textContent = value
-      ? ui.ratingLabels[value]
-      : "Choose 1 to 5 stars.";
-  }
+    if (!report || report.status !== "resolved") {
+      ui.showMessage("You can give feedback once the report is resolved.", "error");
+      return;
+    }
+    if (report.feedback) {
+      openDetails(reportId, opener);
+      return;
+    }
+    if (feedbackDialog) {
+      feedbackDialog.close();
+    }
 
-  function checkedRating(feedbackForm) {
-    const checked = feedbackForm.querySelector('input[name="rating"]:checked');
-    return checked ? Number(checked.value) : 0;
+    const formId = "feedback-form-" + Date.now();
+    const draft = feedbackDrafts.get(reportId) || { rating: 0, outcome: "", tags: [], comment: "", photos: [] };
+    let photos = draft.photos.slice();
+    let busy = false;
+    let sent = false;
+    const backdrop = document.createElement("div");
+    backdrop.className = "dialog-backdrop feedback-backdrop";
+    backdrop.innerHTML =
+      '<section class="dialog feedback-dialog" role="dialog" aria-modal="true" aria-labelledby="' +
+      formId +
+      '-title"><div class="feedback-dialog-head"><div class="dialog-head"><div class="dialog-icon">' +
+      icon("star", "icon-lg") +
+      '</div><div class="dialog-heading"><p class="dialog-kicker">Repair feedback</p><h2 class="dialog-title" id="' +
+      formId +
+      '-title" tabindex="-1">How was the repair?</h2></div></div><button class="btn btn-ghost btn-icon" type="button" data-feedback-close aria-label="Close">' +
+      icon("x") +
+      '</button></div><div class="feedback-dialog-body" data-feedback-body>' +
+      feedbackReportCard(report) +
+      feedbackForm(formId) +
+      '</div><div class="feedback-dialog-foot" data-feedback-foot><button class="btn btn-secondary" type="button" data-feedback-close>Cancel</button><button class="btn btn-primary" type="submit" form="' +
+      formId +
+      '" data-feedback-submit>' +
+      icon("send", "icon-sm") +
+      "Submit feedback</button></div></section>";
+    document.body.appendChild(backdrop);
+    const restoreInert = ui.setBackgroundInert([backdrop]);
+    const previousOverflow = document.documentElement.style.overflow;
+    document.documentElement.style.overflow = "hidden";
+
+    const body = backdrop.querySelector("[data-feedback-body]");
+    const formEl = backdrop.querySelector("#" + formId);
+    const comment = formEl.elements.namedItem("comment");
+    const submit = backdrop.querySelector("[data-feedback-submit]");
+    const errorBox = formEl.querySelector("[data-feedback-error]");
+    const dropzone = formEl.querySelector("[data-feedback-dropzone]");
+
+    function checkedValue(name) {
+      const checked = formEl.querySelector('input[name="' + name + '"]:checked');
+      return checked ? checked.value : "";
+    }
+
+    function readDraft() {
+      return {
+        rating: Number(checkedValue("rating")) || 0,
+        outcome: checkedValue("outcome"),
+        tags: Array.from(formEl.querySelectorAll('input[name="tags"]:checked')).map(function (input) {
+          return input.value;
+        }),
+        comment: comment.value,
+        photos: photos.slice(),
+      };
+    }
+
+    // Lights up the stars up to `value` (the chosen or pointed-at rating).
+    function showRating(value) {
+      formEl.querySelectorAll(".rating-star").forEach(function (star, index) {
+        star.classList.toggle("is-on", index < value);
+      });
+      formEl.querySelector("[data-rating-caption]").textContent = value ? ui.ratingLabels[value] : "Choose 1 to 5 stars.";
+    }
+
+    // The comment prompt follows the answer about the repair.
+    function showCommentPrompt() {
+      const outcome = checkedValue("outcome");
+      comment.placeholder =
+        outcome === "partial" || outcome === "unresolved"
+          ? "What still needs fixing? Describe where the damage is left."
+          : "Anything else the Road Maintenance Office should know?";
+    }
+
+    function showCount() {
+      const length = comment.value.length;
+      const counter = formEl.querySelector("[data-comment-count]");
+      counter.textContent = length + " / " + store.feedbackCommentMax;
+      counter.classList.toggle("is-near", length >= store.feedbackCommentMax - 50);
+    }
+
+    function renderPhotos() {
+      formEl.querySelector("[data-feedback-thumbs]").innerHTML = photos
+        .map(function (photo, index) {
+          return (
+            '<li class="thumb"><img src="' +
+            esc(photo.src) +
+            '" alt="" /><span>' +
+            esc(photo.name) +
+            '</span><button class="thumb-remove" type="button" data-remove-feedback-photo="' +
+            index +
+            '" aria-label="Remove ' +
+            esc(photo.name) +
+            '">' +
+            icon("x") +
+            "</button></li>"
+          );
+        })
+        .join("");
+      dropzone.hidden = photos.length >= store.feedbackPhotosMax;
+    }
+
+    function addPhotos(files) {
+      const room = store.feedbackPhotosMax - photos.length;
+      if (files.length > room) {
+        ui.showMessage("You can add up to " + store.feedbackPhotosMax + " photos. Only the first " + room + " were added.", "info");
+      }
+      Promise.all(
+        files.slice(0, room).map(function (file) {
+          return ui.readImageFile(file).catch(function (error) {
+            ui.showMessage(error.message, "error");
+            return null;
+          });
+        }),
+      ).then(function (results) {
+        photos = photos.concat(results.filter(Boolean)).slice(0, store.feedbackPhotosMax);
+        renderPhotos();
+      });
+    }
+
+    function showFieldError(name, message) {
+      const error = formEl.querySelector('[data-error="' + name + '"]');
+      error.innerHTML = icon("alert-circle", "icon-sm") + esc(message);
+      error.hidden = false;
+      formEl.querySelectorAll('input[name="' + name + '"]').forEach(function (input) {
+        input.setAttribute("aria-invalid", "true");
+      });
+    }
+
+    function clearFieldError(name) {
+      formEl.querySelector('[data-error="' + name + '"]').hidden = true;
+      formEl.querySelectorAll('input[name="' + name + '"]').forEach(function (input) {
+        input.removeAttribute("aria-invalid");
+      });
+    }
+
+    function setBusy(value) {
+      busy = value;
+      submit.classList.toggle("is-loading", value);
+      if (value) {
+        submit.setAttribute("aria-busy", "true");
+      } else {
+        submit.removeAttribute("aria-busy");
+      }
+      backdrop.querySelectorAll("[data-feedback-close], #" + formId + " input, #" + formId + " textarea, #" + formId + " button").forEach(function (element) {
+        element.disabled = value;
+      });
+    }
+
+    function showSent(updated) {
+      const feedback = updated && updated.feedback;
+      const outcome = store.repairOutcome(feedback && feedback.outcome);
+      backdrop.querySelector(".dialog-title").textContent = "Feedback sent";
+      body.innerHTML =
+        '<div class="feedback-success"><span class="success-mark">' +
+        icon("check") +
+        '</span><h3>Thank you for your feedback!</h3><p class="feedback-success-text">It was sent to the Road Maintenance Office with ' +
+        esc(reportId) +
+        ", and helps them check the quality of every repair.</p>" +
+        (feedback ? ui.feedbackSummary(feedback) : "") +
+        (outcome && outcome.value !== "fixed"
+          ? '<p class="alert alert-warning">' +
+            icon("alert-triangle") +
+            "<span>The office can see that the road still needs work, so they can follow up.</span></p>"
+          : "") +
+        "</div>";
+      backdrop.querySelector("[data-feedback-foot]").innerHTML =
+        '<button class="btn btn-primary" type="button" data-feedback-close>Done</button>';
+      body.scrollTop = 0;
+      backdrop.querySelector("[data-feedback-close].btn-primary").focus({ preventScroll: true });
+    }
+
+    function close() {
+      if (busy || feedbackDialog !== controller) {
+        return;
+      }
+      if (!sent) {
+        feedbackDrafts.set(reportId, readDraft());
+      }
+      feedbackDialog = null;
+      document.removeEventListener("keydown", onKeydown, true);
+      restoreInert();
+      document.documentElement.style.overflow = previousOverflow;
+      backdrop.classList.add("is-closing");
+      window.setTimeout(function () {
+        backdrop.remove();
+      }, 200);
+      // After sending, the button that opened the dialog is gone: the
+      // details (or the report's card) take the focus instead.
+      const fallback = drawer.panel.classList.contains("is-open")
+        ? drawer.close
+        : document.querySelector('[data-open-report="' + reportId + '"]');
+      const target = opener && opener.isConnected ? opener : fallback;
+      if (target) {
+        target.focus({ preventScroll: true });
+      }
+    }
+
+    // The lightbox (opened from a photo here) handles its own Escape.
+    function onKeydown(event) {
+      if (event.key === "Escape" && !backdrop.inert) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        close();
+      }
+    }
+
+    formEl.addEventListener("change", function (event) {
+      const name = event.target.name;
+      if (name === "rating") {
+        clearFieldError("rating");
+        showRating(Number(checkedValue("rating")));
+      } else if (name === "outcome") {
+        clearFieldError("outcome");
+        showCommentPrompt();
+      } else if (event.target.matches("[data-feedback-photos]")) {
+        addPhotos(Array.from(event.target.files || []));
+        event.target.value = "";
+      }
+    });
+    formEl.addEventListener("input", function (event) {
+      if (event.target === comment) {
+        showCount();
+      }
+    });
+    formEl.addEventListener("pointerover", function (event) {
+      const star = event.target.closest(".rating-star");
+      if (star) {
+        showRating(Number(star.querySelector("input").value));
+      }
+    });
+    formEl.addEventListener("pointerout", function (event) {
+      const options = event.target.closest(".rating-options");
+      if (options && !options.contains(event.relatedTarget)) {
+        showRating(Number(checkedValue("rating")));
+      }
+    });
+    ["dragenter", "dragover"].forEach(function (type) {
+      dropzone.addEventListener(type, function () {
+        dropzone.classList.add("is-dragging");
+      });
+    });
+    ["dragleave", "drop"].forEach(function (type) {
+      dropzone.addEventListener(type, function () {
+        dropzone.classList.remove("is-dragging");
+      });
+    });
+
+    formEl.addEventListener("submit", function (event) {
+      event.preventDefault();
+      if (busy) {
+        return;
+      }
+      const values = readDraft();
+      errorBox.hidden = true;
+      let firstInvalid = null;
+      if (!values.rating) {
+        showFieldError("rating", "Choose a star rating.");
+        firstInvalid = formEl.querySelector('input[name="rating"]');
+      }
+      if (!values.outcome) {
+        showFieldError("outcome", "Tell us whether the road is fully repaired.");
+        firstInvalid = firstInvalid || formEl.querySelector('input[name="outcome"]');
+      }
+      if (firstInvalid) {
+        firstInvalid.closest("fieldset").scrollIntoView({ block: "nearest", behavior: "smooth" });
+        firstInvalid.focus({ preventScroll: true });
+        return;
+      }
+      setBusy(true);
+      store
+        .submitFeedback(reportId, values)
+        .then(function (updated) {
+          sent = true;
+          setBusy(false);
+          feedbackDrafts.delete(reportId);
+          render();
+          showSent(updated);
+        })
+        .catch(function (failure) {
+          setBusy(false);
+          errorBox.innerHTML = icon("alert-circle") + "<span>" + esc(failure.message) + "</span>";
+          errorBox.hidden = false;
+          errorBox.scrollIntoView({ block: "nearest", behavior: "smooth" });
+          submit.focus({ preventScroll: true });
+        });
+    });
+
+    backdrop.addEventListener("click", function (event) {
+      const photo = event.target.closest("[data-gallery-index]");
+      const remove = event.target.closest("[data-remove-feedback-photo]");
+      if (event.target === backdrop || event.target.closest("[data-feedback-close]")) {
+        close();
+      } else if (remove) {
+        photos.splice(Number(remove.dataset.removeFeedbackPhoto), 1);
+        renderPhotos();
+        dropzone.querySelector("input").focus({ preventScroll: true });
+      } else if (photo) {
+        const images = Array.from(photo.closest("[data-gallery-group]").querySelectorAll("img")).map(function (image) {
+          return { src: image.currentSrc || image.src, alt: image.alt };
+        });
+        ui.openLightbox(images, Number(photo.dataset.galleryIndex), photo);
+      }
+    });
+
+    // Answers from an earlier, unsent try.
+    if (draft.rating) {
+      formEl.querySelector('input[name="rating"][value="' + draft.rating + '"]').checked = true;
+    }
+    if (draft.outcome) {
+      formEl.querySelector('input[name="outcome"][value="' + draft.outcome + '"]').checked = true;
+    }
+    draft.tags.forEach(function (value) {
+      const input = formEl.querySelector('input[name="tags"][value="' + value + '"]');
+      if (input) {
+        input.checked = true;
+      }
+    });
+    comment.value = draft.comment;
+    showRating(draft.rating);
+    showCommentPrompt();
+    showCount();
+    renderPhotos();
+
+    const controller = { close: close };
+    feedbackDialog = controller;
+    document.addEventListener("keydown", onKeydown, true);
+    backdrop.querySelector(".dialog-title").focus({ preventScroll: true });
   }
 
   function openDetails(reportId, opener) {
@@ -1464,20 +1921,10 @@
     } else if (event.target.closest("[data-open-report]")) {
       const button = event.target.closest("[data-open-report]");
       openDetails(button.dataset.openReport, button);
-    } else if (event.target.closest("[data-rate-report]")) {
-      // Opens the report's details at its rating form.
-      const button = event.target.closest("[data-rate-report]");
-      openDetails(button.dataset.rateReport, button);
-      const block = drawer.body.querySelector("#feedback-block");
-      if (block) {
-        window.setTimeout(function () {
-          block.scrollIntoView({ block: "start" });
-          const firstStar = block.querySelector('input[name="rating"]');
-          if (firstStar) {
-            firstStar.focus({ preventScroll: true });
-          }
-        }, 60);
-      }
+    } else if (event.target.closest("[data-give-feedback]")) {
+      // From a report's card or its details.
+      const button = event.target.closest("[data-give-feedback]");
+      openFeedback(button.dataset.giveFeedback, button);
     } else if (event.target.closest("[data-view-duplicate]")) {
       // The report form keeps everything while the resident checks it.
       const button = event.target.closest("[data-view-duplicate]");
@@ -1550,60 +1997,6 @@
     }
   });
 
-  // The rating stars light up as they're chosen or pointed at.
-  drawer.body.addEventListener("change", function (event) {
-    const feedbackForm = event.target.closest("[data-feedback-form]");
-    if (feedbackForm && event.target.name === "rating") {
-      feedbackForm.querySelector("[data-feedback-error]").hidden = true;
-      showRating(feedbackForm, checkedRating(feedbackForm));
-    }
-  });
-  drawer.body.addEventListener("pointerover", function (event) {
-    const star = event.target.closest(".rating-star");
-    if (star) {
-      showRating(star.closest("[data-feedback-form]"), Number(star.querySelector("input").value));
-    }
-  });
-  drawer.body.addEventListener("pointerout", function (event) {
-    const options = event.target.closest(".rating-options");
-    if (options && !options.contains(event.relatedTarget)) {
-      const feedbackForm = options.closest("[data-feedback-form]");
-      showRating(feedbackForm, checkedRating(feedbackForm));
-    }
-  });
-
-  drawer.body.addEventListener("submit", function (event) {
-    const feedbackForm = event.target.closest("[data-feedback-form]");
-    if (!feedbackForm) {
-      return;
-    }
-    event.preventDefault();
-    const button = feedbackForm.querySelector('button[type="submit"]');
-    const error = feedbackForm.querySelector("[data-feedback-error]");
-    const rating = checkedRating(feedbackForm);
-    if (button.classList.contains("is-loading")) {
-      return;
-    }
-    if (!rating) {
-      error.innerHTML = icon("alert-circle", "icon-sm") + "Choose 1 to 5 stars first.";
-      error.hidden = false;
-      feedbackForm.querySelector('input[name="rating"]').focus();
-      return;
-    }
-    error.hidden = true;
-    button.classList.add("is-loading");
-    store
-      .submitFeedback(feedbackForm.dataset.reportId, rating, feedbackForm.elements.namedItem("comment").value)
-      .then(function () {
-        ui.showMessage("Thank you for rating the repair.", "success");
-        render();
-      })
-      .catch(function (failure) {
-        button.classList.remove("is-loading");
-        error.innerHTML = icon("alert-circle", "icon-sm") + esc(failure.message);
-        error.hidden = false;
-      });
-  });
   drawer.close.addEventListener("click", function () {
     closeDetails();
   });
@@ -1838,7 +2231,7 @@
         if (before && before !== report.status) {
           ui.showMessage(
             report.status === "resolved"
-              ? report.id + " is fixed. Open it in My reports to rate the repair."
+              ? report.id + " is fixed. Open it in My reports to give feedback on the repair."
               : report.id + " is now " + ui.statusLabel(report.status) + ".",
             report.status === "rejected" ? "info" : "success",
           );

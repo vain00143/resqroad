@@ -1457,7 +1457,10 @@
         "Assigned crew",
         "Resolved at",
         "Resident rating",
+        "Road fully repaired (resident)",
+        "Feedback tags",
         "Resident feedback",
+        "Feedback photos",
       ],
     ];
     state.reports
@@ -1465,6 +1468,8 @@
       .sort(byNewest)
       .forEach(function (report) {
         const person = findPerson(report.assignedTo);
+        const feedback = report.feedback;
+        const outcome = feedback && store.repairOutcome(feedback.outcome);
         rows.push([
           report.id,
           report.title,
@@ -1478,8 +1483,18 @@
           new Date(report.reportedAt).toISOString(),
           person ? person.team + " (" + person.name + ")" : report.assignedName || "",
           report.status === "resolved" ? eventAt(report, "resolved") || "" : "",
-          report.feedback ? report.feedback.rating + " of 5" : "",
-          report.feedback ? report.feedback.comment : "",
+          feedback ? feedback.rating + " of 5" : "",
+          outcome ? outcome.summary : "",
+          feedback
+            ? feedback.tags
+                .map(function (value) {
+                  const tag = store.feedbackTag(value);
+                  return tag ? tag.label : value;
+                })
+                .join("; ")
+            : "",
+          feedback ? feedback.comment : "",
+          feedback ? (feedback.photos || []).length : "",
         ]);
       });
     ui.downloadCsv("resqroad-reports-" + new Date().toISOString().slice(0, 10) + ".csv", rows);
@@ -1747,7 +1762,9 @@
         "</ul></div></section>"
       : "";
 
-    // The resident's rating of the finished repair.
+    // The resident's feedback on the finished repair. A road the resident
+    // says isn't fully repaired is called out, so the office can follow up.
+    const notFixed = report.feedback && report.feedback.outcome && report.feedback.outcome !== "fixed";
     const feedback =
       report.status === "resolved"
         ? '<section class="detail-block"><div class="detail-block-head"><h3>' +
@@ -1755,17 +1772,20 @@
           "Resident feedback</h3>" +
           (report.feedback ? '<span class="muted text-sm">' + esc("Sent " + ui.formatDate(report.feedback.at)) + "</span>" : "") +
           "</div>" +
+          (notFixed
+            ? '<p class="alert alert-warning">' +
+              icon("alert-triangle") +
+              "<span>" +
+              esc(
+                "The resident says the road is " +
+                  (report.feedback.outcome === "partial" ? "only partially repaired" : "still not repaired") +
+                  ". Check the site and plan a follow-up repair if needed.",
+              ) +
+              "</span></p>"
+            : "") +
           (report.feedback
-            ? '<div class="callout rating-result"><div class="rating-summary">' +
-              ui.ratingStars(report.feedback.rating) +
-              "<strong>" +
-              esc(report.feedback.rating + " of 5 · " + ui.ratingLabels[report.feedback.rating]) +
-              "</strong></div>" +
-              (report.feedback.comment
-                ? '<p class="detail-description">' + esc(report.feedback.comment) + "</p>"
-                : '<p class="muted text-sm" style="margin: 0">No comment.</p>') +
-              "</div>"
-            : '<p class="muted text-sm" style="margin: 0">The resident hasn\'t rated this repair yet.</p>') +
+            ? ui.feedbackSummary(report.feedback, { emptyComment: "No comment." })
+            : '<p class="muted text-sm" style="margin: 0">The resident hasn\'t given feedback on this repair yet.</p>') +
           "</section>"
         : "";
 
@@ -2631,16 +2651,23 @@
         },
       };
     });
-    // Residents' ratings of finished repairs.
+    // Residents' feedback on finished repairs, in the color of their answer
+    // to "Is the road fully repaired?".
     const ratings = state.reports
       .filter(function (report) {
         return report.feedback;
       })
       .map(function (report) {
+        const outcome = store.repairOutcome(report.feedback.outcome);
         return {
           at: report.feedback.at,
-          status: "resolved",
-          title: report.id + " · Rated " + report.feedback.rating + " of 5",
+          status: outcome ? outcome.tone : "resolved",
+          title:
+            report.id +
+            " · Rated " +
+            report.feedback.rating +
+            " of 5" +
+            (outcome && outcome.value !== "fixed" ? " · " + outcome.summary : ""),
           description: report.title,
           meta: reporterName(report) + " · " + ui.relativeTime(report.feedback.at),
           run: function () {

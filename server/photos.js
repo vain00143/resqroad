@@ -31,13 +31,15 @@ export function photoUpload(fields) {
       fieldSize: 20000,
     },
   }).fields(specs);
-  // Too many photos in a field: say how many that field allows.
+  // Too many photos in a field: say how many that field allows. (Too many in
+  // all names no field; with a single field, that's the one.)
   return function (request, response, next) {
     upload(request, response, function (error) {
       if (error instanceof multer.MulterError && (error.code === "LIMIT_UNEXPECTED_FILE" || error.code === "LIMIT_FILE_COUNT")) {
-        const spec = specs.find(function (item) {
-          return item.name === error.field;
-        });
+        const spec =
+          specs.find(function (item) {
+            return item.name === error.field;
+          }) || (specs.length === 1 ? specs[0] : null);
         if (spec) {
           next(new HttpError(400, "Choose no more than " + spec.maxCount + " photos."));
           return;

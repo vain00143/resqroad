@@ -96,13 +96,17 @@ CREATE TABLE IF NOT EXISTS report_notes (
   CONSTRAINT notes_actor_fk FOREIGN KEY (actor_id) REFERENCES users (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- The resident's rating of a finished repair: one per report, given by the
--- resident who filed it once the report is resolved.
+-- The resident's feedback on a finished repair: one per report, given by the
+-- resident who filed it once the report is resolved. Photos of the repaired
+-- spot are in `photos` (kind 'feedback'); the tags are listed in
+-- assets/js/feedback.js.
 CREATE TABLE IF NOT EXISTS report_feedback (
   id         INT UNSIGNED     NOT NULL AUTO_INCREMENT,
   report_id  INT UNSIGNED     NOT NULL,
   user_id    INT UNSIGNED     NULL,
   rating     TINYINT UNSIGNED NOT NULL COMMENT '1 (poor) to 5 (excellent)',
+  outcome    ENUM('fixed', 'partial', 'unresolved') NULL COMMENT 'Is the road fully repaired? NULL on ratings sent before this was asked',
+  tags       VARCHAR(255)     NULL COMMENT 'Quick tags, comma separated (fast, quality, smooth, ...)',
   comment    TEXT             NULL,
   created_at DATETIME(3)      NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   PRIMARY KEY (id),
@@ -113,13 +117,14 @@ CREATE TABLE IF NOT EXISTS report_feedback (
   CONSTRAINT feedback_user_fk FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Evidence and repair photos. The image files live in storage/photos/;
--- `file_path` is relative to that folder. Sample reports list file names only
--- (file_path is NULL), and the website shows stock road photos for them.
+-- Evidence, repair, and feedback photos. The image files live in
+-- storage/photos/; `file_path` is relative to that folder. Sample reports list
+-- file names only (file_path is NULL), and the website shows stock road
+-- photos for them.
 CREATE TABLE IF NOT EXISTS photos (
   id          INT UNSIGNED NOT NULL AUTO_INCREMENT,
   report_id   INT UNSIGNED NOT NULL,
-  kind        ENUM('evidence', 'before', 'after') NOT NULL,
+  kind        ENUM('evidence', 'before', 'after', 'feedback') NOT NULL,
   name        VARCHAR(160) NOT NULL COMMENT 'Original file name',
   file_path   VARCHAR(255) NULL,
   mime_type   VARCHAR(40)  NULL,

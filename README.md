@@ -58,7 +58,7 @@ You need [Node.js](https://nodejs.org/) 20.12 or newer and MySQL 8.0 or newer
 | `index.html` | Everyone | Public landing page: live numbers, how it works, a live map of verified reports, recently fixed roads, and the report tracker at the bottom (`index.html?track=RPT-1048#track` opens a report there). |
 | `login.html` | Everyone | One sign-in for residents, administrators, and maintenance crews. The account decides which workspace opens. |
 | `register.html` | Residents | Create a free resident account (signs you in right away). |
-| `citizen.html` | Residents | Report a road problem in four steps (the report details, the location by map pin or GPS, photos, and a review before sending), follow every report you've filed, open its full details, rate a finished repair, and — without leaving the portal — track a report by ID, browse the live map, and see the public site. |
+| `citizen.html` | Residents | Report a road problem in four steps (the report details, the location by map pin or GPS, photos, and a review before sending), follow every report you've filed, open its full details, give feedback on a finished repair, and — without leaving the portal — track a report by ID, browse the live map, and see the public site. |
 | `admin.html` | Administrator | Dashboard, Insights & Statistics (with a printable report), Review Reports, Task Dispatch, Live Map, User management, and the public site. |
 | `maintenance.html` | Maintenance crews | Overview, assigned jobs (start repairs, submit notes with after-repair photos), repair sites, and the public site. |
 | `admin-login.html`, `maintenance-login.html` | — | Old sign-in addresses; they redirect to `login.html`. |
@@ -143,10 +143,20 @@ with `Rejected` and `Duplicate` as closing outcomes.
    resolves it or requests more work (the note is shown on the crew's job). A
    resubmitted repair replaces the photos shown; earlier ones are kept on the
    server for the record.
-6. Once a report is resolved, the resident who filed it can **rate the
-   repair** (1 to 5 stars and an optional comment, once per report) from its
-   details in My reports. Administrators see the rating in the report's
-   details, in their notifications, and in the CSV export.
+6. Once a report is resolved, the resident who filed it is invited to **give
+   feedback** (a banner at the top of the report's details, and **Give
+   feedback** on its card in My reports). The feedback dialog shows the
+   report (ID, place, the date it was resolved, and before and after photos)
+   and asks for 1 to 5 stars, whether the road is fully repaired (Yes,
+   Partially, or No), optional quick tags (Fast resolution, High-quality
+   repair, Smooth pavement, Site left clean, Left debris, Work incomplete,
+   Uneven surface, Took too long; the list is in `assets/js/feedback.js`), an
+   optional comment (500 characters), and up to three optional photos of the
+   repaired road. Rating and the repair question are required; answers are
+   kept if the dialog is closed before sending. Feedback is sent once per
+   report. Administrators see it in the report's details (with a warning when
+   the resident says the road isn't fully repaired), in their notifications,
+   and in the CSV export.
 
 The server enforces every rule above (who may make each change, and which step
 can follow which), for the website and the mobile app alike. Every decision is
@@ -178,8 +188,8 @@ safe to run again). All times are stored in UTC.
 | `reports` | Reports. The public ID is `RPT-` + `id` (new reports continue from the highest number). `title`, `road`, `location` (the place line, "Barangay, Municipality, Province"; older reports may have just "Barangay, Municipality"), `latitude`, `longitude`, `severity`, `description`, `status`, `reporter_id` → `users`, `client_key` (the app's `Idempotency-Key` for the report, unique together with `reporter_id`, so a retried upload returns the report already filed), `assigned_to` → `users`, `assigned_name`, `repair_notes`, `repair_client_key` (the key of the latest repair upload), `repair_submitted_at`, `reported_at`, `updated_at`. `server/db.js` adds `client_key` and `repair_client_key` to databases set up before they existed when the server starts. |
 | `report_history` | Each workflow step: `report_id`, `status`, `description`, `actor` (name), `actor_id`, `note` (reason shown to the resident or crew), `created_at`. |
 | `report_notes` | Internal staff notes (administrators only): `report_id`, `note`, `actor`, `created_at`. |
-| `report_feedback` | The resident's rating of a finished repair, one per report: `report_id` (unique), `user_id`, `rating` (1–5), `comment`, `created_at`. Seen only by administrators and that resident. |
-| `photos` | Evidence (`kind` = `evidence`) and repair (`before` \| `after`) photos: `report_id`, original `name`, `file_path` (inside `storage/photos/`, and the address under `/uploads/`), `mime_type`, `size_bytes`, `uploaded_by`, `replaced_at` (earlier repair photos after a resubmission). Sample reports list file names only (`file_path` is empty) and the website shows stock road photos for them. |
+| `report_feedback` | The resident's feedback on a finished repair, one per report: `report_id` (unique), `user_id`, `rating` (1–5), `outcome` (is the road fully repaired: `fixed` \| `partial` \| `unresolved`; empty on ratings sent before this was asked), `tags` (quick tags, comma separated), `comment`, `created_at`. Its photos are in `photos`. Seen only by administrators and that resident. `server/db.js` adds `outcome` and `tags` to databases set up before they existed when the server starts. |
+| `photos` | Evidence (`kind` = `evidence`), repair (`before` \| `after`), and the resident's feedback (`feedback`) photos: `report_id`, original `name`, `file_path` (inside `storage/photos/`, and the address under `/uploads/`), `mime_type`, `size_bytes`, `uploaded_by`, `replaced_at` (earlier repair photos after a resubmission). Sample reports list file names only (`file_path` is empty) and the website shows stock road photos for them. |
 | `photo_data` | The photo files themselves when `PHOTO_STORAGE=database` (used on hosts without a permanent disk): `photo_id`, `file_path`, `mime_type`, `data`. Deleted together with their photo. |
 
 **What each person can see.** Reports are public (the landing page, map, and
@@ -229,7 +239,7 @@ the test): a resident reports damage with photos, the administrator reviews,
 verifies, and assigns it, the crew starts and submits the repair, the
 administrator sends it back once, and then resolves it, with every other
 device receiving each step live. It also checks the permission rules, photo
-storage, duplicate detection, sign-in for the website and the app,
+storage, duplicate detection, the resident's feedback on the repair, sign-in for the website and the app,
 deactivation, crew accounts, and that server files are never served. A second
 test runs `npm run import:firebase` against a fake Firebase on this computer
 (database `resqroad_import_test`) and checks that people then sign in with
@@ -544,6 +554,7 @@ assets/css/app.css            Workspace shell (sidebar, top bar) and views
 assets/css/site.css           Landing page, sign-in, citizen portal, tracker
 assets/js/data-store.js       RoadWatchStore: API client, live cache, workflow helpers
 assets/js/duplicates.js       Possible duplicate reports (used by the website and the server)
+assets/js/feedback.js         Repair feedback answers and tags (used by the website and the server)
 assets/js/auth.js             RoadWatchAuth: sign-in and role checks
 assets/js/ui.js               Toasts, dialogs, lightbox, maps, formatting
 assets/js/menus.js            Accessible custom select menus
