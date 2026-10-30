@@ -1,0 +1,273 @@
+1
+00:00:02,878 --> 00:00:07,482
+Every day, we drive over them. Potholes.
+
+2
+00:00:07,934 --> 00:00:11,258
+They damage our vehicles and put people in
+danger.
+
+3
+00:00:11,934 --> 00:00:16,282
+Maybe you reported one and never heard back.
+So...
+
+4
+00:00:16,446 --> 00:00:18,554
+who is actually going to fix it?
+
+5
+00:00:19,914 --> 00:00:26,050
+Today, we are the first group of BSIT 3H-G2. And
+this
+
+6
+00:00:26,090 --> 00:00:32,230
+is our promotional video for IT305, Advanced Web
+Development.
+
+7
+00:00:33,098 --> 00:00:39,430
+In this subject, we build web applications that
+solve real community problems.
+
+8
+00:00:39,594 --> 00:00:41,606
+And here is ours.
+
+9
+00:00:44,532 --> 00:00:47,088
+Introducing ResQRoad:
+
+10
+00:00:47,540 --> 00:00:52,112
+a web and mobile-friendly pothole reporting and
+monitoring system
+
+11
+00:00:52,244 --> 00:00:54,416
+for local government units.
+
+12
+00:00:55,348 --> 00:01:00,432
+In this system, it connects three groups on one
+single platform:
+
+13
+00:01:00,980 --> 00:01:06,128
+residents who report the damage, administrators
+who verify it,
+
+14
+00:01:06,548 --> 00:01:09,296
+and road crews who fix it.
+
+15
+00:01:10,036 --> 00:01:15,792
+One report. One record. From the first photo to
+the verified repair.
+
+16
+00:01:17,531 --> 00:01:24,151
+Too often, reporting road damage is slow and
+unclear. Residents get no feedback.
+
+17
+00:01:24,699 --> 00:01:29,655
+The same pothole is reported again and again and
+again and again.
+
+18
+00:01:30,203 --> 00:01:33,303
+And road offices lack a clear picture.
+
+19
+00:01:34,299 --> 00:01:39,479
+Our group saw that gap, and we decided to design
+and build
+
+20
+00:01:39,643 --> 00:01:41,943
+ResQRoad to close that gap.
+
+21
+00:01:44,306 --> 00:01:46,222
+Let’s start with residents.
+
+22
+00:01:47,090 --> 00:01:53,454
+Reporting takes four simple steps. First, give
+the damage a short title.
+
+23
+00:01:54,290 --> 00:01:57,422
+Choose its severity and describe what you see.
+
+24
+00:01:58,546 --> 00:02:02,990
+Low is a small crack, medium slows drivers down,
+
+25
+00:02:03,154 --> 00:02:06,062
+and high is a deep, dangerous pothole.
+
+26
+00:02:07,506 --> 00:02:09,902
+Second, set the location.
+
+27
+00:02:10,642 --> 00:02:16,302
+Zoom in and place the pin right on the damage.
+Third, add photos:
+
+28
+00:02:16,722 --> 00:02:21,454
+a wide shot for context and a close-up of the
+damage.
+
+29
+00:02:22,482 --> 00:02:24,878
+Finally, review and submit.
+
+30
+00:02:25,842 --> 00:02:27,758
+Your name stays private,
+
+31
+00:02:28,114 --> 00:02:32,718
+and only the Road Maintenance Office sees who
+filed the report.
+
+32
+00:02:33,394 --> 00:02:37,390
+You get a report ID right away. And in My
+Reports,
+
+33
+00:02:37,458 --> 00:02:41,582
+you can follow every update from submitted to
+resolved.
+
+34
+00:02:42,962 --> 00:02:49,006
+Before you report, open the live map. Every
+reported pothole appears as a pin,
+
+35
+00:02:49,298 --> 00:02:54,894
+color-coded by severity so you can see what is
+already on record and avoid duplicates.
+
+36
+00:02:55,314 --> 00:03:00,046
+With your report ID, Track a Report shows its
+status anytime.
+
+37
+00:03:02,158 --> 00:03:06,762
+Now, the LGU side. Administrators start at the
+dashboard,
+
+38
+00:03:06,958 --> 00:03:12,682
+which shows new reports, repairs waiting for
+verification, and high-severity issues.
+
+39
+00:03:12,878 --> 00:03:19,178
+In the review queue, every report opens with its
+photos, location, and status timeline.
+
+40
+00:03:19,438 --> 00:03:23,338
+A report is never verified just because it was
+submitted.
+
+41
+00:03:23,630 --> 00:03:28,714
+The administrator checks the evidence, then
+verifies it, rejects it,
+
+42
+00:03:28,782 --> 00:03:34,378
+or marks it as a duplicate. And every decision
+is recorded in the report history.
+
+43
+00:03:36,235 --> 00:03:41,639
+Once verified, a report goes to Task Dispatch,
+highest severity first.
+
+44
+00:03:41,995 --> 00:03:45,735
+Administrators assign each job to a crew,
+
+45
+00:03:45,963 --> 00:03:48,807
+and the workload panel keeps the work balanced.
+
+46
+00:03:49,017 --> 00:03:52,469
+In the field, crews see jobs on a map,
+
+47
+00:03:52,825 --> 00:03:56,789
+get directions and submit photos of the finished
+repair,
+
+48
+00:03:57,273 --> 00:04:01,141
+which an administrator verifies before the
+report is closed.
+
+49
+00:04:03,007 --> 00:04:09,079
+Behind every report is data. The Insights page
+shows the resolution rate,
+
+50
+00:04:09,119 --> 00:04:14,971
+average time to verify and resolve, and open
+high-severity cases,
+
+51
+00:04:15,103 --> 00:04:21,435
+with monthly and severity breakdowns, ready to
+print or export to CSV.
+
+52
+00:04:22,914 --> 00:04:25,886
+From pothole to fixed in four steps:
+
+53
+00:04:26,114 --> 00:04:29,662
+Report. Verify. Repair. Resolve.
+
+54
+00:04:30,000 --> 00:04:36,138
+One transparent workflow, so residents always
+know where their report stands.
+
+55
+00:04:36,526 --> 00:04:40,362
+And we tested it from the first photo to the
+closed report.
+
+56
+00:04:41,935 --> 00:04:47,947
+ResQRoad was built because every resident
+deserves safer roads,
+
+57
+00:04:48,143 --> 00:04:53,035
+and every LGU deserves better tools to fix them.
+
+58
+00:04:53,519 --> 00:04:58,475
+Report it. Track it. Watch your community’s
+roads get fixed.
+
+59
+00:04:58,927 --> 00:05:02,667
+With ResQRoad, safer roads start with one
+report.
