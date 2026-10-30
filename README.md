@@ -145,7 +145,8 @@ with `Rejected` and `Duplicate` as closing outcomes.
    server for the record.
 6. Once a report is resolved, the resident who filed it is invited to **give
    feedback** (a banner at the top of the report's details, and **Give
-   feedback** on its card in My reports). The feedback dialog shows the
+   feedback** on its card in My reports), on the website and in the mobile
+   app. The feedback dialog shows the
    report (ID, place, the date it was resolved, and before and after photos)
    and asks for 1 to 5 stars, whether the road is fully repaired (Yes,
    Partially, or No), optional quick tags (Fast resolution, High-quality
@@ -319,7 +320,7 @@ encrypted connections, and `TRUST_PROXY=1` behind the host's proxy.
 The Android app for residents and maintenance crews lives in `mobile/`. It's
 built with [Expo](https://expo.dev/) (React Native) and uses the same server,
 accounts, and live updates as the website. Administrators keep using the
-website. The current version is **1.3.0**.
+website. The current version is **1.4.0**.
 
 ```powershell
 cd mobile
@@ -413,6 +414,20 @@ resident account**, and **Track a report by ID**.
   two stacked, with "+N" on the third for the rest. Tapping one opens
   them full screen, uncropped, to swipe through. Repair photos work the same
   way.
+- **Repair feedback**, as on the website: once one of a resident's reports is
+  resolved, its page opens with "Your road was repaired. How did we do?" and
+  **Give feedback**, and its card in My reports gets a **Give feedback**
+  button. The feedback page rises from the bottom and shows the report (ID,
+  place, the date it was resolved, and before and after photos), then asks
+  for 1 to 5 stars, whether the road is fully repaired (Yes, Partially, or
+  No), optional quick tags, an optional comment (500 characters), and up to
+  three optional photos from the camera or gallery. Stars and the repair
+  question are required. Unsent answers are kept until the app closes. After
+  sending, the page thanks the resident and shows what was sent; the report's
+  page then shows it under **Your feedback**. The answers and tags are copied
+  from `assets/js/feedback.js` into `mobile/src/lib/feedback.ts`. Feedback
+  isn't retried automatically: the server takes one per report, so a lost
+  answer would make a retry fail.
 - **Maintenance crews** have three tabs: **Home**, **My jobs** (Active,
   Awaiting review, Completed, and All, in the website's order: repairs
   underway first, then by severity), and **Map** (every job, with active ones
@@ -449,7 +464,8 @@ resident account**, and **Track a report by ID**.
   crew member gets a new job, loses one to reassignment, has a repair sent
   back, or has a repair verified, the app shows a banner (while it's open) or
   a phone notification (while it's in the background and still running).
-  Tapping either opens the report or job. Changes people make themselves
+  Tapping either opens the report or job (a resolved report's alert invites
+  the resident to give feedback on the repair). Changes people make themselves
   don't alert them. These come from the live updates, so there's no push
   server; nothing arrives once Android has closed the app.
 - **Maps** are the website's Leaflet + OpenStreetMap maps running in a WebView,

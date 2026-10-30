@@ -103,6 +103,11 @@ function RootNavigator() {
         </Stack.Protected>
         <Stack.Protected guard={user?.role === "citizen"}>
           <Stack.Screen name="resident" options={{ headerShown: false }} />
+          {/* Rises from the bottom, like the website's feedback dialog on phones. */}
+          <Stack.Screen
+            name="feedback/[id]"
+            options={{ title: "Repair feedback", headerBackTitle: "Back", animation: "slide_from_bottom" }}
+          />
         </Stack.Protected>
         <Stack.Protected guard={user?.role === "maintenance"}>
           <Stack.Screen name="crew" options={{ headerShown: false }} />

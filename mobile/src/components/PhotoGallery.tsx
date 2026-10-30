@@ -35,8 +35,17 @@ function toItems(photos: (Photo | LocalPhoto)[]): Item[] {
 // website's gallery: every photo is cropped to fill its tile. One photo fills
 // the width, two sit side by side, and three or more are one large and two
 // stacked, with "+N" on the third for the photos past it. Tapping a tile opens
-// the whole photo, uncropped, and the viewer swipes between them.
-export function PhotoGallery({ photos, label }: { photos: (Photo | LocalPhoto)[]; label?: string }) {
+// the whole photo, uncropped, and the viewer swipes between them. `captions`
+// labels each photo on its tile (such as "Before" and "After").
+export function PhotoGallery({
+  photos,
+  label,
+  captions,
+}: {
+  photos: (Photo | LocalPhoto)[];
+  label?: string;
+  captions?: string[];
+}) {
   const { colors } = useTheme();
   const items = toItems(photos);
   const [open, setOpen] = useState<number | null>(null);
@@ -52,7 +61,8 @@ export function PhotoGallery({ photos, label }: { photos: (Photo | LocalPhoto)[]
         key={item.key}
         accessibilityRole="imagebutton"
         accessibilityLabel={
-          item.uri ? "Open photo " + (index + 1) + " of " + items.length : "Sample photo " + item.name
+          (captions?.[index] ? captions[index] + ": " : "") +
+          (item.uri ? "Open photo " + (index + 1) + " of " + items.length : "Sample photo " + item.name)
         }
         disabled={!item.uri}
         onPress={() => setOpen(index)}
@@ -68,6 +78,13 @@ export function PhotoGallery({ photos, label }: { photos: (Photo | LocalPhoto)[]
             </AppText>
           </View>
         )}
+        {captions?.[index] ? (
+          <View style={styles.caption} pointerEvents="none">
+            <AppText variant="caption" style={styles.captionText} color="#FFFFFF">
+              {captions[index]}
+            </AppText>
+          </View>
+        ) : null}
         {more > 0 ? (
           <View style={styles.more}>
             <AppText style={styles.moreText} color="#FFFFFF">
@@ -193,6 +210,17 @@ const styles = StyleSheet.create({
   placeholder: { flex: 1, alignItems: "center", justifyContent: "center", gap: 4, padding: 8 },
   more: { ...StyleSheet.absoluteFill, alignItems: "center", justifyContent: "center", backgroundColor: "rgba(0, 0, 0, 0.5)" },
   moreText: { fontFamily: fonts.semibold, fontSize: 20, lineHeight: 26 },
+  // Like the website's before and after labels.
+  caption: {
+    position: "absolute",
+    left: 6,
+    bottom: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: radius.full,
+    backgroundColor: "rgba(14, 11, 10, 0.72)",
+  },
+  captionText: { fontFamily: fonts.semibold, fontSize: 11, lineHeight: 15 },
   viewer: { flex: 1, backgroundColor: "#000000" },
   counter: { position: "absolute", alignSelf: "center" },
   close: {

@@ -1,10 +1,13 @@
-import { Stack, useLocalSearchParams } from "expo-router";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 
 import { AppText } from "@/components/AppText";
 import { Button } from "@/components/Button";
 import { Section } from "@/components/Card";
+import { FeedbackInvite } from "@/components/FeedbackInvite";
+import { FeedbackSummary } from "@/components/FeedbackSummary";
+import { Icon } from "@/components/Icon";
 import { MapView } from "@/components/map/MapView";
 import type { MapMarker } from "@/components/map/mapHtml";
 import { Notice } from "@/components/Notice";
@@ -13,7 +16,8 @@ import { MetaLine, ReportHeading } from "@/components/ReportHeading";
 import { ReportProgress } from "@/components/ReportProgress";
 import { ReportTimeline } from "@/components/ReportTimeline";
 import { api, ApiError, errorMessage } from "@/lib/api";
-import { formatDate } from "@/lib/format";
+import { canGiveFeedback } from "@/lib/feedback";
+import { formatDate, formatShortDay } from "@/lib/format";
 import { normalizeReportId, type Report } from "@/lib/reports";
 import { useSession } from "@/lib/session";
 import { severityColors, useTheme } from "@/theme";
@@ -23,6 +27,7 @@ import { severityColors, useTheme } from "@/theme";
 // from the shared store; others (tracking by ID) load it from the server.
 export default function ReportDetail() {
   const { colors } = useTheme();
+  const router = useRouter();
   const params = useLocalSearchParams<{ id: string }>();
   const reportId = normalizeReportId(String(params.id)) ?? String(params.id);
   const { reports, user, refresh } = useSession();
@@ -111,6 +116,12 @@ export default function ReportDetail() {
         {report.assignedName ? <MetaLine icon="hard-hat">Assigned to {report.assignedName}</MetaLine> : null}
       </ReportHeading>
 
+      {isMine && canGiveFeedback(report) ? (
+        <View style={styles.notice}>
+          <FeedbackInvite reportId={report.id} />
+        </View>
+      ) : null}
+
       {report.status === "rejected" ? (
         <View style={styles.notice}>
           <Notice tone="error" message={"This report was rejected." + (closingNote ? " Reason: " + closingNote : "")} />
@@ -164,6 +175,32 @@ export default function ReportDetail() {
         </Section>
       ) : null}
 
+      {isMine && report.status === "resolved" ? (
+        <Section
+          title="Your feedback"
+          aside={report.feedback ? <AppText variant="caption">Sent {formatShortDay(report.feedback.at)}</AppText> : null}
+        >
+          {report.feedback ? (
+            <>
+              <FeedbackSummary feedback={report.feedback} />
+              <AppText variant="caption">Thank you. The Road Maintenance Office reads every response.</AppText>
+            </>
+          ) : (
+            <>
+              <AppText tone="text2">You haven't given feedback on this repair yet.</AppText>
+              <Button
+                label="Give feedback"
+                variant="secondary"
+                size="sm"
+                onPress={() => router.push({ pathname: "/feedback/[id]", params: { id: report.id } })}
+                icon={<Icon name="star" size={14} color={colors.text} />}
+                style={styles.start}
+              />
+            </>
+          )}
+        </Section>
+      ) : null}
+
       <Section title="Activity">
         <ReportTimeline history={report.history} byViewer={isMine} />
       </Section>
@@ -175,4 +212,5 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: 16, paddingBottom: 32 },
   notice: { paddingBottom: 14 },
   center: { flex: 1, gap: 12, padding: 20, justifyContent: "center" },
+  start: { alignSelf: "flex-start" },
 });

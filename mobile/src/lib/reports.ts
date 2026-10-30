@@ -106,6 +106,21 @@ export type Repair = {
   submittedAt: string;
 };
 
+// The resident's answer to "Is the road fully repaired?" (see lib/feedback).
+export type RepairOutcomeValue = "fixed" | "partial" | "unresolved";
+
+// The resident's feedback on a finished repair. `outcome` is null on ratings
+// sent before the website asked whether the road is fully repaired; `tags`
+// are tag values from lib/feedback.
+export type Feedback = {
+  rating: number;
+  outcome: RepairOutcomeValue | null;
+  tags: string[];
+  comment: string;
+  photos: Photo[];
+  at: string;
+};
+
 export type Report = {
   id: string;
   title: string;
@@ -125,4 +140,6 @@ export type Report = {
   // Only for the resident who filed the report.
   reporterId?: string | null;
   reporter?: string;
+  // Null until they give feedback on the repair.
+  feedback?: Feedback | null;
 };

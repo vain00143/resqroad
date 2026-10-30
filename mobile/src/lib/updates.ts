@@ -30,7 +30,7 @@ export function describeChange(previous: Report | undefined, next: Report, user:
       assigned: ["A crew is assigned to " + next.id, (next.assignedName || "A maintenance crew") + " will handle the repair."],
       in_progress: ["Repair work on " + next.id, "The crew is working on " + next.road + "."],
       repair_submitted: ["Repair finished on " + next.id, "The crew submitted the repair. An administrator is checking it."],
-      resolved: [next.id + " is resolved", next.title + " has been fixed. Thank you for reporting it."],
+      resolved: [next.id + " is resolved", next.title + " has been fixed. Open it to give feedback on the repair."],
       rejected: [next.id + " was rejected", note || "Open the report to see why."],
       duplicate: [next.id + " was marked a duplicate", note || "Another report already covers this spot."],
     };
