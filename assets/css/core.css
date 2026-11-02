@@ -15,7 +15,10 @@
   font-display: swap;
 }
 
-:root {
+/* The light theme. .theme-light gives one part of an always-dark page (the
+   landing page's light bands) the same light surfaces and text. */
+:root,
+.theme-light {
   /* Brand palette — Road Orange, ten steps from deep burnt orange to sand. */
   --rr-900: #7b3621;
   --rr-800: #974328;
@@ -49,7 +52,7 @@
   --text: #2b2522;
   --text-2: #5d5550;
   --text-3: #766d67;
-  --icon: #9b918a;
+  --icon: #141110;
   --placeholder: #a39992;
 
   --primary: var(--rr-700);
@@ -87,18 +90,27 @@
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
   --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
 
-  /* Severity keeps its own hues so high, medium, and low read at a glance. */
-  --sev-high: #d9443a;
-  --sev-medium: #d9961e;
-  --sev-low: #2f9461;
+  /* Severity: red for high, orange for medium, yellow for low. */
+  --sev-high: #d9362b;
+  --sev-medium: #e8771a;
+  --sev-low: #e3b100;
+  /* Severity labels use deeper shades of the same hues so their white text
+     reads clearly (at least 4.5:1) in both themes and over photos. */
+  --sev-high-label: #c62f25;
+  --sev-medium-label: #b8540c;
+  --sev-low-label: #957000;
 
-  /* One tone per workflow status; pills mix it with the surface and text. */
-  --st-submitted: #8a817b;
-  --st-under_review: #d9961e;
-  --st-verified: #cf5c36;
-  --st-assigned: #974328;
-  --st-in_progress: #2f6fd6;
-  --st-repair_submitted: #7c5cd6;
+  /* One tone per workflow status, used everywhere a status appears (pills,
+     timelines, charts, maps, notifications). Open statuses step through the
+     brand's Road Orange scale, from sand (just reported) to deep burnt orange
+     (repair done, waiting for checks), after Asphalt Gray for a new report.
+     Resolved and rejected keep the success and error colors. */
+  --st-submitted: var(--rr-asphalt);
+  --st-under_review: var(--rr-150);
+  --st-verified: var(--rr-300);
+  --st-assigned: var(--rr-500);
+  --st-in_progress: var(--rr-600);
+  --st-repair_submitted: var(--rr-800);
   --st-resolved: #2f9461;
   --st-rejected: #c0392b;
   --st-duplicate: #a39b95;
@@ -136,7 +148,7 @@
   --text: #ebe5e1;
   --text-2: #bbb2ac;
   --text-3: #958c86;
-  --icon: #8a817b;
+  --icon: #d6cfca;
   --placeholder: #776f6a;
 
   --primary: var(--rr-700);
@@ -162,6 +174,7 @@
   --shadow-primary: 0 6px 18px rgb(179 79 47 / 35%);
 
   --st-submitted: #a39a94;
+  --st-repair_submitted: var(--rr-700);
   --st-duplicate: #8a827d;
   --danger: #e2584a;
 
@@ -381,6 +394,37 @@ button:disabled {
   stroke-linejoin: round;
   stroke-width: 1.9;
   vertical-align: middle;
+  color: var(--icon);
+}
+
+/* Icons are near-black in light mode and light grey in dark mode. Icons on a
+   colored or always-dark surface keep the color of the text around them. */
+.btn-primary .icon,
+.btn-soft .icon,
+.btn-danger .icon,
+.btn-danger-outline .icon,
+.btn-dark .icon,
+.btn-light .icon,
+.link-button .icon,
+.chip[aria-pressed="true"] .icon,
+.sev .icon,
+.pill .icon,
+.toast .icon,
+.lightbox .icon,
+.dialog-icon .icon,
+.thumb-remove .icon,
+.journey-marker .icon,
+.success-mark .icon,
+.step-icon .icon,
+.rc-age .icon,
+.sidebar .icon,
+.welcome .icon,
+.hero .icon,
+.section-dark .icon,
+.site-footer .icon,
+.auth-aside .icon,
+.page-hero .icon {
+  color: inherit;
 }
 
 .icon-sm {
@@ -1154,70 +1198,29 @@ input[type="radio"] {
 .status-rejected { --tone: var(--st-rejected); }
 .status-duplicate { --tone: var(--st-duplicate); }
 
+/* Severity label (High, Medium, Low): one solid design on every page, in
+   tables, cards, maps, and details, with white text on the level's color. */
 .sev {
-  --tone: var(--sev-medium);
+  --tone: var(--sev-medium-label);
   min-height: 1.5rem;
-  padding: 0.12rem 0.55rem;
+  padding: 0.12rem 0.6rem;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 0.35rem;
   border-radius: var(--radius-full);
-  background: color-mix(in srgb, var(--tone) 13%, var(--surface));
-  color: color-mix(in srgb, var(--tone) 58%, var(--text));
+  background: var(--tone);
+  color: #fff;
   font-size: 0.74rem;
   font-weight: 600;
   line-height: 1.3;
+  letter-spacing: 0.01em;
   white-space: nowrap;
 }
 
-.sev-bars {
-  height: 0.7rem;
-  display: inline-flex;
-  align-items: flex-end;
-  gap: 2px;
-}
-
-.sev-bars i {
-  width: 3px;
-  border-radius: 1px;
-  background: currentColor;
-  opacity: 0.28;
-}
-
-.sev-bars i:nth-child(1) { height: 40%; }
-.sev-bars i:nth-child(2) { height: 70%; }
-.sev-bars i:nth-child(3) { height: 100%; }
-
-.sev-low .sev-bars i:nth-child(1),
-.sev-medium .sev-bars i:nth-child(-n + 2),
-.sev-high .sev-bars i {
-  opacity: 1;
-}
-
-.sev-high { --tone: var(--sev-high); }
-.sev-medium { --tone: var(--sev-medium); }
-.sev-low { --tone: var(--sev-low); }
-
-/* Solid severity badge laid over photos. */
-.sev.sev-solid {
-  background: var(--tone);
-  color: #fff;
-  box-shadow: 0 2px 8px rgb(0 0 0 / 22%);
-}
-
-.sev-solid .sev-bars i {
-  opacity: 0.4;
-}
-
-.sev-solid.sev-low .sev-bars i:nth-child(1),
-.sev-solid.sev-medium .sev-bars i:nth-child(-n + 2),
-.sev-solid.sev-high .sev-bars i {
-  opacity: 1;
-}
-
-.sev-medium.sev-solid {
-  color: #2b1b02;
-}
+.sev-high { --tone: var(--sev-high-label); }
+.sev-medium { --tone: var(--sev-medium-label); }
+.sev-low { --tone: var(--sev-low-label); }
 
 .chip {
   min-height: 2rem;
@@ -1395,6 +1398,14 @@ input[type="radio"] {
   color: var(--heading);
   font-size: 1rem;
   font-weight: 600;
+}
+
+/* Poppins sits slightly high in its line box, so a centered icon looks a
+   little low next to a heading. Nudge heading icons up to the letters. */
+.card-title > .icon,
+.detail-block-head h3 > .icon,
+.repair-form h4 > .icon {
+  translate: 0 -0.06em;
 }
 
 .card-subtitle {
@@ -1606,6 +1617,10 @@ button.kpi:hover {
 .table .cell-actions {
   text-align: right;
   white-space: nowrap;
+}
+
+.table .cell-actions .btn + .btn {
+  margin-left: 0.4rem;
 }
 
 .table .num {
@@ -1860,8 +1875,19 @@ button.kpi:hover {
   scrollbar-width: thin;
 }
 
+/* Steps a closed report never reached are dimmed with lighter colors, not
+   opacity: a see-through step would let the next step's line run across its
+   circle. */
 .journey.is-closed .journey-step:not(.is-complete) {
-  opacity: 0.45;
+  color: color-mix(in srgb, var(--text-3) 55%, transparent);
+}
+
+.journey.is-closed .journey-step:not(.is-complete) .journey-marker {
+  border-color: var(--border);
+}
+
+.journey.is-closed .journey-step:not(.is-complete)::before {
+  background: var(--border);
 }
 
 /* ---------- Activity timeline ---------- */
@@ -1900,8 +1926,13 @@ button.kpi:hover {
   display: none;
 }
 
-.timeline-dot {
+/* A status class on the dot (e.g. .status-resolved) picks its tone; this
+   default has no weight, so it never overrides one. */
+:where(.timeline-dot) {
   --tone: var(--st-submitted);
+}
+
+.timeline-dot {
   position: absolute;
   top: 0.15rem;
   left: 0;
@@ -1944,12 +1975,12 @@ button.kpi:hover {
 
 .timeline-note {
   margin-top: 0.3rem;
-  padding: 0.55rem 0.7rem;
+  padding: 0.6rem 0.75rem;
   border-radius: var(--radius-sm);
   background: var(--surface-3);
   color: var(--text);
-  font-size: 0.82rem;
-  line-height: 1.5;
+  font-size: 0.875rem;
+  line-height: 1.6;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
@@ -2083,11 +2114,23 @@ button.kpi:hover {
   animation: dialog-out 0.16s ease-in forwards;
 }
 
+/* The icon sits to the left of the kicker and title, centered on them. */
+.dialog-head {
+  margin-bottom: 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+}
+
+.dialog-heading {
+  min-width: 0;
+}
+
 .dialog-icon {
   --tone: var(--accent);
   width: 2.75rem;
   height: 2.75rem;
-  margin-bottom: 1rem;
+  flex: 0 0 auto;
   display: grid;
   place-items: center;
   border-radius: 12px;
@@ -2100,16 +2143,17 @@ button.kpi:hover {
 }
 
 .dialog-kicker {
-  margin-bottom: 0.25rem;
+  margin-bottom: 0.15rem;
   color: var(--text-3);
   font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.08em;
+  line-height: 1.3;
   text-transform: uppercase;
 }
 
 .dialog-title {
-  margin-bottom: 0.4rem;
+  margin: 0;
   font-size: 1.2rem;
 }
 
@@ -2178,9 +2222,14 @@ button.kpi:hover {
     visibility 0.36s;
 }
 
+/* Visible at once when opening (so focus can move into it right away); the
+   base rule keeps it visible while it slides out. */
 .drawer.is-open {
   transform: none;
   visibility: visible;
+  transition:
+    transform 0.36s var(--ease-out),
+    visibility 0s;
 }
 
 .drawer-header {
@@ -2229,19 +2278,28 @@ button.kpi:hover {
   font-size: 0.8rem;
 }
 
+/* Review decisions sit in an even two-column grid; an odd last button (the
+   main action) takes the full row. */
+.drawer-decisions {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.drawer-decisions .btn {
+  min-width: 0;
+}
+
+.drawer-decisions .btn:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+}
+
 @media (max-width: 560px) {
   .drawer-header,
   .drawer-body,
   .drawer-footer {
     padding-inline: 1rem;
-  }
-
-  .drawer-footer .btn {
-    flex: 1 1 calc(50% - 0.6rem);
-  }
-
-  .drawer-footer .footer-note {
-    flex-basis: 100%;
   }
 }
 
@@ -2334,16 +2392,62 @@ button.kpi:hover {
   cursor: zoom-in;
 }
 
-.gallery-item:first-child:nth-last-child(n + 3) {
-  grid-row: span 2;
-  grid-column: span 2;
+/* Report photos fill the whole width, whatever their number or orientation:
+   one photo spans the row, two share it, and three put the first photo large
+   beside two stacked (past three, the third shows "+N" for the rest). Every
+   tile is cropped to its shape (never stretched), so portrait and landscape
+   photos leave no gaps. */
+.gallery.gallery-count-1 {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.gallery.gallery-count-1 .gallery-item {
+  aspect-ratio: 16 / 9;
+}
+
+.gallery.gallery-count-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.gallery.gallery-count-3 {
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  aspect-ratio: 16 / 9;
+}
+
+.gallery.gallery-count-3 .gallery-item {
+  min-height: 0;
   aspect-ratio: auto;
+}
+
+.gallery.gallery-count-3 .gallery-item:first-child {
+  grid-row: 1 / -1;
+}
+
+/* "+2" over the third photo when there are more; select it to see them. */
+.gallery-more {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgb(0 0 0 / 50%);
+  color: #fff;
+  font-size: clamp(1.25rem, 3vw, 1.75rem);
+  font-weight: 700;
+  pointer-events: none;
+}
+
+/* Small thumbnails in rows, for any number of photos (e.g. a crew's
+   after-repair photos). A single photo stays thumbnail-sized. */
+.gallery.gallery-grid {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 8rem), 1fr));
 }
 
 .gallery-item img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: center;
   transition:
     transform 0.4s var(--ease-out),
     filter 0.3s ease;
@@ -2516,7 +2620,7 @@ button.kpi:hover {
   position: relative;
   z-index: 0;
   width: 100%;
-  min-height: 18rem;
+  min-height: 21rem;
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
@@ -2540,10 +2644,11 @@ button.kpi:hover {
   filter: grayscale(1) invert(1) contrast(0.88) brightness(0.82) sepia(0.15);
 }
 
+/* Pins are 22 × 28 px (pinSize in ui.js). */
 .map-pin {
   position: relative;
-  width: 28px;
-  height: 36px;
+  width: 22px;
+  height: 28px;
   display: block;
   filter: drop-shadow(0 3px 4px rgb(0 0 0 / 30%));
   transition: transform 0.18s var(--ease-spring);
@@ -2573,10 +2678,10 @@ button.kpi:hover {
 
 .map-pin.is-pulse::after {
   position: absolute;
-  bottom: -5px;
+  bottom: -4px;
   left: 50%;
-  width: 18px;
-  height: 8px;
+  width: 14px;
+  height: 6px;
   border-radius: 50%;
   background: color-mix(in srgb, var(--pin-tone, var(--accent)) 45%, transparent);
   content: "";
@@ -2835,8 +2940,8 @@ button.kpi:hover {
 .map-pin-button {
   position: absolute;
   z-index: 1;
-  width: 28px;
-  height: 36px;
+  width: 22px;
+  height: 28px;
   padding: 0;
   border: 0;
   background: none;
@@ -2867,7 +2972,7 @@ button.kpi:hover {
   background: var(--surface);
   box-shadow: var(--shadow-lg);
   font-size: 0.82rem;
-  transform: translate(-50%, calc(-100% - 46px));
+  transform: translate(-50%, calc(-100% - 38px));
 }
 
 .map-fallback-popup.is-below {
@@ -2935,8 +3040,9 @@ button.kpi:hover {
   from { transform: scaleY(0); }
 }
 
+/* Hovering a chart shows its tooltip; the cursor stays a normal arrow. */
 .chart-hit {
-  cursor: crosshair;
+  cursor: default;
 }
 
 .chart-tooltip {
@@ -3004,23 +3110,24 @@ button.kpi:hover {
   border-radius: 3px;
 }
 
+/* The ring sits above its legend at every card width, so the chart keeps the
+   same layout when the sidebar is collapsed and the card gets wider. */
 .donut {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 1.25rem 1.5rem;
+  gap: 1.25rem;
 }
 
 .donut svg {
   width: 9.5rem;
-  flex: 0 0 9.5rem;
+  flex: 0 0 auto;
   height: auto;
 }
 
 .donut-legend {
-  flex: 1 1 10.5rem;
-  min-width: 10.5rem;
+  width: min(100%, 18rem);
 }
 
 .donut-legend li > span:not(.pct) {
@@ -3299,7 +3406,7 @@ button.kpi:hover {
 
 .brand-logo img {
   width: auto;
-  height: 1.55rem;
+  height: 1.85rem;
 }
 
 .logo-on-dark,
@@ -3409,19 +3516,8 @@ button.kpi:hover {
   from { transform: scaleX(0); }
 }
 
-@keyframes rise-in {
-  from {
-    opacity: 0;
-    transform: translateY(14px);
-  }
-}
-
 @keyframes shimmer {
   to { background-position: -200% 0; }
-}
-
-.rise-in {
-  animation: rise-in 0.5s var(--ease-out) both;
 }
 
 @media (prefers-reduced-motion: reduce) {

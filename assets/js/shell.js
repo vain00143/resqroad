@@ -1,6 +1,6 @@
 /* Page chrome shared by every ResQRoad page: light/dark theme, the workspace
    sidebar, popover menus, the Ctrl+K command palette, the notifications
-   panel, and the demo-data reset. Pages plug content into the palette and
+   panel. Pages plug content into the palette and
    notifications through window.RoadWatchShell. */
 (function () {
   "use strict";
@@ -56,9 +56,12 @@
   }
 
   // Follow the system setting until the person picks a theme themselves.
+  // The public site, sign-in, and registration always stay dark
+  // (<html data-theme-fixed>); only the workspaces have the theme switch.
+  const fixedTheme = root.hasAttribute("data-theme-fixed");
   const systemDark = window.matchMedia("(prefers-color-scheme: dark)");
   systemDark.addEventListener("change", function (event) {
-    if (!readPref(themeKey)) {
+    if (!fixedTheme && !readPref(themeKey)) {
       setTheme(event.matches ? "dark" : "light", false);
     }
   });
@@ -145,6 +148,9 @@
     const rect = trigger.getBoundingClientRect();
     const placement = trigger.dataset.popoverPlacement || "bottom-end";
     const gap = 8;
+    // data-popover-width="trigger": as wide as the button that opened it
+    // (CSS min-width still applies, e.g. on the collapsed sidebar).
+    popover.style.width = trigger.dataset.popoverWidth === "trigger" ? rect.width + "px" : "";
     const width = popover.offsetWidth;
     const height = popover.offsetHeight;
     let top = placement.startsWith("top") ? rect.top - gap - height : rect.bottom + gap;
@@ -156,9 +162,12 @@
       top = rect.bottom + gap;
     }
     left = Math.max(8, Math.min(left, window.innerWidth - width - 8));
+    const above = top < rect.top;
     popover.style.top = top + "px";
     popover.style.left = left + "px";
-    popover.style.transformOrigin = (placement.startsWith("top") ? "bottom " : "top ") + (placement.endsWith("start") ? "left" : "right");
+    popover.style.transformOrigin = (above ? "bottom " : "top ") + (placement.endsWith("start") ? "left" : "right");
+    // A menu above its button slides up into place; one below slides down.
+    popover.style.setProperty("--menu-shift", above ? "10px" : "-6px");
   }
 
   function closePopover(restoreFocus) {
@@ -541,37 +550,6 @@
     }
     refreshNotifications();
   }
-
-  /* ---------- Demo data reset ---------- */
-
-  document.addEventListener("click", function (event) {
-    const button = event.target.closest("[data-reset-demo]");
-    if (!button || !ui() || !window.RoadWatchStore) {
-      return;
-    }
-    ui()
-      .confirm({
-        kicker: "Demo data",
-        title: "Reset all demo data?",
-        message:
-          "Every report, account, and change saved in this browser goes back to the original sample data. This can't be undone.",
-        confirmLabel: "Reset data",
-        danger: true,
-        icon: "reset",
-        opener: button,
-      })
-      .then(function (confirmed) {
-        if (!confirmed) {
-          return;
-        }
-        try {
-          window.RoadWatchStore.resetDemoData();
-          window.location.reload();
-        } catch (error) {
-          ui().showMessage(error.message, "error");
-        }
-      });
-  });
 
   document.querySelectorAll("[data-current-year]").forEach(function (element) {
     element.textContent = String(new Date().getFullYear());

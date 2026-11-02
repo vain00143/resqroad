@@ -1,0 +1,13 @@
+rules_version = '2';
+
+// TEMPORARY rules used only while seeding a brand-new project (the very first
+// admin profile can't be created under the real rules). Deploy these, run
+// `npm run seed`, then immediately deploy the real rules with
+// `npm run deploy:rules`. Never leave these in place.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}

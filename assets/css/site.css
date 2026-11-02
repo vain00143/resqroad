@@ -3,10 +3,18 @@
    citizen portal, and the public report tracker.
    ========================================================================== */
 
+/* The public site, sign-in, and registration are dark and share one
+   continuous background, the brand's ink with soft orange glows. On the
+   landing page some sections are light bands (.theme-light). */
 .site-body {
   display: flex;
   flex-direction: column;
-  background: var(--bg);
+  background:
+    radial-gradient(1100px 760px at 88% 0%, rgb(207 92 54 / 24%), transparent 70%),
+    radial-gradient(900px 900px at 0% 38%, rgb(123 54 33 / 22%), transparent 70%),
+    radial-gradient(1000px 900px at 100% 72%, rgb(207 92 54 / 11%), transparent 70%),
+    radial-gradient(900px 700px at 10% 100%, rgb(123 54 33 / 18%), transparent 70%),
+    #110e0d;
 }
 
 .site-body > main {
@@ -52,7 +60,7 @@
 }
 
 .site-header .brand-logo img {
-  height: 1.6rem;
+  height: 1.9rem;
 }
 
 .site-nav {
@@ -79,7 +87,10 @@
   color: var(--heading);
 }
 
-.site-nav a[aria-current="page"] {
+/* The current page, or the section being read on the landing page. */
+.site-nav a[aria-current="page"],
+.site-nav a.is-active {
+  background: var(--selected);
   color: var(--heading);
   font-weight: 600;
 }
@@ -93,6 +104,49 @@
 
 .site-menu-button {
   display: none;
+}
+
+/* "Back to home" on the sign-in and registration pages. */
+.btn-home {
+  --btn-bg: rgb(255 255 255 / 5%);
+  --btn-fg: #f3ece7;
+  --btn-border: rgb(255 255 255 / 14%);
+  --btn-bg-hover: rgb(207 92 54 / 14%);
+  min-height: 2.4rem;
+  padding: 0.3rem 1rem 0.3rem 0.35rem;
+  gap: 0.6rem;
+  border-radius: var(--radius-full);
+  font-size: 0.85rem;
+}
+
+.btn-home:hover {
+  border-color: rgb(207 92 54 / 55%);
+  color: #fff;
+}
+
+.btn-home:active:not(:disabled) {
+  background: rgb(207 92 54 / 22%);
+}
+
+.btn-home-icon {
+  width: 1.75rem;
+  height: 1.75rem;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 9%);
+  transition:
+    background-color 0.18s ease,
+    transform 0.18s var(--ease-out);
+}
+
+.btn-home-icon .icon {
+  color: inherit;
+}
+
+.btn-home:hover .btn-home-icon {
+  background: var(--primary);
+  transform: translateX(-2px);
 }
 
 /* Over the dark hero the header is transparent with light text. */
@@ -109,6 +163,11 @@
   color: #fff;
 }
 
+.site-header.on-dark:not(.is-solid) .site-nav a.is-active {
+  background: rgb(255 255 255 / 12%);
+  color: #fff;
+}
+
 .site-header.on-dark:not(.is-solid) .btn-ghost {
   --btn-fg: #fff;
   --btn-bg-hover: rgb(255 255 255 / 10%);
@@ -120,6 +179,11 @@
   --btn-border: rgb(255 255 255 / 22%);
   --btn-bg-hover: rgb(255 255 255 / 15%);
   box-shadow: none;
+}
+
+/* Over the dark hero, header icons stay white like the text. */
+.site-header.on-dark:not(.is-solid) .icon {
+  color: inherit;
 }
 
 .site-header.is-solid .logo-on-dark {
@@ -165,18 +229,48 @@
   background: var(--hover);
 }
 
+.mobile-nav a.is-active {
+  background: var(--selected);
+  color: var(--heading);
+  font-weight: 600;
+}
+
 .mobile-nav .btn {
   margin-top: 0.5rem;
 }
 
 @media (max-width: 960px) {
-  .site-nav,
-  .site-actions .hide-mobile {
+  .site-nav {
     display: none;
   }
 
   .site-menu-button {
     display: inline-flex;
+  }
+}
+
+/* Sign in and Sign up stay in the header on phones too, just smaller. */
+@media (max-width: 560px) {
+  .site-header-inner {
+    gap: 0.75rem;
+  }
+
+  .site-header .brand-logo img {
+    height: 1.55rem;
+  }
+
+  .site-actions {
+    gap: 0.35rem;
+  }
+
+  .site-actions .btn:not(.btn-icon) {
+    min-height: 2.15rem;
+    padding: 0.35rem 0.7rem;
+    font-size: 0.8rem;
+  }
+
+  .site-actions .btn:not(.btn-icon) .icon {
+    display: none;
   }
 }
 
@@ -187,25 +281,8 @@
   margin-top: -73px;
   padding: calc(73px + clamp(2.5rem, 7vw, 5.5rem)) 0 clamp(3rem, 6vw, 5rem);
   overflow: hidden;
-  background:
-    radial-gradient(70% 60% at 85% 20%, rgb(207 92 54 / 38%), transparent 60%),
-    radial-gradient(60% 70% at 0% 100%, rgb(123 54 33 / 45%), transparent 60%),
-    linear-gradient(180deg, #120f0e, #1a1513);
   color: #efe8e3;
   isolation: isolate;
-}
-
-.hero::before {
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background-image:
-    linear-gradient(rgb(255 255 255 / 3.5%) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(255 255 255 / 3.5%) 1px, transparent 1px);
-  background-size: 56px 56px;
-  mask-image: radial-gradient(80% 70% at 60% 40%, #000 30%, transparent 75%);
-  -webkit-mask-image: radial-gradient(80% 70% at 60% 40%, #000 30%, transparent 75%);
-  content: "";
 }
 
 .hero-grid {
@@ -496,11 +573,31 @@
 
 .section {
   padding: clamp(4rem, 9vw, 6.5rem) 0;
+  scroll-margin-top: 72px;
 }
 
+/* Sections sit on the page's one background; only their cards change. */
 .section-surface {
-  background: var(--surface);
-  border-block: 1px solid var(--border);
+  background: transparent;
+}
+
+/* A light band on the landing page: light surfaces and text (see core.css),
+   while the hero, the LGU band, and the footer stay dark. */
+.section.theme-light {
+  background: var(--bg);
+  color: var(--text);
+}
+
+.section.section-surface.theme-light {
+  background: var(--surface-2);
+}
+
+:root[data-theme="dark"] .theme-light .step-num {
+  color: var(--surface-sunken);
+}
+
+:root[data-theme="dark"] .theme-light .map .leaflet-tile-pane {
+  filter: grayscale(0.92) sepia(0.12) contrast(0.92) brightness(1.04);
 }
 
 .section-head {
@@ -608,18 +705,30 @@
   font-size: 0.9rem;
 }
 
-/* Live map */
+/* Live map: the map is exactly as tall as the progress tiles and Recently
+   fixed beside it, and the severity legend sits below both. On narrow
+   screens the legend follows the map. */
 .live-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 22rem;
-  gap: 1.25rem;
+  grid-template-areas:
+    "map side"
+    "legend legend";
+  gap: 0 1.25rem;
 }
 
 .live-grid .map {
-  height: clamp(24rem, 50vw, 32rem);
+  grid-area: map;
+  min-width: 0;
+  min-height: 24rem;
+}
+
+.live-legend {
+  grid-area: legend;
 }
 
 .live-side {
+  grid-area: side;
   display: grid;
   gap: 1.25rem;
   align-content: start;
@@ -701,15 +810,10 @@
   font-size: 0.75rem;
 }
 
-/* Feature band (dark) */
+/* Feature band */
 .section-dark {
   position: relative;
-  overflow: hidden;
-  background:
-    radial-gradient(60% 80% at 100% 0%, rgb(207 92 54 / 22%), transparent 60%),
-    var(--rr-ink);
   color: #e9e2dd;
-  isolation: isolate;
 }
 
 .section-dark h2 {
@@ -766,16 +870,6 @@
   margin: 0;
   color: rgb(255 255 255 / 62%);
   font-size: 0.88rem;
-}
-
-.feature-cta {
-  margin-top: 2.5rem;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 1rem;
-  color: rgb(255 255 255 / 62%);
-  font-size: 0.9rem;
 }
 
 /* Track + CTA */
@@ -839,6 +933,10 @@
   --btn-bg-hover: var(--rr-cream);
 }
 
+.cta-card.is-brand .icon {
+  color: inherit;
+}
+
 .track-form {
   margin-top: 1.25rem;
   display: flex;
@@ -863,18 +961,34 @@
   text-transform: none;
 }
 
+/* Recent IDs under the home page tracker: a clear gap below the form, and
+   room between the label and each chip. */
+.portal-recent.track-recent {
+  margin: 1.15rem 0 0;
+  gap: 0.5rem 0.6rem;
+}
+
+.portal-recent.track-recent button {
+  padding: 0.3rem 0.75rem;
+  line-height: 1.3;
+}
+
+/* The tracked report, under the two cards. */
+.track-result:not(:empty) {
+  margin-top: 1.25rem;
+}
+
 /* ---------- Footer ---------- */
 
 .site-footer {
   padding: clamp(3rem, 6vw, 4.5rem) 0 2rem;
-  background: var(--rr-ink);
   color: rgb(255 255 255 / 62%);
   font-size: 0.88rem;
 }
 
 .footer-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.4fr) repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 2fr) repeat(2, minmax(0, 1fr));
   gap: 2rem;
 }
 
@@ -925,44 +1039,44 @@
 
 /* ---------- Auth (sign in / register) ---------- */
 
+/* Both halves share one background, the same as the public site's, so they
+   read as one connected page. The story and the form sit together in a
+   centered frame (about 1100px wide) with even gutters on wide screens,
+   instead of at the far edges of the window. */
 .auth {
+  --auth-gutter: clamp(1.25rem, 4vw, 3rem);
+  --auth-pad: clamp(2rem, 4vw, 3rem);
   min-height: 100vh;
   min-height: 100dvh;
   display: grid;
-  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  grid-template-columns:
+    minmax(var(--auth-gutter), 1fr)
+    minmax(0, 36rem)
+    clamp(3rem, 7vw, 6.5rem)
+    minmax(0, 27rem)
+    minmax(var(--auth-gutter), 1fr);
+  background:
+    radial-gradient(55% 70% at 40% 0%, rgb(207 92 54 / 30%), transparent 65%),
+    radial-gradient(45% 60% at 0% 100%, rgb(123 54 33 / 42%), transparent 65%),
+    radial-gradient(45% 55% at 100% 100%, rgb(207 92 54 / 12%), transparent 65%),
+    #110e0d;
 }
 
 .auth-aside {
   position: relative;
-  padding: clamp(2rem, 4vw, 3rem) clamp(2rem, 5vw, 4rem);
+  grid-column: 2;
+  padding: var(--auth-pad) 0;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   gap: 2rem;
   overflow: hidden;
-  background:
-    radial-gradient(80% 60% at 100% 0%, rgb(207 92 54 / 40%), transparent 60%),
-    radial-gradient(70% 60% at 0% 100%, rgb(123 54 33 / 50%), transparent 60%),
-    var(--rr-ink);
   color: #efe8e3;
   isolation: isolate;
 }
 
-.auth-aside::before {
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background-image:
-    linear-gradient(rgb(255 255 255 / 3.5%) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(255 255 255 / 3.5%) 1px, transparent 1px);
-  background-size: 48px 48px;
-  mask-image: radial-gradient(90% 70% at 50% 40%, #000 30%, transparent 80%);
-  -webkit-mask-image: radial-gradient(90% 70% at 50% 40%, #000 30%, transparent 80%);
-  content: "";
-}
-
 .auth-aside .brand-logo img {
-  height: 1.75rem;
+  height: 2.05rem;
 }
 
 .auth-aside h2 {
@@ -1029,19 +1143,21 @@
   font-size: 0.8rem;
 }
 
+/* The form column: "Back to home" level with the logo across the frame, and
+   the form in a card centered below it. */
 .auth-main {
   position: relative;
-  padding: 2rem clamp(1.25rem, 4vw, 3rem);
+  grid-column: 4;
+  padding: calc(var(--auth-pad) + 3.5rem) 0 2rem;
   display: grid;
   place-items: center;
-  background: var(--surface);
 }
 
 .auth-top {
   position: absolute;
-  top: 1.25rem;
-  right: clamp(1.25rem, 4vw, 3rem);
-  left: clamp(1.25rem, 4vw, 3rem);
+  top: calc(var(--auth-pad) - 0.2rem);
+  right: 0;
+  left: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1053,8 +1169,14 @@
 }
 
 .auth-card {
-  width: min(100%, 25rem);
-  padding-block: 4rem 2rem;
+  width: 100%;
+  padding: clamp(1.5rem, 2.5vw, 2rem) clamp(1.5rem, 3vw, 2.5rem);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: color-mix(in srgb, var(--surface) 84%, transparent);
+  box-shadow: var(--shadow-lg);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 .auth-card h1 {
@@ -1087,51 +1209,6 @@
   font-weight: 600;
 }
 
-.auth-divider {
-  margin: 1.5rem 0;
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  color: var(--text-3);
-  font-size: 0.75rem;
-}
-
-.auth-divider::before,
-.auth-divider::after {
-  height: 1px;
-  flex: 1;
-  background: var(--border);
-  content: "";
-}
-
-.auth-roles {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.5rem;
-}
-
-.auth-role {
-  padding: 0.65rem 0.5rem;
-  display: grid;
-  justify-items: center;
-  gap: 0.3rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  color: var(--text-3);
-  font-size: 0.72rem;
-  text-align: center;
-}
-
-.auth-role .icon {
-  color: var(--accent);
-}
-
-.auth-role strong {
-  color: var(--text);
-  font-size: 0.78rem;
-  font-weight: 600;
-}
-
 .strength {
   height: 0.3rem;
   display: grid;
@@ -1159,101 +1236,37 @@
     display: none;
   }
 
+  .auth-main {
+    grid-column: 1;
+    padding-inline: var(--auth-gutter);
+  }
+
+  .auth-top {
+    right: var(--auth-gutter);
+    left: var(--auth-gutter);
+  }
+
   .auth-top .brand-logo {
     visibility: visible;
   }
+
+  .auth-card {
+    width: min(100%, 28rem);
+  }
 }
 
-/* ---------- Page hero (portal and tracker) ---------- */
+@media (max-width: 480px) {
+  .auth-card {
+    padding: 1.5rem 1.25rem;
+  }
 
-.page-hero {
-  position: relative;
-  padding: clamp(2.25rem, 5vw, 3.5rem) 0 clamp(4.5rem, 8vw, 6rem);
-  overflow: hidden;
-  background:
-    radial-gradient(70% 90% at 100% 0%, rgb(207 92 54 / 32%), transparent 60%),
-    var(--rr-ink);
-  color: #efe8e3;
-  isolation: isolate;
-}
-
-.page-hero::after {
-  position: absolute;
-  top: -4rem;
-  right: -3rem;
-  z-index: -1;
-  width: 18rem;
-  height: 18rem;
-  background: url("../images/resqroad-mark.png") center / contain no-repeat;
-  opacity: 0.07;
-  transform: rotate(-12deg);
-  content: "";
-}
-
-.page-hero .eyebrow {
-  color: var(--rr-150);
-}
-
-.page-hero h1 {
-  margin: 0 0 0.6rem;
-  color: #fff;
-  font-size: clamp(1.9rem, 4.5vw, 3rem);
-}
-
-.page-hero p {
-  max-width: 40rem;
-  margin: 0;
-  color: rgb(255 255 255 / 70%);
-}
-
-.page-hero-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 1.5rem;
-}
-
-.hero-mini-stats {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.6rem;
-}
-
-.hero-mini-stat {
-  min-width: 7rem;
-  padding: 0.7rem 1rem;
-  border: 1px solid rgb(255 255 255 / 10%);
-  border-radius: var(--radius-md);
-  background: rgb(255 255 255 / 5%);
-}
-
-.hero-mini-stat strong {
-  display: block;
-  color: #fff;
-  font-size: 1.4rem;
-  font-weight: 700;
-  line-height: 1.15;
-}
-
-.hero-mini-stat span {
-  color: rgb(255 255 255 / 60%);
-  font-size: 0.75rem;
-}
-
-.page-body {
-  position: relative;
-  margin-top: clamp(-3.5rem, -5vw, -2.5rem);
-  padding-bottom: 4rem;
+  .auth-top .brand-logo img {
+    height: 1.6rem;
+  }
 }
 
 /* ---------- Citizen portal ---------- */
-
-.portal-tabs {
-  margin-bottom: 1.25rem;
-  box-shadow: var(--shadow-md);
-  background: var(--surface);
-}
+/* The portal uses the workspace shell from app.css; these are its views. */
 
 .portal-layout {
   display: grid;
@@ -1264,15 +1277,148 @@
 
 .portal-aside {
   position: sticky;
-  top: 90px;
+  top: calc(var(--topbar-h) + 1.25rem);
+  display: grid;
+  gap: 1.25rem;
+}
+
+.severity-field {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.severity-field legend {
+  margin-bottom: 0.4rem;
+  padding: 0;
 }
 
 .portal-aside .card-title .icon {
-  color: var(--accent);
+  color: var(--icon);
 }
 
 .form-section {
   margin-bottom: 1.25rem;
+}
+
+/* The report form's steps: an orange bar per step, filled up to the current
+   one, with the step's name under it. Earlier steps can be reopened. */
+.report-steps {
+  margin-bottom: 1.25rem;
+  padding: 1rem 1.25rem;
+}
+
+.stepper {
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.6rem;
+  list-style: none;
+}
+
+.stepper button {
+  width: 100%;
+  padding: 0;
+  display: grid;
+  gap: 0.55rem;
+  border: 0;
+  background: none;
+  color: var(--text-3);
+  text-align: left;
+}
+
+.stepper-bar {
+  height: 0.4rem;
+  border-radius: var(--radius-full);
+  background: var(--border);
+  transition: background-color 0.2s ease;
+}
+
+.stepper-text {
+  display: grid;
+  line-height: 1.3;
+}
+
+.stepper-text small {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.stepper-text strong {
+  font-size: 0.86rem;
+  font-weight: 500;
+}
+
+.stepper-step.is-done .stepper-bar,
+.stepper-step.is-current .stepper-bar {
+  background: var(--accent);
+}
+
+.stepper-step.is-done button,
+.stepper-step.is-current button {
+  color: var(--text);
+}
+
+.stepper-step.is-current .stepper-text small {
+  color: var(--accent);
+}
+
+.stepper-step.is-current .stepper-text strong {
+  color: var(--heading);
+  font-weight: 600;
+}
+
+.stepper button:hover .stepper-text strong {
+  color: var(--heading);
+}
+
+.stepper button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+
+.form-section h2:focus {
+  outline: none;
+}
+
+/* Step 4: the review, one block per step with its Edit button. */
+.review-block {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.review-block-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.review-block-head h3 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.review-text {
+  white-space: pre-wrap;
+}
+
+.review-map {
+  height: 13rem;
+  min-height: 0;
+}
+
+.review-photos .thumb {
+  width: 7rem;
+}
+
+.review-photos .thumb img {
+  width: 7rem;
+  height: 5.25rem;
 }
 
 .field .field-error {
@@ -1337,7 +1483,7 @@
 }
 
 .picker .map {
-  height: 21rem;
+  height: 25rem;
   cursor: crosshair;
 }
 
@@ -1353,6 +1499,12 @@
   gap: 0.6rem;
 }
 
+.picker-heading {
+  min-width: 0;
+  display: grid;
+  gap: 0.15rem;
+}
+
 .picker-status {
   display: inline-flex;
   align-items: center;
@@ -1364,6 +1516,10 @@
 .picker-status.is-set {
   color: var(--success);
   font-weight: 500;
+}
+
+.picker-status.is-set .icon {
+  color: inherit;
 }
 
 .coords {
@@ -1398,6 +1554,13 @@
   font-size: 0.82rem;
 }
 
+.form-nav {
+  margin-left: auto;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
 .tips {
   margin: 0;
   padding: 0;
@@ -1417,7 +1580,7 @@
 
 .tips .icon {
   margin-top: 0.15rem;
-  color: var(--accent);
+  color: var(--icon);
 }
 
 .success-panel {
@@ -1475,11 +1638,10 @@
   gap: 0.6rem;
 }
 
+/* My reports: one compact card per report; View details opens the rest. */
 .my-report {
-  margin-bottom: 1rem;
+  margin-bottom: 0.85rem;
   overflow: hidden;
-  animation: rise-in 0.45s var(--ease-out) both;
-  animation-delay: calc(var(--i, 0) * 40ms);
 }
 
 .my-report-head {
@@ -1509,69 +1671,616 @@
   font-size: 1rem;
 }
 
-.my-report-body {
-  padding: 0 1.25rem 1.15rem;
+/* Status (and Give feedback), at the right of each report card. */
+.my-report-side {
   display: grid;
-  gap: 1rem;
+  justify-items: end;
+  gap: 0.5rem;
 }
 
-.my-report details {
-  border-top: 1px solid var(--border);
-}
-
-.my-report summary {
+.my-report-more {
+  width: 100%;
   padding: 0.8rem 1.25rem;
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
+  display: block;
+  border: 0;
+  border-top: 1px solid var(--border);
+  background: transparent;
   color: var(--link);
   font-size: 0.85rem;
   font-weight: 600;
-  cursor: pointer;
-  list-style: none;
+  text-align: left;
 }
 
-.my-report summary::-webkit-details-marker {
+.my-report-more:hover {
+  background: var(--surface-2);
+}
+
+/* ---------- Feedback on a finished repair ---------- */
+
+/* The invitation at the top of a resolved report's details. */
+.feedback-cta {
+  margin: 0 0 1rem;
+  padding: 1rem 1.1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border));
+  border-radius: var(--radius-lg);
+  background: linear-gradient(
+    120deg,
+    color-mix(in srgb, var(--accent) 12%, var(--surface)),
+    color-mix(in srgb, var(--rr-100) 12%, var(--surface))
+  );
+}
+
+.feedback-cta-icon {
+  width: 2.75rem;
+  height: 2.75rem;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: var(--accent);
+  color: #fff;
+}
+
+.feedback-cta-icon .icon {
+  fill: currentColor;
+}
+
+.feedback-cta-copy {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  gap: 0.15rem;
+}
+
+.feedback-cta-copy strong {
+  color: var(--heading);
+  font-size: 0.95rem;
+}
+
+.feedback-cta-copy span {
+  color: var(--text-2);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.feedback-empty {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.feedback-empty p {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 0.88rem;
+}
+
+.feedback-thanks {
+  margin: 0.65rem 0 0;
+}
+
+/* The dialog: a fixed header and footer around a scrolling body. On phones
+   it rises from the bottom as a sheet. */
+.feedback-dialog {
+  width: min(38rem, 100%);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.feedback-dialog-head {
+  padding: 1rem 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.feedback-dialog-head .dialog-head {
+  margin: 0;
+}
+
+.feedback-dialog-head .dialog-title:focus {
+  outline: none;
+}
+
+.feedback-dialog-body {
+  min-height: 0;
+  flex: 1 1 auto;
+  padding: 1.25rem;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.feedback-dialog-foot {
+  padding: 0.9rem 1.25rem;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  border-top: 1px solid var(--border);
+  background: var(--surface-2);
+}
+
+/* The report being rated. */
+.feedback-report {
+  margin-bottom: 1.5rem;
+  padding: 0.9rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+}
+
+.feedback-report h3 {
+  margin: 0.45rem 0 0.55rem;
+  font-size: 1rem;
+  line-height: 1.35;
+}
+
+/* Labels in one column and values in the other: every value starts at the
+   same edge, and each label sits level with the first line of its value
+   when a long place wraps. */
+.feedback-report-facts {
+  margin: 0;
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 0.4rem 0.75rem;
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.feedback-report-facts div {
+  display: contents;
+}
+
+.feedback-report-facts dt {
+  height: 1.5em;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--text-3);
+}
+
+.feedback-report-facts dt .icon {
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
+.feedback-report-facts dd {
+  min-width: 0;
+  margin: 0;
+  color: var(--text);
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.feedback-compare {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 6.5rem;
+  gap: 0.5rem;
+}
+
+.feedback-compare-item {
+  position: relative;
+  aspect-ratio: 1;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--surface-3);
+  cursor: zoom-in;
+}
+
+.feedback-compare-item img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.feedback-compare-item:focus-visible {
+  box-shadow: var(--focus-ring);
+}
+
+.feedback-compare-label {
+  position: absolute;
+  bottom: 0.35rem;
+  left: 0.35rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: var(--radius-full);
+  background: rgb(14 11 10 / 72%);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 600;
+}
+
+/* The questions. */
+.feedback-form {
+  display: grid;
+  gap: 1.4rem;
+}
+
+.feedback-question {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.55rem;
+  border: 0;
+}
+
+.feedback-question legend {
+  width: 100%;
+  margin-bottom: 0.6rem;
+  padding: 0;
+}
+
+.rating-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.75rem;
+}
+
+.outcome-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.outcome-option {
+  position: relative;
+  cursor: pointer;
+}
+
+.outcome-option input,
+.tag-option input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.outcome-body {
+  height: 100%;
+  padding: 0.8rem 0.6rem;
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: 0.2rem;
+  border: 1.5px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  text-align: center;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.outcome-body .icon {
+  width: 1.4rem;
+  height: 1.4rem;
+  margin-bottom: 0.15rem;
+  color: var(--text-3);
+}
+
+.outcome-body strong {
+  color: var(--heading);
+  font-size: 0.9rem;
+}
+
+.outcome-body small {
+  color: var(--text-3);
+  font-size: 0.74rem;
+  line-height: 1.35;
+}
+
+.outcome-option:hover .outcome-body {
+  border-color: color-mix(in srgb, var(--tone) 55%, var(--border-strong));
+}
+
+.outcome-option input:checked + .outcome-body {
+  border-color: var(--tone);
+  background: color-mix(in srgb, var(--tone) 10%, var(--surface));
+}
+
+.outcome-option input:checked + .outcome-body .icon {
+  color: var(--tone);
+}
+
+.outcome-option input:focus-visible + .outcome-body,
+.tag-option input:focus-visible + span {
+  box-shadow: var(--focus-ring);
+}
+
+.outcome-option input[aria-invalid] + .outcome-body {
+  border-color: color-mix(in srgb, var(--danger) 55%, var(--border-strong));
+}
+
+.tag-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.tag-option {
+  --tone: var(--success);
+  position: relative;
+  cursor: pointer;
+}
+
+.tag-option.is-negative {
+  --tone: var(--danger);
+}
+
+.tag-option span {
+  min-height: 2.1rem;
+  padding: 0.35rem 0.85rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  color: var(--text-2);
+  font-size: 0.8rem;
+  font-weight: 500;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.tag-option:hover span {
+  border-color: color-mix(in srgb, var(--text-3) 50%, var(--border-strong));
+  color: var(--text);
+}
+
+.tag-option .icon {
+  width: 0;
+  height: 0.9rem;
+  margin-right: -0.35rem;
+  color: var(--tone);
+  opacity: 0;
+  stroke-width: 2.6;
+  transition:
+    width 0.15s var(--ease-out),
+    margin 0.15s var(--ease-out),
+    opacity 0.15s ease;
+}
+
+.tag-option input:checked + span {
+  border-color: var(--tone);
+  background: color-mix(in srgb, var(--tone) 16%, var(--surface));
+  color: var(--heading);
+  font-weight: 600;
+}
+
+.tag-option input:checked + span .icon {
+  width: 0.9rem;
+  margin-right: 0;
+  opacity: 1;
+}
+
+.char-count.is-near {
+  color: var(--sev-medium-label);
+  font-weight: 600;
+}
+
+.dropzone-compact {
+  min-height: 0;
+  padding: 0.85rem 1rem;
+  grid-template-columns: auto minmax(0, 1fr);
+  justify-items: start;
+  column-gap: 0.85rem;
+  row-gap: 0.1rem;
+  text-align: left;
+}
+
+.dropzone-compact .dropzone-icon {
+  grid-row: span 2;
+}
+
+.feedback-question .thumb-list:empty {
   display: none;
 }
 
-.my-report summary .icon {
-  transition: transform 0.2s ease;
+.feedback-error {
+  margin: 0;
 }
 
-.my-report details[open] summary .icon {
-  transform: rotate(180deg);
+/* After sending. */
+.feedback-success {
+  padding: 0.5rem 0 0.25rem;
+  display: grid;
+  gap: 1rem;
+  text-align: center;
 }
 
-.my-report details > div {
-  padding: 0 1.25rem 1.25rem;
+.feedback-success .success-mark {
+  margin: 0 auto;
 }
 
-/* ---------- Tracker ---------- */
+.feedback-success h3 {
+  margin: 0;
+  font-size: 1.25rem;
+}
 
-.track-hero-form {
-  max-width: 36rem;
-  margin-top: 1.5rem;
+.feedback-success-text {
+  max-width: 28rem;
+  margin: 0 auto;
+  color: var(--text-2);
+  font-size: 0.9rem;
+}
+
+.feedback-success .feedback-result,
+.feedback-success .alert {
+  margin: 0;
+  text-align: left;
+}
+
+@media (max-width: 560px) {
+  .feedback-cta {
+    flex-wrap: wrap;
+  }
+
+  .feedback-cta .btn {
+    width: 100%;
+  }
+
+  .feedback-backdrop {
+    padding: 0;
+    place-items: end stretch;
+  }
+
+  .feedback-dialog {
+    width: 100%;
+    max-height: calc(100dvh - 1rem);
+    border-bottom: 0;
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    animation: feedback-sheet-in 0.3s var(--ease-out);
+  }
+
+  .feedback-dialog-head,
+  .feedback-dialog-body,
+  .feedback-dialog-foot {
+    padding-right: 1rem;
+    padding-left: 1rem;
+  }
+
+  .feedback-dialog-foot .btn {
+    flex: 1;
+  }
+
+  .feedback-report {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .feedback-compare {
+    grid-auto-columns: minmax(0, 1fr);
+  }
+
+  .feedback-compare-item {
+    aspect-ratio: 4 / 3;
+  }
+}
+
+@media (max-width: 420px) {
+  .outcome-options {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .outcome-body {
+    grid-template-columns: auto minmax(0, 1fr);
+    justify-items: start;
+    column-gap: 0.65rem;
+    text-align: left;
+  }
+
+  .outcome-body .icon {
+    grid-row: span 2;
+    align-self: center;
+    margin-bottom: 0;
+  }
+}
+
+@keyframes feedback-sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+}
+
+/* ---------- Track a report (in the portal) ---------- */
+
+.track-search {
+  margin-bottom: 1.25rem;
+  padding: 1.15rem 1.25rem;
+}
+
+.track-search-form {
   display: flex;
   gap: 0.6rem;
 }
 
-.track-hero-form .input-icon {
+.track-search-form .input-icon {
   flex: 1;
 }
 
-.track-hero-form input {
-  min-height: 3.1rem !important;
-  border-color: transparent !important;
-  font-family: var(--font-mono);
-  font-size: 1rem !important;
-  text-transform: uppercase;
+.track-search .portal-recent {
+  margin: 0.85rem 0 0;
 }
 
-.track-hero-form input::placeholder {
-  font-family: var(--font-body);
-  text-transform: none;
+.track-picks {
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+  list-style: none;
 }
+
+.track-pick {
+  width: 100%;
+  padding: 0.75rem 0.85rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: inherit;
+  text-align: left;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.track-pick:hover {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+  background: var(--surface-2);
+}
+
+.track-pick-copy {
+  min-width: 0;
+  display: grid;
+  gap: 0.1rem;
+}
+
+.track-pick-copy strong {
+  overflow: hidden;
+  color: var(--heading);
+  font-size: 0.92rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.track-pick-copy > span:last-child {
+  overflow: hidden;
+  color: var(--text-3);
+  font-size: 0.78rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.track-pick-tags {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.4rem;
+}
+
+/* ---------- Tracking card (home page and resident portal) ---------- */
 
 .track-result-head {
   padding: 1.5rem 1.5rem 0;
@@ -1593,9 +2302,18 @@
   gap: 1.25rem;
 }
 
-.track-columns .map {
-  height: 100%;
-  min-height: 16rem;
+/* The map fills the column above Last update and Timeline, which always sit
+   below it (never on top of it). */
+.track-side {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.track-side .map {
+  flex: 1 1 auto;
+  min-height: 19rem;
 }
 
 .recent-ids {
@@ -1622,24 +2340,68 @@
   background: rgb(255 255 255 / 12%);
 }
 
+/* The same chips under the My reports search, on a regular surface. */
+.portal-recent {
+  margin: -0.35rem 0 1.15rem;
+  color: var(--text-3);
+}
+
+.portal-recent button {
+  border-color: var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.portal-recent button:hover {
+  background: var(--hover);
+}
+
+.portal-recent button[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  background: var(--selected);
+  color: var(--heading);
+}
+
 /* ---------- Responsive ---------- */
 
-@media (max-width: 1100px) {
-  .feature-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .live-grid,
+/* The portal form shares the row with the sidebar, so its tips column drops
+   below the form sooner than other two-column layouts. */
+@media (max-width: 1280px) {
   .portal-layout {
     grid-template-columns: minmax(0, 1fr);
   }
 
   .portal-aside {
     position: static;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+    align-items: start;
+  }
+}
+
+@media (max-width: 1100px) {
+  .feature-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .live-grid {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "map"
+      "legend"
+      "side";
+  }
+
+  .live-grid .map {
+    height: clamp(20rem, 60vw, 30rem);
+    min-height: 0;
+  }
+
+  .live-legend {
+    margin-bottom: 1.25rem;
   }
 
   .footer-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .footer-brand {
@@ -1701,6 +2463,27 @@
     padding-left: 1.35rem;
   }
 
+  .stepper {
+    gap: 0.4rem;
+  }
+
+  .stepper-text small {
+    font-size: 0.62rem;
+  }
+
+  .stepper-text strong {
+    font-size: 0.76rem;
+  }
+
+  .form-nav,
+  .form-nav .btn {
+    width: 100%;
+  }
+
+  .form-nav .btn {
+    flex: 1 1 0;
+  }
+
   .form-grid,
   .coords {
     grid-template-columns: minmax(0, 1fr);
@@ -1710,9 +2493,21 @@
     grid-template-columns: 4.25rem minmax(0, 1fr);
   }
 
-  .my-report-head > .pill {
+  .my-report-side {
     grid-column: 1 / -1;
-    justify-self: start;
+    grid-template-columns: auto auto;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .track-pick {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .track-pick-tags {
+    grid-column: 1;
+    grid-row: 2;
+    justify-content: flex-start;
   }
 
   .my-report-thumb {
@@ -1721,17 +2516,11 @@
   }
 
   .track-form,
-  .track-hero-form {
+  .track-search-form {
     flex-direction: column;
   }
 
-  .auth-roles {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .auth-role {
-    grid-template-columns: auto minmax(0, 1fr);
-    justify-items: start;
-    text-align: left;
+  .track-search-form .btn {
+    width: 100%;
   }
 }

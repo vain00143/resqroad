@@ -1,0 +1,86 @@
+{
+  "expo": {
+    "name": "ResQRoad",
+    "slug": "resqroad",
+    "scheme": "resqroad",
+    "version": "1.4.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "userInterfaceStyle": "automatic",
+    "backgroundColor": "#F6F3F0",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "ph.resqroad.app"
+    },
+    "android": {
+      "package": "ph.resqroad.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon-foreground.png",
+        "monochromeImage": "./assets/images/adaptive-icon-monochrome.png",
+        "backgroundColor": "#FDF6EC"
+      },
+      "blockedPermissions": ["android.permission.SYSTEM_ALERT_WINDOW"],
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-status-bar",
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 110,
+          "resizeMode": "contain",
+          "backgroundColor": "#FDF6EC",
+          "dark": {
+            "image": "./assets/images/splash-icon.png",
+            "backgroundColor": "#0E0C0B"
+          }
+        }
+      ],
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "ResQRoad uses the camera to take photos of road damage for your report.",
+          "photosPermission": "ResQRoad lets you choose photos of road damage for your report.",
+          "microphonePermission": false
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "ResQRoad uses your location to pin the road damage you're reporting."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#B34F2F"
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "owner": "resqroad",
+    "extra": {
+      "eas": {
+        "projectId": "c623270b-7bbb-4c6b-8c5a-de3efc3af86b"
+      }
+    }
+  }
+}

@@ -4,160 +4,606 @@ ResQRoad is a road damage reporting and maintenance management system for local
 government. Residents report road problems, and the LGU's Road Maintenance
 Office verifies, assigns, tracks, and resolves them from a central workspace.
 
-This is a front-end prototype built with plain HTML, CSS, and JavaScript. There
-is no backend, database, or build step: data lives in the browser, and the
-sign-in is a mock (see [Sign-in](#sign-in)).
+The website is plain HTML, CSS, and JavaScript (no build step), served by a
+small **Node.js** server backed by a **MySQL** database. The same server is the
+API for the ResQRoad mobile app, so the website and the app share one database,
+one set of accounts, and the same live updates.
+
+- **Real accounts**: passwords are stored as bcrypt hashes in MySQL, and the
+  server checks every request against the account's role.
+- **Photos on the server**: evidence and repair photos are uploaded to
+  `storage/photos/`, not kept in the browser.
+- **Live on every device**: when anyone changes something, every open page and
+  app on any phone or computer updates within a moment (over a WebSocket).
 
 ## Run locally
 
-Open the folder through a local web server so browser storage and the map work
-reliably. Either of these works from this folder:
+You need [Node.js](https://nodejs.org/) 20.12 or newer and MySQL 8.0 or newer
+(MariaDB 10.4+ from XAMPP also works).
 
-```powershell
-node serve.js
-```
+1. **Start MySQL.** For the MySQL 8.0 service: open **Services**
+   (`services.msc`), find **MySQL80**, and click **Start** (set its startup type
+   to *Automatic* so it starts with Windows). If XAMPP's MySQL is running, stop
+   it first: both use port 3306.
+2. **Configure the connection.** Copy `.env.example` to `.env` and set
+   `DB_PASSWORD` to your MySQL `root` password (the one chosen when MySQL was
+   installed). `.env` is never committed.
+3. **Install and set up** (from this folder):
 
-```powershell
-python -m http.server 8000
-```
+   ```powershell
+   npm install
+   npm run db:setup       # creates the `resqroad` database and tables
+   npm run create-admin   # creates your administrator account
+   npm run seed           # optional: sample accounts and 21 sample reports
+   ```
 
-Then open <http://localhost:8000/>. (`serve.js` is a tiny dependency-free
-static server for computers without Python.)
+4. **Start the server:**
+
+   ```powershell
+   npm start
+   ```
+
+   Then open <http://localhost:8000/>. The server also prints addresses such as
+   `http://192.168.1.13:8000/` that phones and other computers **on the same
+   Wi-Fi** can open (allow Node.js through Windows Firewall when asked). Note:
+   phones only allow "Use my location" on `localhost` or HTTPS, so on a LAN
+   address residents drop a pin on the map instead.
+
+`npm run dev` restarts the server automatically when server files change.
 
 ## Pages
 
 | Page | Who | What it does |
 | --- | --- | --- |
-| `index.html` | Everyone | Public landing page: live numbers, how it works, a live map of verified reports, recently fixed roads, and a report tracker. |
+| `index.html` | Everyone | Public landing page: live numbers, how it works, a live map of verified reports, recently fixed roads, and the report tracker at the bottom (`index.html?track=RPT-1048#track` opens a report there). |
 | `login.html` | Everyone | One sign-in for residents, administrators, and maintenance crews. The account decides which workspace opens. |
 | `register.html` | Residents | Create a free resident account (signs you in right away). |
-| `citizen.html` | Residents | Report a road problem (title, severity, map pin or GPS, photos) and follow every report you've filed. |
-| `track.html` | Everyone | Look up any report by ID (e.g. `track.html?id=RPT-1048`) and see its public progress. |
-| `admin.html` | Administrator | Dashboard, Analytics & Reports, Review Reports, Assignment, Map, and User management. |
-| `maintenance.html` | Maintenance crews | Overview, assigned jobs (start repairs, submit notes with before/after photos), and job locations. |
-| `admin-login.html`, `maintenance-login.html` | — | Old sign-in addresses; they redirect to `login.html` so existing links keep working. |
+| `citizen.html` | Residents | Report a road problem in four steps (the report details, the location by map pin or GPS, photos, and a review before sending), follow every report you've filed, open its full details, give feedback on a finished repair, and — without leaving the portal — track a report by ID, browse the live map, and see the public site. |
+| `admin.html` | Administrator | Dashboard, Insights & Statistics (with a printable report), Review Reports, Task Dispatch, Live Map, User management, and the public site. |
+| `maintenance.html` | Maintenance crews | Overview, assigned jobs (start repairs, submit notes with after-repair photos), repair sites, and the public site. |
+| `admin-login.html`, `maintenance-login.html` | — | Old sign-in addresses; they redirect to `login.html`. |
+| `track.html` | — | Old tracker address; `track.html?id=RPT-1048` redirects to the tracker on the home page. |
 
-## Sign-in
+The three workspaces (`admin.html`, `maintenance.html`, `citizen.html`) are
+only served to someone signed in with that role; anyone else is sent to the
+sign-in page. They are never cached, so after logging out the browser's Back
+button can't show them again.
 
-Everyone signs in on `login.html`; there is no role picker. `RoadWatchAuth.signIn`
-in `assets/js/auth.js` looks up the email and opens the matching workspace.
-Visiting `login.html` while signed in goes straight to that workspace, and
-logging out returns to the sign-in page (residents return to the home page).
+## Accounts
 
-The sign-in page does not display the test accounts, so keep them handy:
+Everyone signs in on `login.html`; there is no role picker. The server checks
+the email and password, and the account's role decides which workspace opens.
+Sign-ins last 30 days (renewed while in use) or until you log out.
 
-- Administrator: `admin@resqroad.ph` / `admin123`
-- Maintenance: any maintenance email (for example `juan.reyes@resqroad.ph`,
-  `ana.cruz@resqroad.ph`, `leo.santos@resqroad.ph`) / `crew123`
-- Residents: any sample citizen (for example `maria.santos@example.com`) /
-  `citizen123`, or register a new account. `pedro.garcia@example.com` is a
-  deactivated sample account, so it can't sign in.
+- **Administrators** are created with `npm run create-admin` (it can also
+  reset an administrator's password). They can't be created from the website.
+- **Maintenance crews**: the administrator adds them in **User management**
+  with a temporary password (8+ characters with a letter and a number) and
+  shares it with that person privately. A crew account with open jobs can't be
+  deleted until its work is reassigned or finished. A deleted crew account can
+  no longer sign in; its name stays on past reports, and its email can't be
+  reused.
+- **Residents** create their own accounts on `register.html` (8+ characters
+  with a letter and a number). The administrator can deactivate or reactivate
+  them; a deactivated resident is signed out on every device at once and can't
+  sign in or submit reports.
+- Anyone signed in can change their password: **Change password** in the
+  account menu on the website, or on the Home tab in the app. Their other
+  devices are signed out. An administrator can give a crew member or resident
+  who forgot theirs a new temporary password with the lock button in **User
+  management**; that person is signed out everywhere and can change it after
+  signing in. (API: `POST /api/auth/password` and `POST /api/users/:id/password`.)
 
-New maintenance accounts (User management) use the shared `crew123` password.
-Citizen accounts can't be created from the admin workspace; administrators can
-deactivate or reactivate them, and a deactivated resident can no longer sign in
-or submit reports. A maintenance account with open assignments must have its
-work reassigned or finished before it can be deleted.
+Too many wrong passwords for the same email from the same address (8 in 15
+minutes) pause sign-in attempts for a while.
 
-These credentials are fixed values or values stored in the browser, not real
-authentication. The session lives in the current tab's `sessionStorage`.
+### Sample accounts (`npm run seed` only)
+
+For demos and testing, `npm run seed` adds these accounts. Don't run it on a
+real deployment, or change these passwords afterwards.
+
+| Role | Email | Password |
+| --- | --- | --- |
+| Administrator | `admin@resqroad.ph` | `admin123` |
+| Maintenance crew | `juan.reyes@resqroad.ph`, `ana.cruz@resqroad.ph`, `leo.santos@resqroad.ph` | `crew123` |
+| Resident | `maria.santos@example.com` (and the other sample residents) | `citizen123` |
+| Deactivated resident | `pedro.garcia@example.com` | `citizen123` (sign-in is refused) |
+
+`npm run seed -- --reset` deletes every report, note, and uploaded photo and
+reloads the 21 sample reports (accounts are kept).
 
 ## The workflow
 
 `Submitted → Under Review → Verified → Assigned → In Progress → Repair Submitted → Resolved`,
 with `Rejected` and `Duplicate` as closing outcomes.
 
-1. A resident files a report from `citizen.html`. Reports within about 100 m of
-   another **open** report are blocked as likely duplicates (a pothole that
-   comes back after a repair can be reported again).
-2. The administrator reviews it under **Review Reports → Needs review**, then
-   marks it under review, verifies, rejects (with an optional reason shown to
-   the resident), or marks it a duplicate.
-3. Verified reports appear under **Assignment**, where the administrator assigns
-   or reassigns a crew. The crew workload panel shows open jobs per crew.
-4. The crew starts the repair and submits notes plus before-and-after photos.
+1. A resident files a report from `citizen.html`, one step at a time (the
+   report details; the location, with the road or street, barangay, and
+   municipality and province; photos; then a review of everything before
+   sending). **Possible duplicates**: an open report within about 150 m that
+   looks like the same road problem (distance, kind of problem, wording, and
+   severity are compared in `assets/js/duplicates.js`) is shown on the review
+   step. The resident can open it, or submit anyway if theirs is a different
+   problem; the administrator then sees which report it resembled, at the top
+   of the report. Nothing is rejected automatically, and only open reports
+   count: a fixed report nearby isn't flagged, since damage that comes back
+   is a new problem.
+2. The administrator reviews it under **Review Reports → Needs review**
+   (highest severity first, with possible duplicates tagged), marks it under
+   review, and then verifies it (**Verify report** is only available once the
+   report is under review), rejects it (with an optional reason shown to the
+   resident), or marks it a duplicate.
+3. Verified reports appear under **Task Dispatch** (highest severity first),
+   where the administrator assigns or reassigns a crew. The crew workload
+   panel shows open jobs per crew.
+4. The assigned crew starts the repair and submits notes plus one to ten
+   photos of the finished repair. The resident's photos already show the
+   damage, so before photos are optional (the mobile app still sends them).
 5. The administrator checks it under **Review Reports → Repairs to verify**, then
-   resolves it or requests more work (the note is shown on the crew's job).
+   resolves it or requests more work (the note is shown on the crew's job). A
+   resubmitted repair replaces the photos shown; earlier ones are kept on the
+   server for the record.
+6. Once a report is resolved, the resident who filed it is invited to **give
+   feedback** (a banner at the top of the report's details, and **Give
+   feedback** on its card in My reports), on the website and in the mobile
+   app. The feedback dialog shows the
+   report (ID, place, the date it was resolved, and before and after photos)
+   and asks for 1 to 5 stars, whether the road is fully repaired (Yes,
+   Partially, or No), optional quick tags (Fast resolution, High-quality
+   repair, Smooth pavement, Site left clean, Left debris, Work incomplete,
+   Uneven surface, Took too long; the list is in `assets/js/feedback.js`), an
+   optional comment (500 characters), and up to three optional photos of the
+   repaired road. Rating and the repair question are required; answers are
+   kept if the dialog is closed before sending. Feedback is sent once per
+   report. Administrators see it in the report's details (with a warning when
+   the resident says the road isn't fully repaired), in their notifications,
+   and in the CSV export.
 
-Every decision is recorded in the report's activity history. Administrators can
-also add internal notes, which are never shown publicly.
+The server enforces every rule above (who may make each change, and which step
+can follow which), for the website and the mobile app alike. Every decision is
+recorded in the report's history with the name of the person who made it.
+Administrators can also add internal notes, which only administrators can read.
 
-## What's in each workspace
+## Database (MySQL)
 
-**Administrator** — a dashboard with KPIs, a submitted-vs-resolved trend, a
-"needs attention" queue, recent reports, and live activity; the review queues
-(card or table view, search, severity/status filters, sorting); assignment with
-crew workload; a live map with severity filters and a report list; analytics
-(resolution rate, time to verify and resolve, monthly chart, severity, status,
-top locations, crew performance) with CSV export and print; and user
-management. Press <kbd>Ctrl</kbd>+<kbd>K</kbd> to search reports, people, and
-pages. The bell lists new citizen reports and crew updates. "Reset demo data" in
-the account menu restores the original sample data.
+The schema is in `database/schema.sql` (`npm run db:setup` applies it; it's
+safe to run again). All times are stored in UTC.
 
-**Maintenance** — an overview with an "Up next" job, job tabs (Active, Awaiting
-review, Completed, All), directions links, drag-and-drop photo upload with
-previews, and a map of job locations. Unsaved repair notes and photos survive
-data refreshes.
+- **ER diagram**: `docs/database-er-diagram.png` (for slides and documents)
+  and `docs/database-er-diagram.svg` (scalable) show every table, column, key,
+  and relationship.
+- **Database file with sample data**: `database/resqroad-sample-data.sql` is a
+  complete MySQL export of the schema plus the `npm run seed` sample data (12
+  fictional accounts, 21 reports with their history). Load it on a computer
+  with no `resqroad` database from the MySQL prompt
+  (`mysql -u root -p`) with
+  `source C:/path/to/Project/database/resqroad-sample-data.sql`; it refuses to
+  overwrite an existing `resqroad` database.
 
-**Residents** — a guided report form with a map pin picker (open reports are
-shown as orange dots), "use my location", photo upload, a confirmation with the
-report ID, and a "My reports" list with each report's progress. Status changes
-made by staff in another tab appear immediately with a notification.
+![ResQRoad database ER diagram](docs/database-er-diagram.png)
+
+| Table | What it holds |
+| --- | --- |
+| `users` | Every account: `name`, `email` (unique), `password_hash` (bcrypt), `role` (`admin` \| `maintenance` \| `citizen`), `team` (crews), `active`, `created_at`, `deleted_at` (deleted crew accounts). |
+| `sessions` | Signed-in devices: a SHA-256 hash of each session token (never the token itself), `user_id`, `client` (`web` \| `mobile`), `expires_at`. |
+| `reports` | Reports. The public ID is `RPT-` + `id` (new reports continue from the highest number). `title`, `road`, `location` (the place line, "Barangay, Municipality, Province"; older reports may have just "Barangay, Municipality"), `latitude`, `longitude`, `severity`, `description`, `status`, `reporter_id` → `users`, `client_key` (the app's `Idempotency-Key` for the report, unique together with `reporter_id`, so a retried upload returns the report already filed), `assigned_to` → `users`, `assigned_name`, `repair_notes`, `repair_client_key` (the key of the latest repair upload), `repair_submitted_at`, `reported_at`, `updated_at`. `server/db.js` adds `client_key` and `repair_client_key` to databases set up before they existed when the server starts. |
+| `report_history` | Each workflow step: `report_id`, `status`, `description`, `actor` (name), `actor_id`, `note` (reason shown to the resident or crew), `created_at`. |
+| `report_notes` | Internal staff notes (administrators only): `report_id`, `note`, `actor`, `created_at`. |
+| `report_feedback` | The resident's feedback on a finished repair, one per report: `report_id` (unique), `user_id`, `rating` (1–5), `outcome` (is the road fully repaired: `fixed` \| `partial` \| `unresolved`; empty on ratings sent before this was asked), `tags` (quick tags, comma separated), `comment`, `created_at`. Its photos are in `photos`. Seen only by administrators and that resident. `server/db.js` adds `outcome` and `tags` to databases set up before they existed when the server starts. |
+| `photos` | Evidence (`kind` = `evidence`), repair (`before` \| `after`), and the resident's feedback (`feedback`) photos: `report_id`, original `name`, `file_path` (inside `storage/photos/`, and the address under `/uploads/`), `mime_type`, `size_bytes`, `uploaded_by`, `replaced_at` (earlier repair photos after a resubmission). Sample reports list file names only (`file_path` is empty) and the website shows stock road photos for them. |
+| `photo_data` | The photo files themselves when `PHOTO_STORAGE=database` (used on hosts without a permanent disk): `photo_id`, `file_path`, `mime_type`, `data`. Deleted together with their photo. |
+
+**What each person can see.** Reports are public (the landing page, map, and
+tracker need them), but the reporter's identity is only shown to
+administrators and to the reporter, internal notes only to administrators, and
+account details only to administrators and the account's owner.
+
+**Photos** are checked on the server (JPEG, PNG, or WebP, up to 8 MB each;
+up to five with a report and five "before" photos with a repair, and one to
+ten "after" photos), saved as `storage/photos/YYYY/MM/<random name>`, and served from
+`/uploads/...`. Back up the `storage/` folder together with the database. With
+`PHOTO_STORAGE=database` (the hosted setup below), photos are kept in the
+`photo_data` table instead, served from the same `/uploads/...` addresses, so a
+database backup includes them.
+
+## Architecture
+
+```
+Website (HTML/CSS/JS)            ResQRoad server (Node.js)              MySQL
+Mobile app (React Native)        ──────────────────────────             ─────
+  │                              server/app.js     pages + /api  ───►   resqroad database
+  ├─ JSON API (/api/...)   ───►  server/accounts.js sign-in, accounts
+  ├─ photo uploads         ───►  server/reports.js  workflow rules
+  │                              server/photos.js   ───► storage/photos/
+  └─ live updates   ◄── WebSocket server/live.js (/api/live)
+```
+
+`RoadWatchStore` (`assets/js/data-store.js`) loads everything once
+(`GET /api/state`), then keeps its in-memory copy current with the live updates,
+so pages read it instantly and re-render whenever anything changes, on every
+device. Most changes appear on screen immediately and are then saved; if the
+server rejects a change, the real data comes back and an error is shown. If the
+connection drops (a phone going offline), it reconnects and catches up.
+
+The mobile app uses the same API with a token instead of a cookie; see
+[`docs/API.md`](docs/API.md).
+
+## Tests
+
+```powershell
+npm test
+```
+
+Runs the whole workflow end to end against a real MySQL server (the one in
+`.env`, in a separate `resqroad_test` database that's created and dropped by
+the test): a resident reports damage with photos, the administrator reviews,
+verifies, and assigns it, the crew starts and submits the repair, the
+administrator sends it back once, and then resolves it, with every other
+device receiving each step live. It also checks the permission rules, photo
+storage, duplicate detection, the resident's feedback on the repair, sign-in for the website and the app,
+deactivation, crew accounts, and that server files are never served. A second
+test runs `npm run import:firebase` against a fake Firebase on this computer
+(database `resqroad_import_test`) and checks that people then sign in with
+their Firebase passwords. A third runs with `PHOTO_STORAGE=database` (database
+`resqroad_photo_test`) and checks that photos are stored in MySQL, served back
+unchanged, and removed with their report.
+
+## Moving data from Firebase
+
+The previous version stored its data in Firebase (project `resqroad-bulsu`).
+Its configuration and security rules are kept in `firebase/` for reference.
+To copy that data into MySQL:
+
+```powershell
+npm run import:firebase                    # signs in as the Firebase admin; copies everything
+npm run import:firebase -- --public-only   # no sign-in: reports, history, and photos only
+```
+
+Add `--replace` to delete the reports already in MySQL first. Photos stored in
+Firestore become image files in `storage/photos/`.
+
+**Everyone keeps their Firebase email and password**; nobody needs a new
+account. Firebase never reveals passwords, so each imported account is marked
+to have its password checked with Firebase **once**, the first time that
+person signs in to the new site. The server then stores the password in MySQL
+(bcrypt), and Firebase isn't involved for that account again. The administrator
+who runs the import is moved over immediately. Accounts whose email already
+exists in MySQL switch to their Firebase password too.
+
+Keep the Firebase project until everyone has signed in once. To see who
+hasn't yet: `SELECT email FROM users WHERE password_hash LIKE 'firebase:%';`.
+An administrator can give anyone left over a new temporary password
+(`POST /api/users/:id/password`).
+
+## Deploying
+
+The hosted copy is at **https://resqroad.onrender.com**. Its database is
+separate from the one on this computer: accounts, reports, and photos made on
+the live site stay there.
+
+Firebase Hosting only serves static files, so it can't run this version. The
+hosted copy runs for free on **Render** (the Node.js server: website, API, and
+live updates, in Singapore) with **Aiven** (MySQL, in Bangalore), kept awake by
+**UptimeRobot**:
+
+1. **Aiven:** create a free MySQL service. From its overview, note the host,
+   port, user (`avnadmin`), and password, and download the CA certificate.
+2. **Render:** New → Blueprint → this GitHub repository. `render.yaml` sets
+   up a free web service from the `develop` branch with `PHOTO_STORAGE=database`
+   (free Render services have no permanent disk), `COOKIE_SECURE=true`, and
+   `TRUST_PROXY=1`. Enter `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, and
+   `DB_SSL_CA` (the whole CA certificate) when asked. Each start runs
+   `npm run db:setup`, so the tables are created on the first deploy.
+3. **Data:** load accounts and reports with `npm run seed` or a
+   `mysqldump --no-create-info` export of another copy, run with the Aiven
+   values in the environment.
+4. **UptimeRobot:** an HTTP(S) monitor every 5 minutes on
+   `https://resqroad.onrender.com/api/health/db`. Free Render services sleep
+   after 15 minutes without visitors, and Aiven powers off free databases that
+   stay idle; this check keeps both awake. If the server is asleep anyway, the
+   first visit takes up to a minute while it wakes.
+
+The old Firebase addresses (`resqroad-bulsu.web.app` and
+`resqroad-bulsu.firebaseapp.com`) redirect every page to the hosted copy. The
+redirect's configuration is in `firebase/redirect/`; to change it, edit
+`firebase.json` there and run `firebase deploy --only hosting --project
+resqroad-bulsu` from that folder.
+
+Any other host works too: set the `.env` values there, run `npm run db:setup`
+and `npm run create-admin`, start it with `npm start`, and put it behind HTTPS
+(then set `COOKIE_SECURE=true`). Use `PHOTO_STORAGE=database` when the host has
+no permanent disk, `DB_SSL_CA` (or `DB_SSL=true`) when the database requires
+encrypted connections, and `TRUST_PROXY=1` behind the host's proxy.
+
+## Mobile app
+
+The Android app for residents and maintenance crews lives in `mobile/`. It's
+built with [Expo](https://expo.dev/) (React Native) and uses the same server,
+accounts, and live updates as the website. Administrators keep using the
+website. The current version is **1.4.0**.
+
+```powershell
+cd mobile
+npm install
+npx expo start
+```
+
+Scan the QR code with **Expo Go** on an Android phone on the same Wi-Fi, or
+press `w` to open it in a browser.
+
+**Server address.** The APK always connects to the hosted copy,
+`https://resqroad.onrender.com`, so it works on any network, Wi-Fi or mobile
+data. While developing, `npx expo start` uses the server started with
+`npm start` on this computer, so test data stays off the live site: copy
+`mobile/.env.example` to `mobile/.env` and set `EXPO_PUBLIC_API_URL` to the
+address the server prints for other devices (for example
+`http://192.168.1.15:8000`). That address changes when the laptop joins
+another network, so development builds (`npx expo start`) also have **Server
+settings** on the sign-in and registration screens to change it ("Save and
+test connection" checks it). The APK has no Server settings and ignores any
+address saved by an older version. The phone must be on the same Wi-Fi, and
+Node.js must be allowed through Windows Firewall. For the browser preview, use
+`http://localhost:8000` and add `http://localhost:8081` to `CORS_ORIGINS` in
+the server's `.env`.
+
+**If the app says it can't reach the server**, the message names the address
+it tried (in development, Server settings also opens by itself). With the
+hosted address, check the phone's internet connection. The free server sleeps
+when nobody uses it, so requests to it wait up to 90 seconds, and after a few
+seconds the app shows "Waking up the ResQRoad server…" so people know why the
+wait. When the phone has no connection at all, the app says so ("This phone
+isn't connected to the internet…") instead of waiting, and screens that have
+already loaded keep their data under a "Can't reach the server. Showing the
+last update." banner with **Retry**. With a laptop's address, check, in order:
+
+1. The server is running (`npm start` in the project folder; leave it open).
+2. The address is the one `npm start` prints for **the network the phone is
+   on** (usually the Wi-Fi line). An address from a disconnected Ethernet
+   adapter or a VirtualBox adapter (`192.168.56.x`) won't work from a phone.
+3. The phone is on the same Wi-Fi as the laptop, not mobile data. Opening
+   `http://<address>:8000` in the phone's browser should show the website.
+4. Windows Firewall allows Node.js for the network type the laptop's Wi-Fi
+   uses (Public or Private).
+
+In the Android emulator, `http://10.0.2.2:8000` also reaches the laptop.
+
+Residents and maintenance crews sign in with their website accounts, and new
+residents can register in the app (typing the password twice). Administrators
+are pointed to the website. The welcome screen has **Log in**, **Create a
+resident account**, and **Track a report by ID**.
+
+- **Home** (residents and crews) has a white top bar with the ResQRoad logo
+  and the person's initials on the right. Tapping the initials
+  opens a small menu: **Change password** (the current password, then the new
+  one twice; other devices are signed out), **Theme** (System, Light, or Dark;
+  saved on the phone and applied to the whole app, status bar included), and
+  **Log out** (after a confirmation). Below the greeting are four summary
+  cards in a two-by-two grid, like the website's (residents: My reports, Open,
+  In progress, Resolved; crews: To start, In progress, Awaiting review,
+  Completed), then the three newest open reports (residents; resolved and
+  closed ones are in My reports) or the next jobs (crews). Opening a report
+  slides its page in from the right, and going back slides it out.
+- **Report cards** (Home, My reports, My jobs, and the crew map) follow the
+  website's: the first photo cropped to a fixed frame (a plain placeholder
+  when there's none) with the severity and how long ago it was reported over
+  it, then the ID, title, road and place, and a footer with the status and
+  date. Crews see the same cards; the API doesn't send them reporters' names.
+- **Residents** have four tabs on a floating bar (over the screen, with
+  nothing behind it; the orange highlight slides to the chosen tab): **Home**, **Report**, **My
+  reports** (with Open, Resolved, and Closed filters), and **Track** (the round
+  button at the end: any report by ID, also available signed out from the
+  welcome screen).
+- **Report** is a form in four steps, one page each, with a step indicator and
+  Back and Next: (1) title, severity, and description; (2) the location, with
+  a map pin or "Use my location", the road or street and the barangay side
+  by side, then the municipality and province (sent as one place line,
+  "Barangay, Municipality, Province", as on the website); (3) photos from the camera or gallery, at least one and up to
+  five; (4) a review of everything, including the photos and a map of the pin,
+  with **Edit** beside each part. **Submit report** appears only on the review,
+  and each step is checked before Next. Photos are resized to 1280 px on the
+  longest side and saved as JPEG at quality 0.7 before upload
+  (`mobile/src/lib/photos.ts`), about 150–300 KB each. (On the website, and for
+  the server, photos stay optional.)
+- **A report's page** reads top to bottom: the title, with the status and
+  severity under it (the ID is in the header); the photos; the description;
+  the progress through each workflow step; the map and place; any repair (after photos first); and the
+  activity, where the resident's own first entry reads "You submitted this
+  report." (crews and anyone tracking the report never see who filed it).
+  Photos sit in one frame whatever their number or orientation: one
+  fills the width, two sit side by side, and three or more are one large and
+  two stacked, with "+N" on the third for the rest. Tapping one opens
+  them full screen, uncropped, to swipe through. Repair photos work the same
+  way.
+- **Repair feedback**, as on the website: once one of a resident's reports is
+  resolved, its page opens with "Your road was repaired. How did we do?" and
+  **Give feedback**, and its card in My reports gets a **Give feedback**
+  button. The feedback page rises from the bottom and shows the report (ID,
+  place, the date it was resolved, and before and after photos), then asks
+  for 1 to 5 stars, whether the road is fully repaired (Yes, Partially, or
+  No), optional quick tags, an optional comment (500 characters), and up to
+  three optional photos from the camera or gallery. Stars and the repair
+  question are required. Unsent answers are kept until the app closes. After
+  sending, the page thanks the resident and shows what was sent; the report's
+  page then shows it under **Your feedback**. The answers and tags are copied
+  from `assets/js/feedback.js` into `mobile/src/lib/feedback.ts`. Feedback
+  isn't retried automatically: the server takes one per report, so a lost
+  answer would make a retry fail.
+- **Maintenance crews** have three tabs: **Home**, **My jobs** (Active,
+  Awaiting review, Completed, and All, in the website's order: repairs
+  underway first, then by severity), and **Map** (every job, with active ones
+  as pins; tap one for directions). A job's page is laid out like a report's
+  page, with **Directions** (Google Maps) and **Start repair** (or **Repair
+  update**, which jumps to the form) under the title. The repair form
+  takes notes, one to ten after-repair photos, and up to five optional before
+  photos (the resident's photos already show the damage), with a confirmation
+  before sending. When an administrator asks for more work, the note appears
+  at the top and the previous repair stays visible.
+- **Sending photos**: reports and repairs are uploaded with `XMLHttpRequest`
+  (Expo's `fetch` can't send photo files) and show a progress bar with the
+  percentage sent. Each form carries an `Idempotency-Key` header; when the
+  server doesn't answer, or answers 502–504 while restarting, the app tries
+  twice more (after 3 and 8 seconds) with the same key, so a retry returns the
+  report or repair already filed instead of making a second one.
+- **Possible duplicates**: when the server finds an open report nearby that
+  looks like the same road problem, the review lists it (with how far away
+  it is and **View**), and **Submit report** then asks "Submit your report
+  anyway?". Submitting anyway sends `confirmDuplicate=true`, as the website
+  does; an **Edit** clears the list so the server checks again.
+- **Drafts**: an unsent report (its fields, photos, and the step it was on)
+  and each job's unsent repair update are saved on the phone as they're filled
+  in (AsyncStorage, per account), so they survive the app closing, and are
+  cleared once sent. If Android closes the app while the camera is open
+  (common on phones short of memory), the photo is added back to the form that
+  opened the camera when it opens again.
+- **Version line**: the bottom of Home and of the sign-in screen shows, for
+  example, "Version 1.2.0 (build 9) · commit 1a2b3c4": the version from
+  `mobile/app.json`, the build number EAS gives each build, and the git commit
+  it was built from (`mobile/app.config.js`), so anyone can tell which build
+  is installed.
+- **Status alerts**: when one of a resident's reports changes status, or a
+  crew member gets a new job, loses one to reassignment, has a repair sent
+  back, or has a repair verified, the app shows a banner (while it's open) or
+  a phone notification (while it's in the background and still running).
+  Tapping either opens the report or job (a resolved report's alert invites
+  the resident to give feedback on the repair). Changes people make themselves
+  don't alert them. These come from the live updates, so there's no push
+  server; nothing arrives once Android has closed the app.
+- **Maps** are the website's Leaflet + OpenStreetMap maps running in a WebView,
+  so no map API key is needed (the phone needs internet for the map tiles).
+  Open reports appear as grey dots on the reporting map.
+
+The sign-in token is kept in the phone's secure storage; live updates arrive
+over the same WebSocket as the website, and the app reconnects and catches up
+after losing the connection.
+
+The app follows the website's look in a compact phone layout: the brand in
+`assets/css/core.css` (tokens in `mobile/src/theme/tokens.ts`), the website's
+icons, and its solid status and severity labels. Its icons and splash screen
+are made from the Q mark. Headlines use the static Archivo Expanded ExtraBold
+file in `mobile/assets/fonts/` (SIL Open Font License).
+
+### Build the APK
+
+The APK is built in the cloud with [EAS Build](https://docs.expo.dev/build/introduction/),
+so no Android SDK or Java setup is needed on this computer. You need a free
+[Expo account](https://expo.dev/signup).
+
+```powershell
+cd mobile
+npx eas-cli@latest login
+npx eas-cli@latest build -p android --profile preview
+```
+
+The first build asks to create the EAS project (answer yes; this adds its ID
+to `app.json`) and to generate an Android keystore (answer yes; Expo stores
+it, and every later build is signed with it so updates install over the old
+app). The build takes about 10–20 minutes and ends with a link and QR code.
+Open it on the phone, download the APK, allow **Install unknown apps** for
+the browser when Android asks, and install it.
+
+The `preview` profile in `mobile/eas.json` builds an APK of about 72 MB with
+the hosted address `https://resqroad.onrender.com` built in
+(`EXPO_PUBLIC_API_URL`) and native code for `armeabi-v7a`, `arm64-v8a`, and
+`x86_64` (`ORG_GRADLE_PROJECT_reactNativeArchitectures`: 32- and 64-bit ARM
+phones, and the 64-bit Android emulator). The version is `version` in
+`mobile/app.json`; EAS counts the build number itself (`appVersionSource:
+remote` with `autoIncrement`). When a new build's address differs from the
+one an installed app was using, the app switches to it and asks people to sign
+in again. Plain `http://` is still allowed (`usesCleartextTraffic`) so
+development builds can use a laptop on the local network.
+
+The EAS download link expires 14 days after the build, but installed apps keep
+working. Keep the APK file itself (for example `ResQRoad-v1.2.0.apk`) and share
+that instead of the link.
 
 ## Brand and design
 
 The design follows `ResQRoad Brandsheet.pdf`:
 
-- **Colors** — the Road Orange scale (`#7B3621` → `#EFC88B`), Pastel Rust,
-  Black, Blush Mist, and Asphalt Gray are defined as tokens at the top of
-  `assets/css/core.css`. Buttons use `#B34F2F` so white text meets WCAG AA.
-  Severity (high/medium/low) and each workflow status keep their own hues so
-  they stay easy to tell apart.
-- **Type** — headlines use **Nofex**; body copy and UI use **Poppins** (Google
-  Fonts). Nofex isn't on a public font CDN, so the site uses it when it's
-  installed and otherwise falls back to **Archivo Expanded**, which has the same
-  wide, heavy build. To ship Nofex with the site, add the licensed web font to
-  `assets/fonts/` and add it to the `@font-face` rule at the top of `core.css`.
-- **Logo** — `assets/images/resqroad-mark.png` (the Q mark, also the favicon),
-  `resqroad-logotype.png` (light backgrounds), and `resqroad-logotype-white.png`
+- **Colors**: the Road Orange scale (`#7B3621` → `#EFC88B`), Pastel Rust,
+  Black, Blush Mist, and Asphalt Gray are tokens at the top of
+  `assets/css/core.css`. Severity keeps its own hues (red, orange, yellow).
+  Workflow statuses step through the Road Orange scale after Asphalt Gray
+  (submitted), with green for resolved and red for rejected, and use the
+  same color everywhere they appear.
+- **Type**: headlines use **Nofex** when it's installed, otherwise **Archivo
+  Expanded**, which has the same wide, heavy build; body copy and UI use
+  **Poppins**.
+- **Logo**: `assets/images/resqroad-mark.png` (the Q mark and favicon),
+  `resqroad-logotype.png` (light backgrounds), `resqroad-logotype-white.png`
   (dark backgrounds).
-- **Themes** — light and dark, following the system setting until someone picks
-  one with the sun/moon button.
+- **Themes**: sign-in and registration are always dark. The landing page
+  mixes both: the hero, the "For LGU teams" band, and the footer are dark;
+  How it works, the live map, and the tracker are light. The three
+  workspaces have light and dark themes, following the system setting until
+  someone picks one with the sun/moon button at the top right (beside the
+  notifications). Every page works at phone width.
 
 ## Code layout
 
 ```
-assets/css/core.css      Design tokens, base styles, and shared components
-assets/css/app.css       Workspace shell (sidebar, top bar) and workspace views
-assets/css/site.css      Landing page, sign-in, citizen portal, and tracker
-assets/js/icons.js       Inline SVG icon set
-assets/js/data-store.js  RoadWatchStore: data, workflow rules, and migrations
-assets/js/auth.js        RoadWatchAuth: mock sign-in and role checks
-assets/js/ui.js          RoadWatchUI: toasts, dialogs, lightbox, maps, formatting
-assets/js/menus.js       Accessible custom select menus
-assets/js/shell.js       Theme, sidebar, popovers, Ctrl+K palette, notifications
-assets/js/charts.js      SVG charts (trend, columns, donut, bars, sparklines)
-assets/js/*.js           One script per page (admin, maintenance, citizen, …)
-serve.js                 Optional local static server (Node.js, no dependencies)
+serve.js                      Starts the server (npm start)
+server/index.js               Server start-up and network addresses
+server/app.js                 Website pages, /api, /uploads, error handling
+server/accounts.js            Sign-in, registration, account management, GET /api/state
+server/reports.js             Reports and the workflow rules
+server/photos.js              Photo checks and storage
+server/live.js                Live updates over WebSocket
+server/auth.js                Passwords, sessions, role checks, sign-in limits
+server/db.js, config.js       MySQL connection and .env settings
+database/schema.sql           MySQL tables
+database/resqroad-sample-data.sql  The schema plus sample data, as a MySQL export
+docs/database-er-diagram.*    ER diagram of the database (PNG and SVG)
+tools/db-setup.js             npm run db:setup
+tools/create-admin.js         npm run create-admin
+tools/seed.js, seed-data.js   npm run seed (sample accounts and reports)
+tools/import-firebase.js      npm run import:firebase
+tests/workflow.test.js        npm test: the whole workflow end to end
+tests/firebase-import.test.js npm test: Firebase import and password carry-over
+tests/photo-database.test.js  npm test: photos kept in MySQL (PHOTO_STORAGE=database)
+render.yaml                   Render Blueprint for the hosted copy (with Aiven MySQL)
+docs/API.md                   API for the mobile app
+docs/ResQRoad-User-Guide.pptx User guide (PowerPoint) for residents, crews, administrators, and the app
+firebase/                     The previous Firebase configuration (reference); redirect/ sends the old site to the hosted copy
+assets/css/core.css           Design tokens, base styles, shared components
+assets/css/app.css            Workspace shell (sidebar, top bar) and views
+assets/css/site.css           Landing page, sign-in, citizen portal, tracker
+assets/js/data-store.js       RoadWatchStore: API client, live cache, workflow helpers
+assets/js/duplicates.js       Possible duplicate reports (used by the website and the server)
+assets/js/feedback.js         Repair feedback answers and tags (used by the website and the server)
+assets/js/auth.js             RoadWatchAuth: sign-in and role checks
+assets/js/ui.js               Toasts, dialogs, lightbox, maps, formatting
+assets/js/menus.js            Accessible custom select menus
+assets/js/shell.js            Theme, sidebar, popovers, Ctrl+K palette, notifications
+assets/js/charts.js           SVG charts (trend, columns, donut, bars, sparklines)
+assets/js/*.js                One script per page (admin, maintenance, citizen, …)
+storage/photos/               Uploaded photos (created automatically; not committed)
+mobile/                       The Android app (Expo): screens in mobile/src/app/
 ```
 
-## Maps
+## Acknowledgements
 
-Maps use [Leaflet](https://leafletjs.com/) with OpenStreetMap tiles (loaded from
-the internet, with attribution). If the map library or tiles can't load, every
-map falls back to the original schematic map of Bulacan, so pins and popups
-still work offline.
-
-## Stored data
-
-Reports, accounts, and changes are saved in browser `localStorage` under the
-same key as before (`roadwatch-demo-v1`), shared by every page on the same
-browser and origin, so data saved by the earlier version carries over and is
-upgraded automatically. Open tabs update each other live. Changes stay in that
-browser; nothing is sent to a server. Reset everything with **Reset demo data**
-in the administrator's account menu, or by clearing the site's browser storage.
-
-Photos chosen by residents and crews are resized in the browser and saved with
-the report, so administrators can view them. If browser storage runs out, the
-report is still saved with the photo file names only. Sample reports use sample
-road photos.
+- [Express](https://expressjs.com/), [mysql2](https://sidorares.github.io/node-mysql2/),
+  [ws](https://github.com/websockets/ws), [Multer](https://github.com/expressjs/multer),
+  and [bcrypt.js](https://github.com/dcodeIO/bcrypt.js) for the server.
+- The mobile app is built with [Expo](https://expo.dev/) and
+  [React Native](https://reactnative.dev/): [Expo Router](https://docs.expo.dev/router/introduction/),
+  Expo's Secure Store, Image Picker, Image Manipulator, Location,
+  Notifications, and Splash Screen modules,
+  [AsyncStorage](https://github.com/react-native-async-storage/async-storage)
+  (drafts and the theme choice), [NetInfo](https://github.com/react-native-netinfo/react-native-netinfo)
+  (the offline message),
+  [react-native-svg](https://github.com/software-mansion/react-native-svg),
+  [react-native-webview](https://github.com/react-native-webview/react-native-webview),
+  [react-native-screens](https://github.com/software-mansion/react-native-screens),
+  and [react-native-safe-area-context](https://github.com/AppAndFlow/react-native-safe-area-context).
+  The APK is built with [EAS Build](https://docs.expo.dev/build/introduction/).
+- Hosting: [Render](https://render.com/) runs the server, [Aiven](https://aiven.io/)
+  hosts MySQL, and [UptimeRobot](https://uptimerobot.com/) keeps both awake.
+- [Leaflet](https://leafletjs.com/) for maps, with map data © [OpenStreetMap](https://www.openstreetmap.org/copyright)
+  contributors. If the map can't load, a built-in schematic map is shown.
+- Fonts: [Poppins](https://fonts.google.com/specimen/Poppins) and
+  [Archivo](https://fonts.google.com/specimen/Archivo) via Google Fonts; Nofex
+  from the ResQRoad brand sheet.
+- Icons are drawn in the style of [Lucide](https://lucide.dev/) (ISC license).
+- Sample road photos on demo reports are linked from public news websites.

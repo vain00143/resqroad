@@ -1,7 +1,8 @@
 /* Maintenance crew workspace: overview, assigned jobs (start a repair, submit
-   notes with before-and-after photos), and a map of job locations. Repair
-   drafts survive re-renders, so typing is never lost when data refreshes. */
-(function () {
+   notes with after-repair photos), a map of repair sites, and the public
+   site. Repair drafts survive re-renders, so typing is never lost when data
+   refreshes. */
+(async function () {
   "use strict";
 
   const store = window.RoadWatchStore;
@@ -9,12 +10,13 @@
   const shell = window.RoadWatchShell;
   const icon = ui.icon;
   const esc = ui.escapeHtml;
-  const currentUser = window.RoadWatchAuth.requireRole("maintenance", "login.html");
+  const currentUser = await window.RoadWatchAuth.requireRole("maintenance", "login.html");
   if (!currentUser) {
     return;
   }
 
-  const maxPhotos = 5;
+  // The server accepts up to ten after-repair photos per repair update.
+  const maxPhotos = 10;
   const severityRank = { High: 3, Medium: 2, Low: 1 };
   const jobSteps = ["assigned", "in_progress", "repair_submitted", "resolved"];
   const jobStepLabels = { assigned: "Assigned", in_progress: "Repairing", repair_submitted: "Submitted", resolved: "Verified" };
@@ -26,7 +28,8 @@
   const viewDetails = {
     overview: { crumb: "Overview", title: "Road maintenance workspace", icon: "dashboard" },
     jobs: { crumb: "My assigned jobs", title: "My assigned jobs", icon: "wrench" },
-    map: { crumb: "Locations", title: "Job locations", icon: "map-pin" },
+    map: { crumb: "Repair sites", title: "Repair sites", icon: "map" },
+    public: { crumb: "Public site", title: "Public site", icon: "globe" },
   };
 
   const $ = function (selector) {
@@ -38,6 +41,9 @@
 
   const jobList = $("#job-list");
   const drafts = new Map();
+  // Completed jobs show only their summary until opened ("View more
+  // details"); these are the ones opened.
+  const expandedJobs = new Set();
   let state = null;
   let person = null;
   let currentView = "overview";
@@ -79,7 +85,7 @@
 
   function draftFor(reportId) {
     if (!drafts.has(reportId)) {
-      drafts.set(reportId, { notes: "", before: [], after: [] });
+      drafts.set(reportId, { notes: "", after: [] });
     }
     return drafts.get(reportId);
   }
@@ -102,15 +108,7 @@
     }
     currentView = name;
     $$("[data-crew-view-panel]").forEach(function (panel) {
-      const active = panel.dataset.crewViewPanel === name;
-      if (active && panel.hidden) {
-        panel.hidden = false;
-        panel.style.animation = "none";
-        panel.getBoundingClientRect();
-        panel.style.animation = "";
-      } else if (!active) {
-        panel.hidden = true;
-      }
+      panel.hidden = panel.dataset.crewViewPanel !== name;
     });
     $$("[data-crew-view]").forEach(function (button) {
       const active = button.dataset.crewView === name;
@@ -128,6 +126,7 @@
       window.scrollTo({ top: 0, behavior: "instant" });
     }
     runSafely(renderMaps);
+    runSafely(renderPublicView);
   }
 
   /* ---------- Overview ---------- */
@@ -159,7 +158,7 @@
 
     $("#job-summary").innerHTML = [
       { label: "Open assigned jobs", value: open.length, icon: "clipboard-list", tone: "var(--accent)", foot: ui.pluralize(notStarted, "job") + " waiting to start", tab: "active" },
-      { label: "In progress", value: inProgress, icon: "construction", tone: "var(--info)", foot: "Repairs underway", tab: "active" },
+      { label: "In progress", value: inProgress, icon: "construction", tone: "var(--st-in_progress)", foot: "Repairs underway", tab: "active" },
       { label: "Awaiting admin review", value: awaiting, icon: "clock", tone: "var(--st-repair_submitted)", foot: "Submitted for verification", tab: "review" },
       { label: "Completed", value: completed, icon: "check-circle", tone: "var(--success)", foot: "Verified by the administrator", tab: "done" },
     ]
@@ -193,21 +192,30 @@
         icon("check-circle") +
         "</span><h3>You're all caught up</h3><p>When an administrator assigns a verified report, it will appear here.</p></div>";
     } else {
+      // The job fills the card: photo on the left, then what, where, the
+      // description, the progress, and the actions, evenly spaced.
       const photo = ui.reportPhotos(next)[0];
+      const assigned = lastEvent(next, "assigned");
       $("#next-job").innerHTML =
         '<div class="next-job"><div class="next-job-media">' +
         ui.photoImg(photo) +
-        '</div><div><div class="toolbar-group"><span class="id-tag">' +
+        '</div><div class="next-job-body"><div><div class="toolbar-group"><span class="id-tag">' +
         esc(next.id) +
         "</span>" +
         ui.severityBadge(next.severity) +
         ui.statusPill(next.status) +
         "</div><h3>" +
         esc(next.title) +
-        '</h3><p class="job-meta"><span>' +
+        '</h3><p class="job-meta" style="margin: 0"><span>' +
         icon("map-pin") +
         esc(next.road + " · " + next.location) +
-        '</span></p><div class="job-actions">' +
+        "</span>" +
+        (assigned ? "<span>" + icon("calendar") + "Assigned " + esc(ui.formatDay(assigned.at)) + "</span>" : "") +
+        '</p></div><p class="detail-description">' +
+        esc(next.description) +
+        '</p><div class="job-progress">' +
+        ui.journey(next, { steps: jobSteps, labels: jobStepLabels }) +
+        '</div><div class="job-actions">' +
         (next.status === "assigned"
           ? '<button class="btn btn-primary btn-sm" type="button" data-action="start" data-report-id="' + esc(next.id) + '">' + icon("play", "icon-sm") + "Start repair</button>"
           : '<button class="btn btn-primary btn-sm" type="button" data-open-job="' + esc(next.id) + '">' + icon("wrench", "icon-sm") + "Continue repair</button>") +
@@ -264,6 +272,10 @@
     });
   }
 
+  function photoCountText(count) {
+    return count ? count + " of " + maxPhotos + " added" : "Up to " + maxPhotos;
+  }
+
   function thumbList(photos, field, reportId) {
     return photos
       .map(function (photo, index) {
@@ -294,8 +306,10 @@
     return (
       '<div class="photo-field"><span class="field-label">' +
       label +
-      ' <span class="optional">Up to ' +
-      maxPhotos +
+      ' <span class="optional" data-photo-count="' +
+      field +
+      '">' +
+      photoCountText(draftFor(reportId)[field].length) +
       '</span></span><label class="dropzone"><input type="file" name="' +
       field +
       '-photos" accept="image/*" multiple data-photo-input="' +
@@ -315,31 +329,7 @@
     );
   }
 
-  function repairPhotoBlock(list) {
-    const withData = ui.photosWithData(list);
-    if (withData.length) {
-      return (
-        '<div class="gallery" data-gallery-group>' +
-        withData
-          .map(function (photo, index) {
-            return (
-              '<button class="gallery-item" type="button" data-gallery-index="' +
-              index +
-              '" aria-label="View ' +
-              esc(photo.name) +
-              '">' +
-              ui.photoImg(photo) +
-              "</button>"
-            );
-          })
-          .join("") +
-        "</div>"
-      );
-    }
-    return ui.fileChips(list);
-  }
-
-  function renderJobCard(report, index) {
+  function renderJobCard(report) {
     const photos = ui.reportPhotos(report);
     const assigned = lastEvent(report, "assigned");
     const sentBack = report.status === "in_progress" && report.repair ? lastEvent(report, "in_progress") : null;
@@ -371,40 +361,59 @@
           icon("wrench") +
           'Submit repair update</h4><label class="field"><span class="field-label">Repair notes</span><textarea name="notes" rows="3" maxlength="1000" placeholder="Describe the inspection and repair work completed">' +
           esc(draft.notes) +
-          '</textarea></label><div class="photo-fields">' +
-          dropzone("before", "Before photos", report.id) +
-          dropzone("after", "After photos", report.id) +
-          '</div><p class="field-hint">Choose at least one image for both fields. Photos are resized and saved with the report so the administrator can compare them.</p><div class="job-actions"><button class="btn btn-primary" type="submit">' +
+          "</textarea></label>" +
+          dropzone("after", "After-repair photos", report.id) +
+          '<p class="field-hint">Add at least one photo of the finished repair. The resident\'s photos of the damage are already on the report, so the administrator can compare them. Photos are resized before they are saved.</p><div class="job-actions"><button class="btn btn-primary" type="submit">' +
           icon("send", "icon-sm") +
           "Submit repair for review</button></div></form>"
         : "";
 
+    const afterPhotos = report.repair ? ui.repairPhotos(report, "after") : [];
     const receipt = report.repair
       ? '<div class="callout callout-tone"><div class="detail-block-head"><h3>' +
-        icon("clipboard-check") +
+        icon("wrench") +
         (report.status === "in_progress" ? "Previous repair update" : "Repair update") +
         '</h3><span class="muted text-sm">' +
         esc(report.repair.submittedAt ? ui.formatDate(report.repair.submittedAt) : "") +
         '</span></div><p class="detail-description">' +
         esc(report.repair.notes) +
-        '</p><div class="before-after"><div><h4>Before</h4>' +
-        repairPhotoBlock(report.repair.beforePhotos) +
-        "</div><div><h4>After</h4>" +
-        repairPhotoBlock(report.repair.afterPhotos) +
-        "</div></div>" +
+        '</p><div class="repair-photos"><h4>After-repair photos <span>' +
+        esc(ui.pluralize(afterPhotos.length, "photo")) +
+        "</span></h4>" +
+        ui.photoGallery(afterPhotos, "After-repair photos", "gallery-grid") +
+        "</div>" +
         (report.status === "repair_submitted"
           ? '<p class="field-hint" style="margin-top: 0.75rem">This repair is waiting for an administrator to verify it.</p>'
           : "") +
         "</div>"
       : "";
 
+    // A completed job is a short summary until "View more details".
+    const collapsible = report.status === "resolved";
+    const collapsed = collapsible && !expandedJobs.has(report.id);
+    const toggle = collapsible
+      ? '<button class="job-toggle" type="button" data-toggle-job="' +
+        esc(report.id) +
+        '" aria-expanded="' +
+        String(!collapsed) +
+        '" aria-controls="job-body-' +
+        esc(report.id) +
+        '">' +
+        (collapsed ? "View more details" : "Hide details") +
+        '<span class="visually-hidden"> of ' +
+        esc(report.id) +
+        "</span>" +
+        icon("chevron-down", "icon-sm") +
+        "</button>"
+      : "";
+
     return (
-      '<article class="card job-card" tabindex="-1" id="job-' +
+      '<article class="card job-card' +
+      (collapsed ? " is-collapsed" : "") +
+      '" tabindex="-1" id="job-' +
       esc(report.id) +
       '" data-job-card="' +
       esc(report.id) +
-      '" style="--i:' +
-      Math.min(index, 10) +
       '"><div class="job-head"><button class="job-thumb" type="button" data-job-photos="' +
       esc(report.id) +
       '" aria-label="View ' +
@@ -426,7 +435,11 @@
       (assigned ? "<span>" + icon("calendar") + "Assigned " + esc(ui.formatDay(assigned.at)) + "</span>" : "") +
       "</div></div>" +
       ui.statusPill(report.status) +
-      '</div><div class="job-body"><div class="job-progress">' +
+      '</div><div class="job-body" id="job-body-' +
+      esc(report.id) +
+      '"' +
+      (collapsed ? " hidden" : "") +
+      '><div class="job-progress">' +
       ui.journey(report, { steps: jobSteps, labels: jobStepLabels }) +
       "</div>" +
       feedback +
@@ -448,7 +461,9 @@
       "</span></div>" +
       repairForm +
       receipt +
-      "</div></article>"
+      "</div>" +
+      toggle +
+      "</article>"
     );
   }
 
@@ -572,9 +587,7 @@
                 esc(report.title) +
                 "</strong><small><span>" +
                 esc(report.id + " · " + report.road) +
-                "</span>" +
-                ui.statusPill(report.status) +
-                "</small></button></li>"
+                "</span></small></button></li>"
               );
             })
             .join("")
@@ -591,6 +604,8 @@
       ui.showMessage("This job is no longer assigned to you.", "error");
       return;
     }
+    // A completed job opens with all its details.
+    expandedJobs.add(reportId);
     $("#job-search").value = "";
     const tab =
       Object.keys(tabStatuses).find(function (key) {
@@ -612,6 +627,25 @@
     }
   }
 
+  /* ---------- Public site ---------- */
+
+  // The public site inside the workspace. Only the crew's own jobs open from
+  // it; other reports are shown as the public sees them.
+  function renderPublicView() {
+    if (currentView !== "public" || !state) {
+      return;
+    }
+    window.RoadWatchPublicView.render($("#public-view"), state, {
+      canOpen: function (report) {
+        return report.assignedTo === person.id;
+      },
+      openLabel: "Open job",
+      onOpen: function (reportId) {
+        focusJob(reportId);
+      },
+    });
+  }
+
   /* ---------- Render ---------- */
 
   function render() {
@@ -628,6 +662,7 @@
     renderOverview(jobs);
     renderJobs(jobs);
     renderMaps();
+    renderPublicView();
     shell.refreshNotifications();
   }
 
@@ -635,7 +670,12 @@
 
   function refreshThumbs(form, field) {
     const reportId = form.dataset.reportId;
-    form.querySelector('[data-preview="' + field + '"]').innerHTML = thumbList(draftFor(reportId)[field], field, reportId);
+    const photos = draftFor(reportId)[field];
+    form.querySelector('[data-preview="' + field + '"]').innerHTML = thumbList(photos, field, reportId);
+    const count = form.querySelector('[data-photo-count="' + field + '"]');
+    if (count) {
+      count.textContent = photoCountText(photos.length);
+    }
   }
 
   function addPhotos(input) {
@@ -646,7 +686,7 @@
     input.value = "";
     const room = maxPhotos - draft[field].length;
     if (room <= 0) {
-      ui.showMessage("You can add up to " + maxPhotos + " " + field + " photos.", "error");
+      ui.showMessage("You can add up to " + maxPhotos + " after-repair photos.", "error");
       return;
     }
     if (files.length > room) {
@@ -725,6 +765,20 @@
     }, 120),
   );
 
+  // Both maps' refresh buttons reload every job from the server.
+  $$("[data-refresh-map]").forEach(function (button) {
+    button.addEventListener("click", function () {
+      ui.refreshMap(button, function () {
+        runSafely(render);
+        [overviewMap, crewMap].forEach(function (map) {
+          if (map) {
+            map.refresh();
+          }
+        });
+      });
+    });
+  });
+
   $("#crew-map-list").addEventListener("click", function (event) {
     const item = event.target.closest("[data-map-focus]");
     if (item && crewMap) {
@@ -736,6 +790,21 @@
   });
 
   jobList.addEventListener("click", function (event) {
+    const toggle = event.target.closest("[data-toggle-job]");
+    if (toggle) {
+      const reportId = toggle.dataset.toggleJob;
+      if (expandedJobs.has(reportId)) {
+        expandedJobs.delete(reportId);
+      } else {
+        expandedJobs.add(reportId);
+      }
+      runSafely(render);
+      const again = jobList.querySelector('[data-toggle-job="' + CSS.escape(reportId) + '"]');
+      if (again) {
+        again.focus({ preventScroll: true });
+      }
+      return;
+    }
     const photos = event.target.closest("[data-job-photos]");
     if (photos) {
       const report = myJobs().find(function (item) {
@@ -802,8 +871,8 @@
     const reportId = form.dataset.reportId;
     const draft = draftFor(reportId);
     draft.notes = form.elements.namedItem("notes").value;
-    if (!draft.notes.trim() || draft.before.length === 0 || draft.after.length === 0) {
-      ui.showMessage("Add repair notes and choose at least one before and after photo.", "error");
+    if (!draft.notes.trim() || draft.after.length === 0) {
+      ui.showMessage("Add repair notes and at least one after-repair photo.", "error");
       if (!draft.notes.trim()) {
         form.elements.namedItem("notes").focus();
       }
@@ -821,19 +890,30 @@
       if (!confirmed) {
         return;
       }
-      runSafely(function () {
-        const result = store.submitRepair(reportId, currentUser.userId, {
+      const submitButton = form.querySelector('button[type="submit"]');
+      submitButton.classList.add("is-loading");
+      let request;
+      try {
+        request = store.submitRepair(reportId, currentUser.userId, {
           notes: draft.notes,
-          beforePhotos: draft.before,
           afterPhotos: draft.after,
         });
-        drafts.delete(reportId);
-        ui.showMessage(reportId + " sent to the administrator for verification.", "success");
-        if (result.photosTrimmed) {
-          ui.showMessage("Browser storage is full, so only the photo file names were saved.", "info");
-        }
-        render();
-      });
+      } catch (error) {
+        submitButton.classList.remove("is-loading");
+        ui.showMessage(error.message, "error");
+        return;
+      }
+      request
+        .then(function () {
+          drafts.delete(reportId);
+          ui.showMessage(reportId + " sent to the administrator for verification.", "success");
+          runSafely(render);
+        })
+        .catch(function (error) {
+          // The draft is kept, so the crew can simply try again.
+          submitButton.classList.remove("is-loading");
+          ui.showMessage(error.message, "error");
+        });
     });
   });
 

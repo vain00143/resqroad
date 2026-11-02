@@ -3,8 +3,6 @@ student_login_registration/
 
 # Local editor and tooling settings.
 .vscode/
-.claude/
-CLAUDE.md
 
 # Operating system and tooling clutter.
 Thumbs.db
@@ -12,3 +10,19 @@ desktop.ini
 .DS_Store
 node_modules/
 *.log
+
+# Firebase deploy cache.
+.firebase/
+
+# Local settings and uploaded photos.
+.env
+.env.*
+!.env.example
+storage/
+
+# Database certificates (e.g. the Aiven CA certificate) stay on this computer.
+*.pem
+
+# Database exports of real data (database/resqroad-sample-data.sql is the
+# shareable one with sample data only).
+database/resqroad-backup*.sql

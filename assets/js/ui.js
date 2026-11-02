@@ -9,6 +9,10 @@
   const icon = window.RoadWatchIcons.svg;
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
   const placeholderPhoto = "assets/images/photo-placeholder.svg";
+  const sampleRepairPhotos = {
+    before: "assets/images/sample-repair-before.svg",
+    after: "assets/images/sample-repair-after.svg",
+  };
   const sampleRoadPhotos = [
     {
       src: "https://npr.brightspotcdn.com/dims4/default/c139ad9/2147483647/strip/true/crop/1024x768%2B0%2B0/resize/880x660%21/quality/90/?url=http%3A%2F%2Fnpr-brightspot.s3.amazonaws.com%2Flegacy%2Fsites%2Fwkar%2Ffiles%2Fpothole.jpg",
@@ -108,6 +112,31 @@
     return new Intl.NumberFormat(undefined, { maximumFractionDigits: digits == null ? 0 : digits }).format(value);
   }
 
+  // A length of time given in days, counted in whole days ("8 days"), or in
+  // hours when it is under a day. Null when there is nothing to show.
+  function duration(days) {
+    if (days == null || !Number.isFinite(days)) {
+      return null;
+    }
+    if (days < 1) {
+      const hours = Math.max(1, Math.round(days * 24));
+      return { value: hours, unit: hours === 1 ? "hr" : "hrs" };
+    }
+    const whole = Math.round(days);
+    return { value: whole, unit: whole === 1 ? "day" : "days" };
+  }
+
+  function durationText(days) {
+    const time = duration(days);
+    return time ? time.value + " " + time.unit : "—";
+  }
+
+  // The same, for big numbers: the unit in a <small> after the value.
+  function durationHtml(days) {
+    const time = duration(days);
+    return time ? time.value + "<small>" + time.unit + "</small>" : "—";
+  }
+
   function debounce(fn, wait) {
     let timer = null;
     return function () {
@@ -136,18 +165,92 @@
     );
   }
 
+  // The one High / Medium / Low label used everywhere (see .sev in core.css).
   function severityBadge(severity, options) {
     const value = String(severity || "Medium");
-    const solid = options && options.solid;
     return (
       '<span class="sev sev-' +
       escapeHtml(value.toLowerCase()) +
-      (solid ? " sev-solid" : "") +
       (options && options.className ? " " + options.className : "") +
-      '"><span class="sev-bars" aria-hidden="true"><i></i><i></i><i></i></span>' +
+      '">' +
       escapeHtml(value) +
       (options && options.suffix ? " " + escapeHtml(options.suffix) : "") +
       "</span>"
+    );
+  }
+
+  // A resident's rating of a finished repair (1 to 5 stars).
+  const ratingLabels = { 1: "Poor", 2: "Fair", 3: "Good", 4: "Very good", 5: "Excellent" };
+
+  function ratingStars(rating) {
+    let stars = "";
+    for (let star = 1; star <= 5; star += 1) {
+      stars += icon("star", star <= rating ? "star-on" : "star-off");
+    }
+    return '<span class="rating-display" role="img" aria-label="' + rating + ' out of 5 stars">' + stars + "</span>";
+  }
+
+  // "Fully repaired", "Partially repaired", or "Not repaired", as a pill in
+  // the answer's color. Empty for ratings sent before the question was asked.
+  function repairOutcomePill(value) {
+    const outcome = store().repairOutcome(value);
+    if (!outcome) {
+      return "";
+    }
+    return (
+      '<span class="pill outcome-pill status-' +
+      outcome.tone +
+      '">' +
+      icon(outcome.icon) +
+      escapeHtml(outcome.summary) +
+      "</span>"
+    );
+  }
+
+  // A resident's feedback on a finished repair: the stars, whether the road
+  // is fully repaired, the quick tags, the comment, and any photos of the
+  // repaired spot. options.emptyComment: shown when there's no comment.
+  function feedbackSummary(feedback, options) {
+    const settings = options || {};
+    const tags = (feedback.tags || []).map(store().feedbackTag).filter(Boolean);
+    const photos = photosWithData(feedback.photos);
+    return (
+      '<div class="callout feedback-result"><div class="feedback-result-head"><div class="rating-summary">' +
+      ratingStars(feedback.rating) +
+      "<strong>" +
+      escapeHtml(feedback.rating + " of 5 · " + ratingLabels[feedback.rating]) +
+      "</strong></div>" +
+      repairOutcomePill(feedback.outcome) +
+      "</div>" +
+      (tags.length
+        ? '<ul class="feedback-tags" aria-label="Tags">' +
+          tags
+            .map(function (tag) {
+              return (
+                '<li class="feedback-tag ' +
+                (tag.positive ? "is-positive" : "is-negative") +
+                '">' +
+                icon(tag.positive ? "check" : "alert-circle") +
+                escapeHtml(tag.label) +
+                "</li>"
+              );
+            })
+            .join("") +
+          "</ul>"
+        : "") +
+      (feedback.comment
+        ? '<p class="detail-description">' + escapeHtml(feedback.comment) + "</p>"
+        : settings.emptyComment
+          ? '<p class="muted text-sm" style="margin: 0">' + escapeHtml(settings.emptyComment) + "</p>"
+          : "") +
+      (photos.length
+        ? '<div class="repair-photos"><h4>Photos of the repaired road <span>' +
+          escapeHtml(pluralize(photos.length, "photo")) +
+          "</span></h4>" +
+          photoGallery(photos, "Photos of the repaired road", "gallery-grid") +
+          "</div>"
+        : "") +
+      "</div>"
     );
   }
 
@@ -208,6 +311,69 @@
     return sampleRoadPhotos.map(function (photo) {
       return { src: photo.src, alt: photo.alt, name: photo.alt };
     });
+  }
+
+  // The crew's before or after repair photos. Uploads that were saved show as
+  // is; sample reports list file names only, so each gets a sample picture.
+  // Uploads that couldn't be saved show a placeholder.
+  function repairPhotos(report, side) {
+    const list = report && report.repair ? report.repair[side === "before" ? "beforePhotos" : "afterPhotos"] : [];
+    const uploaded = photosWithData(list);
+    if (uploaded.length) {
+      return uploaded;
+    }
+    return (list || []).map(function (photo) {
+      const name = photoName(photo);
+      if (report.photosTrimmed) {
+        return { src: placeholderPhoto, alt: name + " (photo not available)", name: name };
+      }
+      return { src: sampleRepairPhotos[side === "before" ? "before" : "after"], alt: name + " (sample photo)", name: name };
+    });
+  }
+
+  // A grid of photo thumbnails. Each opens the lightbox through the page's
+  // click handler, which reads the images in the same [data-gallery-group].
+  // `className` adds a layout, e.g. "gallery-grid" for rows of thumbnails.
+  // Without one, the photos fill the full width in a layout made for their
+  // number: one, two, or three (the first large beside two stacked). Past
+  // three, the third tile shows "+N" for the rest, which stay in the group so
+  // the lightbox still steps through every photo.
+  function photoGallery(photos, label, className) {
+    if (!photos.length) {
+      return '<p class="muted text-sm">No photos</p>';
+    }
+    const layout = className || "gallery-count-" + Math.min(photos.length, 3);
+    const more = className ? 0 : photos.length - 3;
+    return (
+      '<div class="gallery ' +
+      escapeHtml(layout) +
+      '" data-gallery-group aria-label="' +
+      escapeHtml(label) +
+      '">' +
+      photos
+        .map(function (photo, index) {
+          const counter = more > 0 && index === 2;
+          return (
+            '<button class="gallery-item" type="button" data-gallery-index="' +
+            index +
+            '"' +
+            (more > 0 && index > 2 ? " hidden" : "") +
+            ' aria-label="View photo ' +
+            (index + 1) +
+            " of " +
+            photos.length +
+            " full size" +
+            (photo.alt ? ": " + escapeHtml(photo.alt) : "") +
+            (counter ? " (" + more + " more)" : "") +
+            '">' +
+            photoImg(photo) +
+            (counter ? '<span class="gallery-more" aria-hidden="true">+' + more + "</span>" : "") +
+            "</button>"
+          );
+        })
+        .join("") +
+      "</div>"
+    );
   }
 
   function photoImg(photo, extra) {
@@ -329,9 +495,12 @@
     );
   }
 
-  // Activity list, newest first. `publicOnly` hides notes and staff names.
+  // Activity list, newest first. `publicOnly` hides notes and staff names,
+  // and tells residents and the public that a submitted report went to the
+  // administrator (options.submittedText can say it in the resident's words).
   function timeline(report, options) {
     const publicOnly = options && options.publicOnly;
+    const submittedText = (options && options.submittedText) || "Report submitted and sent to the administrator.";
     const entries = (report.history || [])
       .slice()
       .reverse()
@@ -349,7 +518,10 @@
           const title = isNote
             ? "<strong>" + escapeHtml(entry.actor || "Staff") + "</strong> added a note"
             : publicOnly
-              ? "<strong>" + escapeHtml(statusLabel(entry.status)) + "</strong> · " + escapeHtml(entry.description)
+              ? "<strong>" +
+                escapeHtml(statusLabel(entry.status)) +
+                "</strong> · " +
+                escapeHtml(entry.status === "submitted" ? submittedText : entry.description)
               : escapeHtml(entry.description);
           const meta = publicOnly
             ? formatDate(entry.at)
@@ -516,6 +688,21 @@
 
   let activeDialog = null;
 
+  // The dialog's icon, with the kicker and title beside it.
+  function dialogHead(iconName, kicker, title, titleId) {
+    return (
+      '<div class="dialog-head"><div class="dialog-icon">' +
+      icon(iconName, "icon-lg") +
+      '</div><div class="dialog-heading">' +
+      (kicker ? '<p class="dialog-kicker">' + escapeHtml(kicker) + "</p>" : "") +
+      '<h2 class="dialog-title" id="' +
+      titleId +
+      '">' +
+      escapeHtml(title) +
+      "</h2></div></div>"
+    );
+  }
+
   // options: title, message, confirmLabel, cancelLabel, kicker, danger, icon,
   // opener, and for prompts: input { label, placeholder, required, multiline,
   // maxLength, value, hint }. Resolves true/false, or the text/null for prompts.
@@ -539,15 +726,8 @@
         titleId +
         '"' +
         (options.message ? ' aria-describedby="' + messageId + '"' : "") +
-        '><div class="dialog-icon">' +
-        icon(iconName, "icon-lg") +
-        "</div>" +
-        (options.kicker ? '<p class="dialog-kicker">' + escapeHtml(options.kicker) + "</p>" : "") +
-        '<h2 class="dialog-title" id="' +
-        titleId +
-        '">' +
-        escapeHtml(options.title) +
-        "</h2>" +
+        ">" +
+        dialogHead(iconName, options.kicker, options.title, titleId) +
         (options.message ? '<p class="dialog-message" id="' + messageId + '">' + escapeHtml(options.message) + "</p>" : "") +
         (input
           ? '<label class="field dialog-field"><span class="field-label">' +
@@ -659,6 +839,143 @@
 
   function promptAction(options) {
     return openDialog(options, true);
+  }
+
+  /* ---------- Form dialog ---------- */
+
+  // A dialog with several fields that stays open until `submit` succeeds.
+  // options: title, message, kicker, icon, confirmLabel, cancelLabel, opener,
+  // fields [{ name, label, type, autocomplete, hint }], and submit(values),
+  // which returns a promise; throwing shows its message in the dialog.
+  // Resolves with what submit returned, or null when cancelled.
+  function formDialog(options) {
+    if (activeDialog) {
+      activeDialog.settle(false);
+    }
+
+    return new Promise(function (resolve) {
+      const backdrop = document.createElement("div");
+      backdrop.className = "dialog-backdrop";
+      const titleId = "dialog-title-" + Date.now();
+      const messageId = titleId + "-message";
+      backdrop.innerHTML =
+        '<section class="dialog" role="dialog" aria-modal="true" aria-labelledby="' +
+        titleId +
+        '"' +
+        (options.message ? ' aria-describedby="' + messageId + '"' : "") +
+        "><form novalidate>" +
+        dialogHead(options.icon || "info", options.kicker, options.title, titleId) +
+        (options.message ? '<p class="dialog-message" id="' + messageId + '">' + escapeHtml(options.message) + "</p>" : "") +
+        options.fields
+          .map(function (spec) {
+            return (
+              '<label class="field dialog-field"><span class="field-label">' +
+              escapeHtml(spec.label) +
+              '</span><input type="' +
+              escapeHtml(spec.type || "text") +
+              '" name="' +
+              escapeHtml(spec.name) +
+              '" autocomplete="' +
+              escapeHtml(spec.autocomplete || "off") +
+              '" spellcheck="false" maxlength="128" />' +
+              (spec.hint ? '<span class="field-hint">' + escapeHtml(spec.hint) + "</span>" : "") +
+              "</label>"
+            );
+          })
+          .join("") +
+        '<p class="field-error dialog-field" role="alert" data-form-error hidden></p>' +
+        '<div class="dialog-actions"><button class="btn btn-secondary" type="button" data-dialog-cancel>' +
+        escapeHtml(options.cancelLabel || "Cancel") +
+        '</button><button class="btn btn-primary" type="submit" data-dialog-accept>' +
+        escapeHtml(options.confirmLabel || "Save") +
+        "</button></div></form></section>";
+
+      const form = backdrop.querySelector("form");
+      const error = backdrop.querySelector("[data-form-error]");
+      const accept = backdrop.querySelector("[data-dialog-accept]");
+      document.body.appendChild(backdrop);
+      const opener = options.opener || document.activeElement;
+      const restoreInert = setBackgroundInert([backdrop]);
+      let busy = false;
+
+      function focusables() {
+        return Array.from(backdrop.querySelectorAll("button, input")).filter(function (element) {
+          return !element.disabled;
+        });
+      }
+
+      function close(result) {
+        if (activeDialog !== controller) {
+          return;
+        }
+        activeDialog = null;
+        document.removeEventListener("keydown", onKeydown, true);
+        restoreInert();
+        backdrop.classList.add("is-closing");
+        afterAnimation(backdrop, function () {
+          backdrop.remove();
+        });
+        if (opener && opener.isConnected && typeof opener.focus === "function") {
+          opener.focus({ preventScroll: true });
+        }
+        resolve(result);
+      }
+
+      function onKeydown(event) {
+        if (event.key === "Escape") {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          if (!busy) {
+            close(null);
+          }
+        } else if (event.key === "Tab") {
+          const list = focusables();
+          const index = list.indexOf(document.activeElement);
+          const next = event.shiftKey ? (index <= 0 ? list.length : index) - 1 : (index + 1) % list.length;
+          event.preventDefault();
+          list[next].focus();
+        }
+      }
+
+      form.addEventListener("submit", async function (event) {
+        event.preventDefault();
+        if (busy) {
+          return;
+        }
+        const values = {};
+        options.fields.forEach(function (spec) {
+          values[spec.name] = form.elements[spec.name].value;
+        });
+        busy = true;
+        error.hidden = true;
+        accept.classList.add("is-loading");
+        accept.setAttribute("aria-busy", "true");
+        try {
+          close(await options.submit(values));
+        } catch (failure) {
+          error.textContent = failure.message || "Something went wrong. Try again.";
+          error.hidden = false;
+          busy = false;
+          accept.classList.remove("is-loading");
+          accept.removeAttribute("aria-busy");
+        }
+      });
+
+      backdrop.addEventListener("click", function (event) {
+        if (!busy && (event.target === backdrop || event.target.closest("[data-dialog-cancel]"))) {
+          close(null);
+        }
+      });
+
+      const controller = {
+        settle: function () {
+          close(null);
+        },
+      };
+      activeDialog = controller;
+      document.addEventListener("keydown", onKeydown, true);
+      form.elements[options.fields[0].name].focus({ preventScroll: true });
+    });
   }
 
   /* ---------- Lightbox ---------- */
@@ -931,10 +1248,11 @@
     }, 1500);
   }
 
-  // Shrinks a photo to a JPEG data URL small enough to keep in localStorage.
+  // Shrinks a photo to a JPEG data URL for the preview; the store uploads it
+  // to the server's photo storage when the form is sent.
   function readImageFile(file, options) {
-    const maxSize = (options && options.maxSize) || 960;
-    const quality = (options && options.quality) || 0.72;
+    const maxSize = (options && options.maxSize) || 1600;
+    const quality = (options && options.quality) || 0.82;
     return new Promise(function (resolve, reject) {
       if (!file || !/^image\//.test(file.type)) {
         reject(new Error(file ? file.name + " is not an image." : "Choose an image."));
@@ -970,6 +1288,8 @@
 
   const mapCenter = [14.866, 120.83];
   const schematicBounds = { north: 14.94, south: 14.82, west: 120.75, east: 121.0 };
+  // Pin size in pixels (the drawing is 28 × 36; see .map-pin in core.css).
+  const pinSize = [22, 28];
   const pinSvg =
     '<svg viewBox="0 0 28 36" aria-hidden="true" focusable="false"><path class="pin-shape" d="M26.5 13.5c0 9-12.5 22.5-12.5 22.5S1.5 22.5 1.5 13.5a12.5 12.5 0 1 1 25 0Z"/><circle class="pin-dot" cx="14" cy="13.5" r="4.5"/></svg>';
   const mapControllers = new WeakMap();
@@ -1000,15 +1320,16 @@
     return report.id + ", " + report.title + ", " + report.severity + " severity, " + statusLabel(report.status);
   }
 
-  // Default popup body for a report marker.
+  // Default popup body for a report marker. `action: false` leaves out the
+  // button.
   function reportPopup(report, options) {
     const photo = reportPhotos(report)[0];
     const actionLabel = (options && options.actionLabel) || "View details";
-    const action = (options && options.action) || "open";
+    const action = options && options.action === false ? null : (options && options.action) || "open";
     return (
       '<div class="map-popup"><div class="map-popup-media">' +
       photoImg(photo) +
-      severityBadge(report.severity, { solid: true }) +
+      severityBadge(report.severity) +
       '</div><div class="map-popup-body"><span class="id-tag">' +
       escapeHtml(report.id) +
       " · " +
@@ -1122,12 +1443,60 @@
     const markers = new Map();
     let options = {};
 
+    // Pointing at a pin shows its report right away and hides it again when
+    // the pointer leaves (with a moment to reach the popup's button).
+    // Clicking or tapping a pin keeps its report open until it's closed.
+    let closeTimer = null;
+
+    function cancelClose() {
+      window.clearTimeout(closeTimer);
+    }
+
+    function closeSoon(popup) {
+      cancelClose();
+      closeTimer = window.setTimeout(function () {
+        if (popup.rrHover && map.hasLayer(popup)) {
+          map.closePopup(popup);
+        }
+      }, 250);
+    }
+
+    function showPopup(marker, hover) {
+      const popup = marker.rrPopup;
+      if (!popup) {
+        return;
+      }
+      cancelClose();
+      if (map.hasLayer(popup)) {
+        if (!hover) {
+          popup.rrHover = false;
+        }
+        return;
+      }
+      popup.rrHover = hover;
+      // A popup shown on hover never moves the map under the pointer.
+      popup.options.autoPan = !hover;
+      popup.setLatLng(marker.getLatLng()).openOn(map);
+    }
+
     map.on("popupopen", function (event) {
-      bindPopupActions(event.popup.getElement(), options);
+      const element = event.popup.getElement();
+      bindPopupActions(element, options);
+      if (!element.rrHoverBound) {
+        element.rrHoverBound = true;
+        element.addEventListener("mouseenter", cancelClose);
+        element.addEventListener("mouseleave", function () {
+          if (event.popup.rrHover) {
+            closeSoon(event.popup);
+          }
+        });
+      }
     });
 
     function update(reports, nextOptions) {
       options = nextOptions || {};
+      cancelClose();
+      map.closePopup();
       layer.clearLayers();
       markers.clear();
       const list = validReports(reports);
@@ -1137,26 +1506,46 @@
           icon: L.divIcon({
             className: "rr-pin-icon",
             html: pinMarkup(report, pulse),
-            iconSize: [28, 36],
-            iconAnchor: [14, 36],
-            popupAnchor: [0, -34],
+            iconSize: pinSize,
+            iconAnchor: [pinSize[0] / 2, pinSize[1]],
+            popupAnchor: [0, 2 - pinSize[1]],
           }),
           keyboard: true,
           riseOnHover: true,
-          title: report.id + " · " + report.road,
+          // With a popup, hovering already shows the report.
+          title: options.popup === false ? report.id + " · " + report.road : "",
         });
         if (options.popup !== false) {
           const content = typeof options.popup === "function" ? options.popup(report) : reportPopup(report, options);
-          marker.bindPopup(content, {
-            maxWidth: 260,
-            minWidth: 240,
-            autoPanPadding: [24, 24],
-            className: "rr-popup",
+          const popup = L.popup(
+            {
+              maxWidth: 260,
+              minWidth: 240,
+              autoPanPadding: [24, 24],
+              className: "rr-popup",
+            },
+            marker,
+          ).setContent(content);
+          marker.rrPopup = popup;
+          marker.on("mouseover", function () {
+            showPopup(marker, true);
+          });
+          marker.on("mouseout", function () {
+            if (popup.rrHover) {
+              closeSoon(popup);
+            }
           });
         }
         marker.on("click", function () {
+          showPopup(marker, false);
           if (options.onSelect) {
             options.onSelect(report.id);
+          }
+        });
+        // Enter on a focused pin does the same as a click.
+        marker.on("keypress", function (event) {
+          if (event.originalEvent && event.originalEvent.key === "Enter") {
+            marker.fire("click");
           }
         });
         marker.on("add", function () {
@@ -1191,9 +1580,7 @@
       map.flyTo(marker.getLatLng(), Math.max(map.getZoom(), 15), { duration: reducedMotion.matches ? 0 : 0.6 });
       if (!focusOptions || focusOptions.openPopup !== false) {
         window.setTimeout(function () {
-          if (marker.getPopup()) {
-            marker.openPopup();
-          }
+          showPopup(marker, false);
         }, reducedMotion.matches ? 0 : 650);
       }
     }
@@ -1250,7 +1637,7 @@
       popup.style.left = clamp(marker.offsetLeft, half + 8, canvas.clientWidth - half - 8) + "px";
       popup.style.top = marker.offsetTop + "px";
       canvas.appendChild(popup);
-      if (marker.offsetTop - 46 < popup.offsetHeight + 8) {
+      if (marker.offsetTop - 38 < popup.offsetHeight + 8) {
         popup.classList.add("is-below");
       }
       marker.querySelector(".map-pin").classList.add("is-active");
@@ -1324,6 +1711,20 @@
     }
     container.addEventListener("click", onClick);
 
+    // Pointing at a pin shows its report right away, as on the live map.
+    function onPointerOver(event) {
+      const marker = event.pointerType === "mouse" && event.target.closest("[data-map-report]");
+      const active = container.querySelector(".map-pin.is-active");
+      if (!marker || (active && marker.contains(active))) {
+        return;
+      }
+      const report = reportsById.get(marker.dataset.mapReport);
+      if (report) {
+        openPopup(marker, report);
+      }
+    }
+    container.addEventListener("pointerover", onPointerOver);
+
     return {
       kind: "schematic",
       update: update,
@@ -1336,6 +1737,7 @@
       refresh: function () {},
       destroy: function () {
         container.removeEventListener("click", onClick);
+        container.removeEventListener("pointerover", onPointerOver);
         container.innerHTML = "";
       },
     };
@@ -1441,10 +1843,40 @@
     return window.L.divIcon({
       className: "rr-pin-icon",
       html: pinMarkup({ severity: severity || "Medium" }, pulse),
-      iconSize: [28, 36],
-      iconAnchor: [14, 36],
-      popupAnchor: [0, -34],
+      iconSize: pinSize,
+      iconAnchor: [pinSize[0] / 2, pinSize[1]],
+      popupAnchor: [0, 2 - pinSize[1]],
     });
+  }
+
+  // A map's refresh button: reloads every report from the server, then
+  // `redraw()` draws the map again. The icon spins while it works, and
+  // clicks wait until the refresh is done.
+  function refreshMap(button, redraw) {
+    if (button.getAttribute("aria-busy") === "true") {
+      return;
+    }
+    button.setAttribute("aria-busy", "true");
+    button.disabled = true;
+    button.classList.add("is-spinning");
+    const minimumSpin = new Promise(function (resolve) {
+      window.setTimeout(resolve, 450);
+    });
+    Promise.all([store().refresh(), minimumSpin])
+      .then(function () {
+        if (redraw) {
+          redraw();
+        }
+        showMessage("Map updated with the latest reports.", "info");
+      })
+      .catch(function (error) {
+        showMessage(error.message, "error");
+      })
+      .finally(function () {
+        button.removeAttribute("aria-busy");
+        button.disabled = false;
+        button.classList.remove("is-spinning");
+      });
   }
 
   function mapLegend() {
@@ -1496,13 +1928,21 @@
     daysBetween: daysBetween,
     pluralize: pluralize,
     formatNumber: formatNumber,
+    durationText: durationText,
+    durationHtml: durationHtml,
     debounce: debounce,
     statusLabel: statusLabel,
     statusPill: statusPill,
     severityBadge: severityBadge,
+    ratingLabels: ratingLabels,
+    ratingStars: ratingStars,
+    repairOutcomePill: repairOutcomePill,
+    feedbackSummary: feedbackSummary,
     initials: initials,
     avatar: avatar,
     reportPhotos: reportPhotos,
+    repairPhotos: repairPhotos,
+    photoGallery: photoGallery,
     photosWithData: photosWithData,
     photoImg: photoImg,
     photoName: photoName,
@@ -1518,6 +1958,7 @@
     showMessage: showMessage,
     confirm: confirmAction,
     prompt: promptAction,
+    form: formDialog,
     openLightbox: openLightbox,
     bindPhotoPreview: bindPhotoPreview,
     downloadCsv: downloadCsv,
@@ -1527,6 +1968,7 @@
     mapLegend: mapLegend,
     createBaseMap: createBaseMap,
     pinIcon: pinIcon,
+    refreshMap: refreshMap,
     mapCenter: mapCenter,
     hasLeaflet: hasLeaflet,
     setBackgroundInert: setBackgroundInert,

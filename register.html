@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-theme="light">
+<html lang="en" data-theme="dark" data-theme-fixed>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -7,24 +7,13 @@
     <meta name="theme-color" content="#141110" />
     <title>Create an account | ResQRoad</title>
     <link rel="icon" type="image/png" href="assets/images/resqroad-mark.png" />
-    <script>
-      (function () {
-        try {
-          var saved = localStorage.getItem("resqroad-theme");
-          var dark = saved === "dark" || (saved !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-          document.documentElement.dataset.theme = dark ? "dark" : "light";
-        } catch (error) {
-          document.documentElement.dataset.theme = "light";
-        }
-      })();
-    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="assets/css/core.css" />
     <link rel="stylesheet" href="assets/css/site.css" />
     <script src="assets/js/icons.js" defer></script>
-    <script src="assets/js/data-store.js" defer></script>
+    <script type="module" src="assets/js/data-store.js"></script>
     <script src="assets/js/ui.js" defer></script>
     <script src="assets/js/auth.js" defer></script>
     <script src="assets/js/shell.js" defer></script>
@@ -66,10 +55,7 @@
             <img class="logo-on-light" src="assets/images/resqroad-logotype.png" alt="ResQRoad" width="748" height="127" />
             <img class="logo-on-dark" src="assets/images/resqroad-logotype-white.png" alt="ResQRoad" width="748" height="127" />
           </a>
-          <div class="toolbar-group">
-            <a class="btn btn-ghost btn-sm" href="index.html"><svg data-icon="arrow-left" class="icon-sm"></svg>Home</a>
-            <button class="btn btn-ghost btn-icon btn-sm theme-toggle" type="button" data-theme-toggle><svg data-icon="sun" class="icon-sun"></svg><svg data-icon="moon" class="icon-moon"></svg></button>
-          </div>
+          <a class="btn btn-home" href="index.html"><span class="btn-home-icon" aria-hidden="true"><svg data-icon="arrow-left" class="icon-sm"></svg></span>Back to home</a>
         </div>
 
         <div class="auth-card">

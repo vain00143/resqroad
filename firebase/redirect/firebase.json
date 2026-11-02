@@ -1,0 +1,17 @@
+{
+  "hosting": {
+    "public": "public",
+    "redirects": [
+      {
+        "source": "/",
+        "destination": "https://resqroad.onrender.com/",
+        "type": 302
+      },
+      {
+        "source": "/:path*",
+        "destination": "https://resqroad.onrender.com/:path",
+        "type": 302
+      }
+    ]
+  }
+}

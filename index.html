@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-theme="light">
+<html lang="en" data-theme="dark" data-theme-fixed>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -10,30 +10,21 @@
     <meta property="og:image" content="assets/images/resqroad-logotype.png" />
     <title>ResQRoad | Road damage reporting and repair tracking</title>
     <link rel="icon" type="image/png" href="assets/images/resqroad-mark.png" />
-    <script>
-      (function () {
-        try {
-          var saved = localStorage.getItem("resqroad-theme");
-          var dark = saved === "dark" || (saved !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-          document.documentElement.dataset.theme = dark ? "dark" : "light";
-        } catch (error) {
-          document.documentElement.dataset.theme = "light";
-        }
-      })();
-    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
     <link rel="stylesheet" href="assets/css/core.css" />
     <link rel="stylesheet" href="assets/css/site.css" />
+    <link rel="stylesheet" href="assets/css/app.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="" defer></script>
     <script src="assets/js/icons.js" defer></script>
-    <script src="assets/js/data-store.js" defer></script>
+    <script type="module" src="assets/js/data-store.js"></script>
     <script src="assets/js/ui.js" defer></script>
     <script src="assets/js/auth.js" defer></script>
     <script src="assets/js/shell.js" defer></script>
     <script src="assets/js/site.js" defer></script>
+    <script src="assets/js/public-view.js" defer></script>
     <script src="assets/js/landing.js" defer></script>
   </head>
   <body class="site-body">
@@ -49,13 +40,12 @@
           <a href="#how-it-works">How it works</a>
           <a href="#live-map">Live map</a>
           <a href="#for-lgu">For LGU teams</a>
-          <a href="track.html">Track a report</a>
+          <a href="#track">Track a report</a>
         </nav>
         <div class="site-actions">
-          <button class="btn btn-ghost btn-icon theme-toggle" type="button" data-theme-toggle><svg data-icon="sun" class="icon-sun"></svg><svg data-icon="moon" class="icon-moon"></svg></button>
-          <a class="btn btn-secondary hide-mobile" href="login.html" data-signed-out><svg data-icon="log-in"></svg>Sign in</a>
-          <a class="btn btn-secondary hide-mobile" href="login.html" data-signed-in data-workspace-link hidden><svg data-icon="dashboard"></svg><span data-workspace-label>Open workspace</span></a>
-          <a class="btn btn-primary hide-mobile" href="login.html?next=report" data-report-link><svg data-icon="map-pin"></svg>Report a problem</a>
+          <a class="btn btn-primary" href="login.html" data-signed-out><svg data-icon="log-in"></svg>Sign in</a>
+          <a class="btn btn-secondary" href="register.html" data-signed-out><svg data-icon="user-plus"></svg>Sign up</a>
+          <a class="btn btn-primary" href="login.html" data-signed-in data-workspace-link hidden><svg data-icon="dashboard"></svg><span data-workspace-label>Open workspace</span></a>
           <button class="btn btn-ghost btn-icon site-menu-button" type="button" data-site-menu aria-expanded="false" aria-controls="mobile-nav" aria-label="Open menu"><svg data-icon="menu"></svg></button>
         </div>
       </div>
@@ -64,10 +54,7 @@
       <a href="#how-it-works">How it works</a>
       <a href="#live-map">Live map</a>
       <a href="#for-lgu">For LGU teams</a>
-      <a href="track.html">Track a report</a>
-      <a class="btn btn-secondary btn-block" href="login.html" data-signed-out><svg data-icon="log-in"></svg>Sign in</a>
-      <a class="btn btn-secondary btn-block" href="login.html" data-signed-in data-workspace-link hidden><svg data-icon="dashboard"></svg><span data-workspace-label>Open workspace</span></a>
-      <a class="btn btn-primary btn-block" href="login.html?next=report" data-report-link><svg data-icon="map-pin"></svg>Report a problem</a>
+      <a href="#track">Track a report</a>
     </nav>
 
     <main id="main">
@@ -83,7 +70,7 @@
             </p>
             <div class="hero-actions">
               <a class="btn btn-primary btn-lg" href="login.html?next=report" data-report-link><svg data-icon="map-pin"></svg>Report a road problem</a>
-              <a class="btn btn-light btn-lg" href="track.html"><svg data-icon="search"></svg>Track a report</a>
+              <a class="btn btn-light btn-lg" href="#track"><svg data-icon="search"></svg>Track a report</a>
             </div>
             <ul class="hero-trust">
               <li><svg data-icon="check-circle"></svg>Free for every resident</li>
@@ -132,7 +119,7 @@
       </section>
 
       <!-- How it works -->
-      <section class="section" id="how-it-works" aria-labelledby="how-title">
+      <section class="section theme-light" id="how-it-works" aria-labelledby="how-title">
         <div class="container">
           <div class="section-head is-center">
             <p class="eyebrow">How it works</p>
@@ -156,7 +143,7 @@
               <span class="step-num" aria-hidden="true">03</span>
               <span class="step-icon"><svg data-icon="hard-hat"></svg></span>
               <h3>Repair</h3>
-              <p>A maintenance crew is assigned, fixes the road, and submits before-and-after photos.</p>
+              <p>A maintenance crew is assigned, fixes the road, and submits photos of the finished repair.</p>
             </li>
             <li class="step">
               <span class="step-num" aria-hidden="true">04</span>
@@ -169,7 +156,7 @@
       </section>
 
       <!-- Live map -->
-      <section class="section section-surface" id="live-map" aria-labelledby="live-title">
+      <section class="section section-surface theme-light" id="live-map" aria-labelledby="live-title">
         <div class="container">
           <div class="section-head">
             <p class="eyebrow">Live map</p>
@@ -177,10 +164,8 @@
             <p>Verified road damage across Bulacan, color-coded by severity. Select a pin to see its status or follow its progress.</p>
           </div>
           <div class="live-grid">
-            <div>
-              <div class="map" id="public-map"></div>
-              <div id="public-legend"></div>
-            </div>
+            <div class="map" id="public-map"></div>
+            <div class="live-legend" id="public-legend"></div>
             <div class="live-side">
               <div class="status-strip" id="status-strip"></div>
               <section class="card" aria-labelledby="fixed-title">
@@ -207,7 +192,7 @@
           </div>
           <div class="feature-grid">
             <article class="feature">
-              <span class="feature-icon"><svg data-icon="clipboard-check"></svg></span>
+              <span class="feature-icon"><svg data-icon="file-search"></svg></span>
               <h3>Review queue</h3>
               <p>Verify, reject, or merge duplicate reports with a full audit trail and internal notes.</p>
             </article>
@@ -219,43 +204,43 @@
             <article class="feature">
               <span class="feature-icon"><svg data-icon="wrench"></svg></span>
               <h3>Field workspace</h3>
-              <p>Crews see their jobs on a map, get directions, and submit before-and-after photos.</p>
+              <p>Crews see their jobs on a map, get directions, and submit photos of every finished repair.</p>
             </article>
             <article class="feature">
               <span class="feature-icon"><svg data-icon="chart-bar"></svg></span>
-              <h3>Analytics &amp; export</h3>
+              <h3>Insights &amp; export</h3>
               <p>Track resolution rates, repair times, and hotspots. Export everything to CSV.</p>
             </article>
-          </div>
-          <div class="feature-cta">
-            <a class="btn btn-light" href="login.html"><svg data-icon="log-in"></svg>Staff sign in</a>
-            <span>Administrators and maintenance crews use the same sign-in.</span>
           </div>
         </div>
       </section>
 
-      <!-- Track + CTA -->
-      <section class="section" aria-label="Track a report or file a new one">
-        <div class="container split-cta">
-          <div class="cta-card">
-            <p class="eyebrow">Track a report</p>
-            <h2>Already reported something?</h2>
-            <p>Enter your report ID to see where it is in the repair process. No sign-in needed.</p>
-            <form class="track-form" action="track.html" method="get" id="track-form">
-              <label class="input-icon">
-                <span class="visually-hidden">Report ID</span>
-                <svg data-icon="hash"></svg>
-                <input name="id" type="text" placeholder="e.g. RPT-1048" autocomplete="off" required maxlength="12" />
-              </label>
-              <button class="btn btn-primary btn-lg" type="submit">Track<svg data-icon="arrow-right"></svg></button>
-            </form>
+      <!-- Track a report (the header's "Track a report" scrolls here) + CTA -->
+      <section class="section track-section theme-light" id="track" aria-labelledby="track-title">
+        <div class="container">
+          <div class="split-cta">
+            <div class="cta-card">
+              <p class="eyebrow">Track a report</p>
+              <h2 id="track-title">Already reported something?</h2>
+              <p>Enter your report ID to see where it is in the repair process. No sign-in needed.</p>
+              <form class="track-form" id="track-form" role="search" novalidate>
+                <label class="input-icon">
+                  <span class="visually-hidden">Report ID</span>
+                  <svg data-icon="hash"></svg>
+                  <input name="id" type="text" placeholder="e.g. RPT-1048" autocomplete="off" maxlength="12" />
+                </label>
+                <button class="btn btn-primary btn-lg" type="submit">Track<svg data-icon="arrow-right"></svg></button>
+              </form>
+              <div class="recent-ids portal-recent track-recent" id="track-recent" hidden></div>
+            </div>
+            <div class="cta-card is-brand">
+              <p class="eyebrow" style="color: var(--rr-100)">Spotted a pothole?</p>
+              <h2>Report it in under a minute.</h2>
+              <p>Your report goes straight to the Road Maintenance Office, and you'll see every update until it's fixed.</p>
+              <a class="btn btn-lg" href="login.html?next=report" data-report-link style="margin-top: 0.5rem"><svg data-icon="map-pin"></svg>Report a road problem</a>
+            </div>
           </div>
-          <div class="cta-card is-brand">
-            <p class="eyebrow" style="color: var(--rr-100)">Spotted a pothole?</p>
-            <h2>Report it in under a minute.</h2>
-            <p>Your report goes straight to the Road Maintenance Office, and you'll see every update until it's fixed.</p>
-            <a class="btn btn-lg" href="login.html?next=report" data-report-link style="margin-top: 0.5rem"><svg data-icon="map-pin"></svg>Report a road problem</a>
-          </div>
+          <div class="track-result" id="track-result" aria-live="polite"></div>
         </div>
       </section>
     </main>
@@ -271,15 +256,8 @@
             <h3>Residents</h3>
             <ul>
               <li><a href="login.html?next=report" data-report-link>Report a problem</a></li>
-              <li><a href="track.html">Track a report</a></li>
+              <li><a href="#track">Track a report</a></li>
               <li><a href="register.html">Create an account</a></li>
-            </ul>
-          </div>
-          <div>
-            <h3>Staff</h3>
-            <ul>
-              <li><a href="login.html">Staff sign in</a></li>
-              <li><a href="#for-lgu">Features</a></li>
             </ul>
           </div>
           <div>
@@ -287,12 +265,12 @@
             <ul>
               <li><a href="#how-it-works">How it works</a></li>
               <li><a href="#live-map">Live map</a></li>
+              <li><a href="#for-lgu">For LGU teams</a></li>
             </ul>
           </div>
         </div>
         <div class="footer-bottom">
           <span>&copy; <span data-current-year></span> ResQRoad · Road Maintenance Office</span>
-          <span>Prototype — reports and accounts are stored in this browser only.</span>
         </div>
       </div>
     </footer>

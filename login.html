@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" data-theme="light">
+<html lang="en" data-theme="dark" data-theme-fixed>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -7,24 +7,13 @@
     <meta name="theme-color" content="#141110" />
     <title>Log in | ResQRoad</title>
     <link rel="icon" type="image/png" href="assets/images/resqroad-mark.png" />
-    <script>
-      (function () {
-        try {
-          var saved = localStorage.getItem("resqroad-theme");
-          var dark = saved === "dark" || (saved !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-          document.documentElement.dataset.theme = dark ? "dark" : "light";
-        } catch (error) {
-          document.documentElement.dataset.theme = "light";
-        }
-      })();
-    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="assets/css/core.css" />
     <link rel="stylesheet" href="assets/css/site.css" />
     <script src="assets/js/icons.js" defer></script>
-    <script src="assets/js/data-store.js" defer></script>
+    <script type="module" src="assets/js/data-store.js"></script>
     <script src="assets/js/ui.js" defer></script>
     <script src="assets/js/auth.js" defer></script>
     <script src="assets/js/shell.js" defer></script>
@@ -45,7 +34,7 @@
               <div><strong>Residents</strong><span>Report road damage and follow every repair.</span></div>
             </li>
             <li>
-              <span class="point-icon"><svg data-icon="clipboard-check"></svg></span>
+              <span class="point-icon"><svg data-icon="file-search"></svg></span>
               <div><strong>Administrators</strong><span>Verify reports, assign crews, and track performance.</span></div>
             </li>
             <li>
@@ -66,10 +55,7 @@
             <img class="logo-on-light" src="assets/images/resqroad-logotype.png" alt="ResQRoad" width="748" height="127" />
             <img class="logo-on-dark" src="assets/images/resqroad-logotype-white.png" alt="ResQRoad" width="748" height="127" />
           </a>
-          <div class="toolbar-group">
-            <a class="btn btn-ghost btn-sm" href="index.html"><svg data-icon="arrow-left" class="icon-sm"></svg>Home</a>
-            <button class="btn btn-ghost btn-icon btn-sm theme-toggle" type="button" data-theme-toggle><svg data-icon="sun" class="icon-sun"></svg><svg data-icon="moon" class="icon-moon"></svg></button>
-          </div>
+          <a class="btn btn-home" href="index.html"><span class="btn-home-icon" aria-hidden="true"><svg data-icon="arrow-left" class="icon-sm"></svg></span>Back to home</a>
         </div>
 
         <div class="auth-card">
@@ -83,26 +69,20 @@
               <span class="field-label">Email</span>
               <span class="input-icon">
                 <svg data-icon="mail"></svg>
-                <input type="email" name="email" autocomplete="username" placeholder="you@example.com" required />
+                <input type="email" name="email" autocomplete="username" placeholder="you@example.com" required readonly />
               </span>
             </label>
             <label class="field">
               <span class="field-label">Password</span>
               <span class="input-icon password-field">
                 <svg data-icon="lock"></svg>
-                <input type="password" name="password" autocomplete="current-password" placeholder="Enter your password" required />
+                <input type="password" name="password" autocomplete="current-password" placeholder="Enter your password" required readonly />
                 <button class="password-toggle" type="button" data-toggle-password aria-label="Show password" aria-pressed="false"><svg data-icon="eye"></svg></button>
               </span>
             </label>
             <button class="btn btn-primary btn-lg btn-block" type="submit">Continue<svg data-icon="arrow-right"></svg></button>
           </form>
           <p class="auth-switch">New to ResQRoad? <a href="register.html" id="register-link">Create a resident account</a></p>
-          <div class="auth-divider">Who signs in here</div>
-          <div class="auth-roles" aria-hidden="true">
-            <div class="auth-role"><svg data-icon="user"></svg><strong>Residents</strong>Report &amp; track</div>
-            <div class="auth-role"><svg data-icon="shield-check"></svg><strong>Admins</strong>Review &amp; assign</div>
-            <div class="auth-role"><svg data-icon="hard-hat"></svg><strong>Crews</strong>Repair &amp; submit</div>
-          </div>
         </div>
       </main>
     </div>

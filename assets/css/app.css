@@ -7,6 +7,33 @@
   background: var(--bg);
 }
 
+/* Until the sign-in is confirmed (auth.js removes data-booting), a workspace
+   shows only a loading spinner, never its empty frame or another account's
+   page. */
+.app-body[data-booting] .shell {
+  visibility: hidden;
+}
+
+.app-body[data-booting]::after {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  width: 2rem;
+  height: 2rem;
+  margin: -1rem 0 0 -1rem;
+  border: 3px solid var(--border-strong);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  content: "";
+  animation: spin 0.8s linear infinite;
+}
+
+/* Keep the scrollbar's space when a panel locks page scrolling, so the
+   page behind it doesn't widen and reflow (e.g. 3 to 4 report columns). */
+html:has(> body.app-body) {
+  scrollbar-gutter: stable;
+}
+
 .shell {
   min-height: 100vh;
   display: grid;
@@ -20,7 +47,29 @@
 
 /* ---------- Sidebar ---------- */
 
+/* The sidebar follows the theme: light surfaces in light mode, the brand's
+   ink in dark mode. Every color comes from these tokens. */
 .sidebar {
+  --sb-bg: var(--surface);
+  --sb-glow: rgb(207 92 54 / 7%);
+  --sb-glow-2: rgb(207 92 54 / 4%);
+  --sb-border: var(--border);
+  --sb-text: var(--text-2);
+  --sb-strong: var(--heading);
+  --sb-muted: var(--text-3);
+  --sb-icon: #7a716b;
+  --sb-icon-hover: var(--text);
+  --sb-hover: var(--hover);
+  --sb-active-from: rgb(207 92 54 / 14%);
+  --sb-active-to: rgb(207 92 54 / 4%);
+  --sb-active-icon: var(--rr-700);
+  --sb-badge: var(--surface-3);
+  --sb-badge-text: var(--text-2);
+  --sb-panel: var(--surface-2);
+  --sb-panel-border: var(--border);
+  --sb-divider: var(--border);
+  --sb-scrollbar: rgb(43 37 34 / 16%);
+
   position: sticky;
   top: 0;
   z-index: 60;
@@ -29,24 +78,34 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border-right: 1px solid #000;
+  border-right: 1px solid var(--sb-border);
   background:
-    radial-gradient(130% 50% at 0% 0%, rgb(207 92 54 / 18%), transparent 60%),
-    radial-gradient(90% 40% at 100% 100%, rgb(207 92 54 / 8%), transparent 60%),
-    var(--rr-ink);
-  color: #cfc6c0;
+    radial-gradient(130% 50% at 0% 0%, var(--sb-glow), transparent 60%),
+    radial-gradient(90% 40% at 100% 100%, var(--sb-glow-2), transparent 60%),
+    var(--sb-bg);
+  color: var(--sb-text);
 }
 
-/* A faint dashed lane line runs down the sidebar edge. */
-.sidebar::after {
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: 1px;
-  background: repeating-linear-gradient(to bottom, rgb(239 200 139 / 18%) 0 14px, transparent 14px 28px);
-  content: "";
-  pointer-events: none;
+:root[data-theme="dark"] .sidebar {
+  --sb-bg: var(--rr-ink);
+  --sb-glow: rgb(207 92 54 / 18%);
+  --sb-glow-2: rgb(207 92 54 / 8%);
+  --sb-border: #000;
+  --sb-text: #cfc6c0;
+  --sb-strong: #fff;
+  --sb-muted: #8f8680;
+  --sb-icon: #847b75;
+  --sb-icon-hover: #d9d1cb;
+  --sb-hover: rgb(255 255 255 / 6%);
+  --sb-active-from: rgb(207 92 54 / 24%);
+  --sb-active-to: rgb(207 92 54 / 7%);
+  --sb-active-icon: var(--rr-300);
+  --sb-badge: rgb(255 255 255 / 9%);
+  --sb-badge-text: #e6ded8;
+  --sb-panel: rgb(255 255 255 / 3%);
+  --sb-panel-border: rgb(255 255 255 / 7%);
+  --sb-divider: rgb(255 255 255 / 6%);
+  --sb-scrollbar: rgb(255 255 255 / 12%);
 }
 
 .sidebar-head {
@@ -58,20 +117,27 @@
   gap: 0.5rem;
 }
 
+/* The logotype is a label, not a link: the sidebar already leads everywhere. */
 .sidebar-brand {
   min-width: 0;
   display: flex;
   align-items: center;
-  text-decoration: none;
+  user-select: none;
 }
 
+/* The logotype comes in dark ink (light theme) and white (dark theme); the
+   logo-on-light / logo-on-dark classes in core.css pick one. */
 .sidebar-logo-full {
-  width: 9.75rem;
+  width: 11.5rem;
+}
+
+.sidebar-logo-full img {
+  width: 100%;
   height: auto;
 }
 
 .sidebar-logo-mark {
-  width: 1.9rem;
+  width: 2.2rem;
   height: auto;
   display: none;
 }
@@ -86,16 +152,15 @@
   border: 0;
   border-radius: 8px;
   background: transparent;
-  color: #8f8680;
+  color: var(--sb-muted);
   transition:
     background-color 0.15s ease,
-    color 0.15s ease,
-    transform 0.3s var(--ease-out);
+    color 0.15s ease;
 }
 
 .sidebar-icon-btn:hover {
-  background: rgb(255 255 255 / 8%);
-  color: #fff;
+  background: var(--sb-hover);
+  color: var(--sb-strong);
 }
 
 .sidebar-close {
@@ -108,12 +173,12 @@
   padding: 0.5rem 0.75rem 1rem;
   overflow-y: auto;
   scrollbar-width: thin;
-  scrollbar-color: rgb(255 255 255 / 12%) transparent;
+  scrollbar-color: var(--sb-scrollbar) transparent;
 }
 
 .sidebar-section {
   margin: 1rem 0.65rem 0.45rem;
-  color: #7d746e;
+  color: var(--sb-muted);
   font-size: 0.68rem;
   font-weight: 600;
   letter-spacing: 0.14em;
@@ -141,7 +206,7 @@
   border: 0;
   border-radius: 10px;
   background: transparent;
-  color: #b9b0aa;
+  color: var(--sb-text);
   font-size: 0.875rem;
   font-weight: 500;
   text-align: left;
@@ -153,22 +218,22 @@
 }
 
 .nav-item .icon {
-  color: #847b75;
+  color: var(--sb-icon);
   transition: color 0.15s ease;
 }
 
 .nav-item:hover {
-  background: rgb(255 255 255 / 6%);
-  color: #fff;
+  background: var(--sb-hover);
+  color: var(--sb-strong);
 }
 
 .nav-item:hover .icon {
-  color: #d9d1cb;
+  color: var(--sb-icon-hover);
 }
 
 .nav-item.is-active {
-  background: linear-gradient(90deg, rgb(207 92 54 / 24%), rgb(207 92 54 / 7%));
-  color: #fff;
+  background: linear-gradient(90deg, var(--sb-active-from), var(--sb-active-to));
+  color: var(--sb-strong);
   font-weight: 600;
 }
 
@@ -185,7 +250,7 @@
 }
 
 .nav-item.is-active .icon {
-  color: var(--rr-300);
+  color: var(--sb-active-icon);
 }
 
 .nav-item:focus-visible {
@@ -207,8 +272,8 @@
   display: inline-grid;
   place-items: center;
   border-radius: var(--radius-full);
-  background: rgb(255 255 255 / 9%);
-  color: #e6ded8;
+  background: var(--sb-badge);
+  color: var(--sb-badge-text);
   font-size: 0.7rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -228,31 +293,7 @@
   padding: 0.75rem;
   display: grid;
   gap: 0.6rem;
-  border-top: 1px solid rgb(255 255 255 / 6%);
-}
-
-.sidebar-status {
-  padding: 0.75rem 0.85rem;
-  display: grid;
-  gap: 0.15rem;
-  border: 1px solid rgb(255 255 255 / 7%);
-  border-radius: 12px;
-  background: rgb(255 255 255 / 3%);
-  font-size: 0.74rem;
-  line-height: 1.45;
-}
-
-.sidebar-status strong {
-  display: flex;
-  align-items: center;
-  gap: 0.45rem;
-  color: #f1ebe6;
-  font-size: 0.78rem;
-  font-weight: 600;
-}
-
-.sidebar-status span {
-  color: #8f8680;
+  border-top: 1px solid var(--sb-divider);
 }
 
 .live-dot {
@@ -280,46 +321,32 @@
 
 .sidebar-user:hover,
 .sidebar-user[aria-expanded="true"] {
-  background: rgb(255 255 255 / 6%);
+  background: var(--sb-hover);
 }
 
 .sidebar-user .person-copy strong {
-  color: #fff;
+  color: var(--sb-strong);
 }
 
 .sidebar-user .person-copy span {
-  color: #8f8680;
-}
-
-.sidebar-user > .icon {
-  margin-left: auto;
-  color: #847b75;
+  color: var(--sb-muted);
 }
 
 /* Collapsed (desktop): icon rail with tooltips. */
 .shell.is-collapsed .sidebar-head {
   padding: 0;
-  flex-direction: column;
   justify-content: center;
-  gap: 0.25rem;
 }
 
 .shell.is-collapsed .sidebar-logo-full,
 .shell.is-collapsed .nav-label,
 .shell.is-collapsed .sidebar-section,
-.shell.is-collapsed .sidebar-status,
-.shell.is-collapsed .sidebar-user .person-copy,
-.shell.is-collapsed .sidebar-user > .icon {
+.shell.is-collapsed .sidebar-user .person-copy {
   display: none;
 }
 
 .shell.is-collapsed .sidebar-logo-mark {
   display: block;
-  margin-top: 0.75rem;
-}
-
-.shell.is-collapsed .sidebar-collapse {
-  transform: rotate(180deg);
 }
 
 .shell.is-collapsed .sidebar-scroll {
@@ -406,6 +433,18 @@
   display: none;
 }
 
+/* Collapse control first, then a divider, then the breadcrumb. */
+.topbar-collapse {
+  margin-left: -0.5rem;
+}
+
+.topbar-divider {
+  width: 1px;
+  height: 1.25rem;
+  flex: 0 0 auto;
+  background: var(--border-strong);
+}
+
 .breadcrumb {
   min-width: 0;
   display: flex;
@@ -476,6 +515,11 @@
   gap: 0.35rem;
 }
 
+/* Without a search box (the resident portal), still at the right end. */
+.breadcrumb + .topbar-actions {
+  margin-left: auto;
+}
+
 .topbar .btn-icon {
   color: var(--text-2);
 }
@@ -511,16 +555,8 @@
 
 /* ---------- Views ---------- */
 
-.view {
-  animation: view-in 0.38s var(--ease-out) both;
-}
-
-@keyframes view-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-}
+/* Sections and filtered lists appear at once, with no slide-in, so moving
+   between them is never slowed down. */
 
 .page-head {
   margin-bottom: 1.5rem;
@@ -574,6 +610,11 @@
 .card + .grid,
 .stack > * + * {
   margin-top: 1.25rem;
+}
+
+/* A toolbar under a row of tiles starts a new section. */
+.grid + .toolbar {
+  margin-top: 1.5rem;
 }
 
 .grid-kpi {
@@ -705,22 +746,6 @@
   content: "";
 }
 
-.welcome::after {
-  position: absolute;
-  right: 0;
-  bottom: 1.1rem;
-  left: 0;
-  z-index: -1;
-  height: 3px;
-  background: repeating-linear-gradient(90deg, rgb(239 200 139 / 30%) 0 26px, transparent 26px 52px);
-  content: "";
-  animation: lane-move 2.4s linear infinite;
-}
-
-@keyframes lane-move {
-  to { background-position: 52px 0; }
-}
-
 .welcome .eyebrow {
   color: var(--rr-150);
 }
@@ -756,6 +781,12 @@
   --btn-border: #fff;
   --btn-bg-hover: var(--rr-cream);
   box-shadow: 0 6px 20px rgb(0 0 0 / 25%);
+}
+
+/* The count on the white button gets a brand color so it stays visible. */
+.welcome .btn-primary .btn-count {
+  background: var(--primary);
+  color: #fff;
 }
 
 .attention-list {
@@ -899,9 +930,12 @@ button.crew-row:hover {
 
 /* ---------- Report cards ---------- */
 
+/* Up to three columns: each column is at least a third of the row (or
+   17.5rem when that is wider), so a fourth never fits, even when the page
+   gets a little wider. Narrow rows drop to two columns, then one. */
 .report-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(17.5rem, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(max(17.5rem, calc((100% - 2 * 1.1rem) / 3 - 1px)), 1fr));
   gap: 1.1rem;
 }
 
@@ -922,8 +956,6 @@ button.crew-row:hover {
     border-color 0.2s ease,
     box-shadow 0.25s ease,
     transform 0.25s var(--ease-out);
-  animation: rise-in 0.45s var(--ease-out) both;
-  animation-delay: calc(var(--i, 0) * 35ms);
 }
 
 .report-card:hover {
@@ -972,6 +1004,31 @@ button.crew-row:hover {
   top: 0.65rem;
   left: 0.65rem;
   z-index: 1;
+}
+
+/* Marks a card whose preview is the crew's after-repair photo. */
+.rc-tag {
+  position: absolute;
+  top: 0.65rem;
+  right: 0.65rem;
+  z-index: 1;
+  min-height: 1.5rem;
+  padding: 0.12rem 0.55rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border-radius: var(--radius-full);
+  background: rgb(20 17 16 / 72%);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 600;
+  backdrop-filter: blur(4px);
+}
+
+.rc-tag .icon {
+  width: 0.8rem;
+  height: 0.8rem;
+  color: inherit;
 }
 
 .rc-age {
@@ -1064,7 +1121,7 @@ button.crew-row:hover {
   width: 0.9rem;
   height: 0.9rem;
   margin-top: 0.15rem;
-  color: var(--accent);
+  color: var(--icon);
 }
 
 .rc-loc span {
@@ -1121,7 +1178,7 @@ button.crew-row:hover {
 .rc-crew .icon {
   width: 0.9rem;
   height: 0.9rem;
-  color: var(--accent);
+  color: var(--icon);
 }
 
 .rc-crew span {
@@ -1139,6 +1196,16 @@ button.crew-row:hover {
 }
 
 /* ---------- Report detail drawer ---------- */
+
+/* The report ID leads the drawer header. */
+.drawer-report-id {
+  color: var(--heading);
+  font-family: var(--font-mono);
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+}
 
 .detail-title {
   margin: 0 0 0.35rem;
@@ -1173,6 +1240,11 @@ button.crew-row:hover {
   margin-top: 1.5rem;
 }
 
+/* A block above the report title (possible duplicates), seen first. */
+.detail-block-first {
+  margin: 0 0 1.5rem;
+}
+
 .detail-block-head {
   margin-bottom: 0.75rem;
   display: flex;
@@ -1190,11 +1262,12 @@ button.crew-row:hover {
 }
 
 .detail-block-head h3 .icon {
-  color: var(--accent);
+  color: var(--icon);
 }
 
 .journey-card {
   padding: 1rem 0.75rem 0.6rem;
+  overflow-x: auto;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   background: var(--surface-2);
@@ -1213,6 +1286,18 @@ button.crew-row:hover {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 1rem;
+}
+
+/* Information and Map, each under its own heading; the map fills the
+   column's height next to the table. */
+.detail-column {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.detail-column .detail-map {
+  flex: 1;
 }
 
 .facts {
@@ -1243,9 +1328,9 @@ button.crew-row:hover {
 }
 
 .facts dt {
-  color: var(--text-3);
+  color: var(--heading);
   font-size: 0.72rem;
-  font-weight: 500;
+  font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
@@ -1264,14 +1349,249 @@ button.crew-row:hover {
   border-right: 0 !important;
 }
 
+/* GPS coordinates, with the OpenStreetMap link on its own line below. */
+.facts .facts-coords {
+  display: grid;
+  justify-items: start;
+  gap: 0.35rem;
+}
+
+.facts-coords a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.facts-coords a .icon {
+  color: inherit;
+}
+
+/* ---------- Possible duplicate reports ---------- */
+
+.duplicate-panel {
+  --tone: var(--warning);
+  padding: 1rem 1.1rem;
+  display: grid;
+  gap: 0.85rem;
+  border: 1px solid color-mix(in srgb, var(--tone) 35%, var(--border));
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--tone) 7%, var(--surface));
+}
+
+.duplicate-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+}
+
+.duplicate-head > .icon {
+  margin-top: 0.15rem;
+  color: var(--tone);
+}
+
+.duplicate-head h3 {
+  margin: 0 0 0.2rem;
+  font-size: 0.95rem;
+}
+
+.duplicate-head p {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 0.84rem;
+}
+
+.duplicate-list {
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+  list-style: none;
+}
+
+.duplicate-item {
+  padding: 0.75rem 0.85rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.duplicate-copy {
+  min-width: 0;
+  display: grid;
+  gap: 0.2rem;
+  font-size: 0.8rem;
+}
+
+.duplicate-copy strong {
+  color: var(--heading);
+  font-size: 0.9rem;
+}
+
+.duplicate-copy > span {
+  color: var(--text-3);
+}
+
+.duplicate-copy .duplicate-reasons {
+  color: var(--text-2);
+  font-weight: 500;
+}
+
+/* ---------- Resident feedback (rating of a finished repair) ---------- */
+
+.rating-display {
+  display: inline-flex;
+  gap: 0.15rem;
+}
+
+.rating-display .icon {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.icon.star-on {
+  color: var(--rr-500);
+  fill: var(--rr-500);
+}
+
+.icon.star-off {
+  color: var(--border-strong);
+}
+
+.rating-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.rating-summary strong {
+  color: var(--heading);
+  font-size: 0.9rem;
+}
+
+/* A sent feedback (ui.feedbackSummary): stars and the answer to "Is the road
+   fully repaired?", then tags, the comment, and photos. */
+.feedback-result {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.feedback-result-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 0.75rem;
+}
+
+.outcome-pill .icon {
+  width: 0.85rem;
+  height: 0.85rem;
+  color: var(--tone);
+}
+
+.feedback-tags {
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  list-style: none;
+}
+
+.feedback-tag {
+  --tone: var(--success);
+  min-height: 1.6rem;
+  padding: 0.15rem 0.65rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border: 1px solid color-mix(in srgb, var(--tone) 24%, var(--border));
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--tone) 8%, var(--surface));
+  color: color-mix(in srgb, var(--tone) 50%, var(--text));
+  font-size: 0.76rem;
+  font-weight: 500;
+}
+
+.feedback-tag.is-negative {
+  --tone: var(--danger);
+}
+
+.feedback-tag .icon {
+  width: 0.8rem;
+  height: 0.8rem;
+  color: var(--tone);
+  stroke-width: 2.4;
+}
+
+.feedback-result .repair-photos {
+  margin-top: 0;
+}
+
+.rating-options {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.rating-star {
+  position: relative;
+  width: 2.5rem;
+  height: 2.5rem;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.rating-star input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.rating-star .icon {
+  width: 1.75rem;
+  height: 1.75rem;
+  color: var(--border-strong);
+  transition:
+    color 0.12s ease,
+    fill 0.12s ease,
+    transform 0.12s var(--ease-out);
+}
+
+.rating-star.is-on .icon {
+  color: var(--rr-500);
+  fill: var(--rr-500);
+}
+
+.rating-star:hover .icon {
+  transform: scale(1.08);
+}
+
+.rating-star:has(input:focus-visible) {
+  box-shadow: var(--focus-ring);
+}
+
+.rating-caption {
+  color: var(--text-2);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
 .detail-map {
   height: 100%;
-  min-height: 12rem;
+  min-height: 14rem;
 }
 
 .detail-map .map {
   height: 100%;
-  min-height: 12rem;
+  min-height: 14rem;
 }
 
 .detail-description {
@@ -1300,15 +1620,16 @@ button.crew-row:hover {
   background: color-mix(in srgb, var(--tone) 5%, var(--surface));
 }
 
-.before-after {
+/* A crew's after-repair photos (the resident's photos show the "before"). */
+.repair-photos {
   margin-top: 0.85rem;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.75rem;
 }
 
-.before-after h4 {
-  margin: 0 0 0.45rem;
+.repair-photos h4 {
+  margin: 0 0 0.5rem;
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
   color: var(--text-3);
   font-size: 0.72rem;
   font-weight: 600;
@@ -1316,14 +1637,10 @@ button.crew-row:hover {
   text-transform: uppercase;
 }
 
-.before-after .gallery {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.before-after .gallery-item:first-child:nth-last-child(n + 3) {
-  grid-row: auto;
-  grid-column: auto;
-  aspect-ratio: 4 / 3;
+.repair-photos h4 span {
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 .assign-box {
@@ -1343,13 +1660,29 @@ button.crew-row:hover {
 }
 
 .note-form {
-  margin-top: 1rem;
+  margin-top: 1.25rem;
   display: grid;
   gap: 0.6rem;
 }
 
+/* Internal notes are read and written often, so they use larger type. */
+.note-form .field-label {
+  align-items: center;
+  color: var(--heading);
+  font-size: 1rem;
+}
+
+.note-form .field-label .optional {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.82rem;
+}
+
 .note-form textarea {
-  min-height: 4.5rem;
+  min-height: 5.5rem;
+  font-size: 0.95rem;
+  line-height: 1.6;
 }
 
 .note-form-actions {
@@ -1409,16 +1742,33 @@ button.crew-row:hover {
   flex-direction: column;
 }
 
-.map-main .map {
+.map-main .card-body {
   flex: 1;
-  height: clamp(26rem, calc(100vh - 19rem), 46rem);
+  display: flex;
+  flex-direction: column;
 }
 
+/* The map's refresh icon spins while it reloads. */
+.refresh-button.is-spinning .icon {
+  animation: spin 0.8s linear infinite;
+}
+
+.map-main .map {
+  flex: 1 0 auto;
+  height: clamp(32rem, calc(100vh - 14rem), 56rem);
+}
+
+.overview-map {
+  height: 24rem;
+}
+
+/* The list matches the map card's height and scrolls; size containment keeps
+   a long list from stretching the row. */
 .map-side {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  max-height: clamp(26rem, calc(100vh - 19rem), 46rem);
+  contain: size;
 }
 
 .map-side .card-body {
@@ -1487,6 +1837,193 @@ button.crew-row:hover {
   white-space: nowrap;
 }
 
+.map-list-tag {
+  flex: 0 0 auto;
+  padding: 0 0.45rem;
+  border-radius: var(--radius-full);
+  background: var(--primary-soft);
+  color: var(--primary-soft-text);
+  font-size: 0.68rem;
+  font-weight: 600;
+}
+
+/* ---------- Public site (inside every workspace) ---------- */
+
+/* The map card is as tall as Report progress and Recently fixed beside it,
+   and the map fills it, so no empty space is left under the map. */
+.pv-map-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.pv-map-card .card-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.pv-map {
+  flex: 1 1 auto;
+  min-height: 20rem;
+}
+
+.pv-side {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.pv-status {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.pv-status-tile {
+  padding: 0.75rem 0.85rem;
+  display: grid;
+  gap: 0.1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
+.pv-status-tile strong {
+  color: var(--heading);
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.pv-status-tile span {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--text-3);
+  font-size: 0.78rem;
+}
+
+.pv-fixed {
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.25rem;
+  list-style: none;
+}
+
+.pv-fixed-item {
+  width: 100%;
+  padding: 0.55rem 0.6rem;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.7rem;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+button.pv-fixed-item:hover {
+  background: var(--surface-2);
+}
+
+.pv-fixed-check {
+  width: 1.75rem;
+  height: 1.75rem;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--success) 14%, var(--surface));
+  color: var(--success);
+}
+
+.pv-fixed-check .icon {
+  color: inherit;
+  stroke-width: 2.6;
+}
+
+.pv-fixed-copy {
+  min-width: 0;
+  display: grid;
+  line-height: 1.35;
+}
+
+.pv-fixed-copy strong {
+  overflow: hidden;
+  color: var(--heading);
+  font-size: 0.86rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pv-fixed-copy span {
+  overflow: hidden;
+  color: var(--text-3);
+  font-size: 0.76rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pv-how {
+  margin-top: 1.25rem;
+}
+
+.pv-steps {
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1rem;
+  list-style: none;
+}
+
+.pv-step {
+  padding: 1rem;
+  display: grid;
+  align-content: start;
+  gap: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+}
+
+.pv-step-icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: var(--primary-soft);
+  color: var(--primary-soft-text);
+}
+
+.pv-step-icon .icon {
+  color: inherit;
+}
+
+.pv-step-num {
+  color: var(--accent);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.pv-step h3 {
+  margin: 0.1rem 0 0.25rem;
+  font-size: 0.98rem;
+}
+
+.pv-step p {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 0.82rem;
+  line-height: 1.55;
+}
+
 /* ---------- Analytics ---------- */
 
 .analytics-kpis .kpi-value {
@@ -1501,11 +2038,167 @@ button.crew-row:hover {
   padding-top: 0.75rem;
 }
 
+/* Reports by severity: the donut stays above its legend and centered in its
+   card, whether the sidebar is open (narrow card) or collapsed (wide card). */
+.donut-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.donut-card > .card-body {
+  flex: 1;
+  display: grid;
+  align-content: center;
+}
+
 .chart-head-legend {
   margin-top: 0.5rem;
 }
 
+/* The printed Insights & Statistics report (admin.js fills it in just
+   before printing): black on white, summary first, then plain tables. */
+.print-sheet {
+  display: none;
+}
+
 @media print {
+  @page {
+    margin: 14mm;
+  }
+
+  body.is-printing-report {
+    background: #fff !important;
+  }
+
+  body.is-printing-report > :not(.print-sheet) {
+    display: none !important;
+  }
+
+  body.is-printing-report .print-sheet {
+    display: block;
+    color: #111;
+    font-family: var(--font-body);
+    font-size: 10pt;
+    line-height: 1.45;
+  }
+
+  .print-sheet h1,
+  .print-sheet h2 {
+    color: #111;
+    letter-spacing: 0;
+  }
+
+  .print-head {
+    margin-bottom: 6mm;
+    padding-bottom: 4mm;
+    display: flex;
+    align-items: center;
+    gap: 6mm;
+    border-bottom: 2px solid #b34f2f;
+  }
+
+  .print-head img {
+    width: 38mm;
+    height: auto;
+  }
+
+  .print-head h1 {
+    margin: 0 0 1mm;
+    font-size: 17pt;
+  }
+
+  .print-head p {
+    margin: 0;
+    color: #444;
+    font-size: 9pt;
+  }
+
+  .print-sheet section {
+    margin-bottom: 6mm;
+    break-inside: avoid;
+  }
+
+  .print-sheet h2 {
+    margin: 0 0 2mm;
+    font-size: 11.5pt;
+  }
+
+  .print-figures {
+    margin: 0;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2.5mm;
+  }
+
+  .print-figures div {
+    padding: 2.5mm 3mm;
+    border: 1px solid #ccc;
+    border-radius: 2mm;
+  }
+
+  .print-figures dt {
+    color: #555;
+    font-size: 8.5pt;
+  }
+
+  .print-figures dd {
+    margin: 0.5mm 0 0;
+    font-size: 12pt;
+    font-weight: 700;
+  }
+
+  .print-columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6mm;
+  }
+
+  .print-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 9pt;
+  }
+
+  .print-table th,
+  .print-table td {
+    padding: 1.4mm 2mm;
+    border-bottom: 1px solid #ddd;
+    text-align: left;
+    vertical-align: top;
+  }
+
+  .print-table th {
+    border-bottom: 1.5px solid #999;
+    color: #333;
+    font-size: 8pt;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .print-table tr {
+    break-inside: avoid;
+  }
+
+  .print-reports td strong {
+    display: block;
+  }
+
+  .print-reports td span {
+    display: block;
+    color: #555;
+    font-size: 8.5pt;
+  }
+
+  .print-note {
+    margin: 0 0 2mm;
+    color: #555;
+    font-size: 8.5pt;
+  }
+
+  .print-sheet section:last-child {
+    break-inside: auto;
+  }
+
   .sidebar,
   .topbar,
   .app-footer,
@@ -1565,7 +2258,7 @@ button.crew-row:hover {
 
 .form-note .icon {
   margin-top: 0.1rem;
-  color: var(--accent);
+  color: var(--icon);
 }
 
 .form-note code {
@@ -1588,8 +2281,39 @@ button.crew-row:hover {
 .job-card {
   scroll-margin-top: calc(var(--topbar-h) + 1rem);
   overflow: hidden;
-  animation: rise-in 0.45s var(--ease-out) both;
-  animation-delay: calc(var(--i, 0) * 40ms);
+}
+
+/* A completed job shows only its summary until "View more details". */
+.job-toggle {
+  width: 100%;
+  padding: 0.8rem 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 0;
+  border-top: 1px solid var(--border);
+  background: transparent;
+  color: var(--link);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-align: left;
+}
+
+.job-toggle:hover {
+  background: var(--surface-2);
+}
+
+.job-toggle .icon {
+  color: inherit;
+  transition: transform 0.2s ease;
+}
+
+.job-toggle[aria-expanded="true"] .icon {
+  transform: rotate(180deg);
+}
+
+.job-card.is-collapsed .job-head {
+  padding-bottom: 1rem;
 }
 
 .job-card:focus {
@@ -1698,13 +2422,7 @@ button.crew-row:hover {
 }
 
 .repair-form h4 .icon {
-  color: var(--accent);
-}
-
-.photo-fields {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.9rem;
+  color: var(--icon);
 }
 
 .photo-field {
@@ -1735,16 +2453,36 @@ button.crew-row:hover {
   font-size: 0.82rem;
 }
 
+/* "Up next" fills its card, which is as tall as "Recent updates" beside it:
+   the photo takes the left part at full height and the job the rest; with
+   no job, "You're all caught up" sits in the middle. */
+.next-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.next-slot {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.next-slot > .empty {
+  flex: 1;
+  align-content: center;
+}
+
 .next-job {
+  flex: 1;
   padding: 1.25rem;
   display: grid;
-  grid-template-columns: 9rem minmax(0, 1fr);
-  gap: 1.25rem;
-  align-items: center;
+  grid-template-columns: minmax(11rem, 2fr) minmax(0, 3fr);
+  gap: 1.5rem;
+  align-items: stretch;
 }
 
 .next-job-media {
-  height: 7rem;
+  min-height: 12rem;
   overflow: hidden;
   border-radius: var(--radius-md);
   background: var(--surface-3);
@@ -1756,13 +2494,28 @@ button.crew-row:hover {
   object-fit: cover;
 }
 
-.next-job h3 {
-  margin: 0.35rem 0 0.25rem;
-  font-size: 1.05rem;
+.next-job-body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 0.75rem;
 }
 
-.next-job .job-actions {
-  margin-top: 0.85rem;
+.next-job h3 {
+  margin: 0.35rem 0 0.25rem;
+  font-size: 1.15rem;
+}
+
+.next-job .detail-description {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--text-2);
+  font-size: 0.88rem;
+  line-height: 1.6;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
 }
 
 /* ---------- Notifications popover ---------- */
@@ -1812,8 +2565,19 @@ button.crew-row:hover {
   background: var(--hover);
 }
 
+/* New updates get a small orange dot; each update's own dot shows its
+   status color. */
 .notif-item.is-unread {
-  background: color-mix(in srgb, var(--accent) 6%, transparent);
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.notif-item.is-unread::after {
+  width: 0.5rem;
+  height: 0.5rem;
+  margin-top: 0.45rem;
+  border-radius: 50%;
+  background: var(--accent);
+  content: "";
 }
 
 .notif-item .timeline-dot {
@@ -1864,7 +2628,8 @@ button.crew-row:hover {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .grid-3 {
+  .grid-3,
+  .pv-steps {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -1912,7 +2677,9 @@ button.crew-row:hover {
     visibility: visible;
   }
 
-  .sidebar-collapse {
+  /* On small screens the menu button opens the sidebar instead. */
+  .topbar-collapse,
+  .topbar-divider {
     display: none;
   }
 
@@ -1920,29 +2687,48 @@ button.crew-row:hover {
     display: grid;
   }
 
-  /* The collapsed rail only exists on desktop. */
+  /* The collapsed rail only exists on desktop: the phone menu always shows
+     the full sidebar, with the same layout as when it isn't collapsed. */
   .shell.is-collapsed .sidebar-logo-full,
   .shell.is-collapsed .nav-label,
-  .shell.is-collapsed .sidebar-section,
-  .shell.is-collapsed .sidebar-status,
-  .shell.is-collapsed .sidebar-user .person-copy,
-  .shell.is-collapsed .sidebar-user > .icon {
-    display: revert;
+  .shell.is-collapsed .sidebar-section {
+    display: block;
+  }
+
+  .shell.is-collapsed .sidebar-user .person-copy {
+    display: grid;
   }
 
   .shell.is-collapsed .sidebar-logo-mark {
     display: none;
   }
 
+  .shell.is-collapsed .sidebar {
+    overflow: hidden;
+  }
+
   .shell.is-collapsed .sidebar-head {
     padding: 0 0.85rem 0 1.25rem;
-    flex-direction: row;
     justify-content: space-between;
+  }
+
+  .shell.is-collapsed .sidebar-scroll {
+    padding-inline: 0.75rem;
+    overflow-y: auto;
   }
 
   .shell.is-collapsed .nav-item {
     justify-content: flex-start;
     padding-inline: 0.75rem;
+  }
+
+  .shell.is-collapsed .nav-item.is-active::before {
+    left: -0.75rem;
+  }
+
+  .shell.is-collapsed .sidebar-user {
+    justify-content: flex-start;
+    padding-inline: 0.55rem;
   }
 
   .shell.is-collapsed .nav-badge {
@@ -1963,13 +2749,19 @@ button.crew-row:hover {
 
   .map-side {
     max-height: 24rem;
+    contain: none;
   }
 }
 
 @media (max-width: 720px) {
   .grid-1-1,
-  .grid-3 {
+  .grid-3,
+  .pv-steps {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .pv-map {
+    min-height: 18rem;
   }
 
   .search-trigger {
@@ -1989,9 +2781,7 @@ button.crew-row:hover {
     display: none;
   }
 
-  .detail-columns,
-  .photo-fields,
-  .before-after {
+  .detail-columns {
     grid-template-columns: minmax(0, 1fr);
   }
 
@@ -2000,6 +2790,7 @@ button.crew-row:hover {
   }
 
   .next-job-media {
+    min-height: 0;
     height: 9rem;
   }
 
@@ -2042,6 +2833,14 @@ button.crew-row:hover {
   .job-thumb {
     width: 4rem;
     height: 3.25rem;
+  }
+
+  .duplicate-item {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .duplicate-item .btn {
+    justify-self: start;
   }
 
   .page-actions,

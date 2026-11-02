@@ -1,0 +1,106 @@
+rules_version = '2';
+
+// ResQRoad security rules.
+// - Reports and the crew directory are public (the landing page, map, and
+//   tracker need them); they never contain reporter names or emails.
+// - User profiles (names, emails, roles) are private to the owner and admins.
+// - Residents create reports; crews may only move their own assigned jobs
+//   forward; administrators manage everything else.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function profilePath() {
+      return /databases/$(database)/documents/users/$(request.auth.uid);
+    }
+
+    function hasRole(role) {
+      return signedIn()
+        && exists(profilePath())
+        && get(profilePath()).data.role == role
+        && get(profilePath()).data.active == true;
+    }
+
+    function isAdmin() {
+      return hasRole('admin');
+    }
+
+    function isCrew() {
+      return hasRole('maintenance');
+    }
+
+    function isCitizen() {
+      return hasRole('citizen');
+    }
+
+    function changedKeys() {
+      return request.resource.data.diff(resource.data).affectedKeys();
+    }
+
+    match /users/{uid} {
+      allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
+      // Residents create their own profile when they register; admins create
+      // maintenance profiles.
+      allow create: if isAdmin()
+        || (signedIn()
+          && request.auth.uid == uid
+          && request.resource.data.role == 'citizen'
+          && request.resource.data.active == true
+          && request.resource.data.email == request.auth.token.email);
+      allow update: if isAdmin()
+        || (signedIn() && request.auth.uid == uid && changedKeys().hasOnly(['name', 'updatedAt']));
+      allow delete: if isAdmin();
+    }
+
+    // Public crew directory: names and teams only.
+    match /crews/{uid} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /reports/{reportId} {
+      allow read: if true;
+      allow create: if (isAdmin() && reportId.matches('RPT-[0-9]+'))
+        || isCitizen()
+        && reportId.matches('RPT-[0-9]+')
+        && request.resource.data.id == reportId
+        && request.resource.data.reporterId == request.auth.uid
+        && request.resource.data.status == 'submitted'
+        && request.resource.data.assignedTo == null;
+      allow update: if isAdmin()
+        || (isCrew()
+          && resource.data.assignedTo == request.auth.uid
+          && request.resource.data.assignedTo == request.auth.uid
+          && changedKeys().hasOnly(['status', 'history', 'repair', 'updatedAt'])
+          && ((resource.data.status == 'assigned' && request.resource.data.status == 'in_progress')
+            || (resource.data.status == 'in_progress' && request.resource.data.status == 'repair_submitted')));
+      allow delete: if isAdmin();
+    }
+
+    // Report ID sequence (RPT-1054, RPT-1055, ...).
+    match /counters/{name} {
+      allow read: if signedIn();
+      allow create: if isAdmin();
+      allow update: if isAdmin()
+        || (isCitizen() && request.resource.data.next == resource.data.next + 1);
+    }
+
+    // Internal staff notes on reports.
+    match /notes/{noteId} {
+      allow read, create, delete: if isAdmin();
+      allow update: if false;
+    }
+
+    // Resized photos (stored as data URLs to stay on the free plan).
+    match /photos/{photoId} {
+      allow read: if true;
+      allow create: if (isCitizen() || isCrew() || isAdmin())
+        && request.resource.data.uploadedBy == request.auth.uid
+        && request.resource.data.src is string
+        && request.resource.data.src.size() < 900000;
+      allow delete: if isAdmin();
+    }
+  }
+}

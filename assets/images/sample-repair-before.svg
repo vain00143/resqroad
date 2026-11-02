@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 480" role="img" aria-label="Sample photo: road damage before repair">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f6e7da"/>
+      <stop offset="1" stop-color="#efc88b"/>
+    </linearGradient>
+    <linearGradient id="road" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5a524d"/>
+      <stop offset="1" stop-color="#2e2825"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="480" fill="url(#sky)"/>
+  <path d="M0 250 Q160 205 320 238 T640 226 V480 H0Z" fill="#e4a46f" opacity=".45"/>
+  <path d="M270 236 L370 236 L640 480 L0 480Z" fill="url(#road)"/>
+  <path d="M316 250 h8 l6 40 h-20Z M308 318 h24 l8 62 h-40Z M298 412 h44 l8 68 h-60Z" fill="#efc88b" opacity=".7"/>
+  <ellipse cx="410" cy="398" rx="92" ry="28" fill="#120f0d"/>
+  <ellipse cx="410" cy="392" rx="70" ry="16" fill="#1d1816"/>
+  <path d="M318 402 l-26 18 M500 396 l34 14 M380 372 l-12 -16 M446 372 l10 -18 M262 430 l-30 8" stroke="#1a1513" stroke-width="5" stroke-linecap="round"/>
+  <path d="M188 360 l18 -60 l18 60Z" fill="#cf5c36"/>
+  <path d="M195 336 h22 M191 349 h30" stroke="#fff" stroke-width="6"/>
+  <rect x="180" y="358" width="52" height="8" rx="2" fill="#7b3621"/>
+</svg>
